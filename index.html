@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERGO-SENSING PRO v7</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+
+<style>
+body{margin:0;background:#000;color:#fff;font-family:sans-serif}
+canvas{width:100vw;height:100vh}
+#status{position:absolute;top:10px;left:10px;background:#000;padding:8px}
+</style>
+</head>
+
+<body>
+
+<div id="status">INICIALIZANDO...</div>
+<video id="video" autoplay playsinline muted style="display:none"></video>
+<canvas id="canvas"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusTxt = document.getElementById('status');
+
+// =========================
+// CONFIG (IGUAL PYTHON)
+// =========================
+const BUFFER_SIZE = 8;
+const historial = Array.from({length:33}, ()=>[]);
+const ultimosAngulos = {};
+
+const THRESHOLDS = {
+    cabeza:{yellow:15, red:25},
+    abdomen:{yellow:20, red:40},
+    extremities:{yellow:30, red:55},
+    default:{yellow:20, red:45}
+};
+
+// =========================
+// FILTRADO (IGUAL PYTHON)
+// =========================
+function filtrar(i, punto){
+    const h = historial[i];
+    h.push(punto);
+    if(h.length > BUFFER_SIZE) h.shift();
+
+    let avg=[0,0,0];
+    h.forEach(p=>{
+        avg[0]+=p.x;
+        avg[1]+=p.y;
+        avg[2]+=p.z;
+    });
+
+    return {
+        x:avg[0]/h.length,
+        y:avg[1]/h.length,
+        z:avg[2]/h.length
+    };
+}
+
+// =========================
+// ANGULO 3D (ROBUSTO)
+// =========================
+function angulo3D(a,b,c){
+    const v1={x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};
+    const v2={x:c.x-b.x,y:c.y-b.y,z:c.z-b.z};
+
+    const dot=v1.x*v2.x+v1.y*v2.y+v1.z*v2.z;
+    const m1=Math.hypot(v1.x,v1.y,v1.z);
+    const m2=Math.hypot(v2.x,v2.y,v2.z);
+
+    if(m1===0||m2===0) return 0;
+
+    let cos=dot/(m1*m2);
+    cos=Math.max(-1,Math.min(1,cos));
+
+    return Math.acos(cos)*180/Math.PI;
+}
+
+// =========================
+// COLOR (MISMA LÓGICA PYTHON)
+// =========================
+function getColor(parte, ang, offset, vis){
+
+    if(vis < 0.4){
+        ang = ultimosAngulos[parte] || 0;
+    }else{
+        ultimosAngulos[parte] = ang;
+    }
+
+    let conf;
+
+    if(THRESHOLDS[parte]){
+        conf = THRESHOLDS[parte];
+    }else if(/mano|pie|tobillo|codo|rodilla/.test(parte)){
+        conf = THRESHOLDS.extremities;
+    }else{
+        conf = THRESHOLDS.default;
+    }
+
+    const d = Math.abs(ang - (offset||0));
+
+    if(d > conf.red) return "red";
+    if(d > conf.yellow) return "yellow";
+    return "lime";
+}
+
+// =========================
+// POSE
+// =========================
+const pose = new Pose({
+    locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+});
+
+pose.setOptions({
+    modelComplexity:2,
+    smoothLandmarks:true,
+    minDetectionConfidence:0.5,
+    minTrackingConfidence:0.6
+});
+
+pose.onResults(onResults);
+
+// =========================
+// PROCESAMIENTO
+// =========================
+function onResults(res){
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+
+    if(!res.poseLandmarks) return;
+
+    const lm = res.poseLandmarks;
+
+    // suavizado
+    const p = {};
+    for(let i=0;i<33;i++){
+        p[i] = filtrar(i,lm[i]);
+    }
+
+    const pt = i=>({x:p[i].x*canvas.width, y:p[i].y*canvas.height});
+    const v = i=>lm[i].visibility;
+
+    const h_med = {
+        x:(p[11].x+p[12].x)/2,
+        y:(p[11].y+p[12].y)/2,
+        z:(p[11].z+p[12].z)/2
+    };
+
+    const c_med = {
+        x:(p[23].x+p[24].x)/2,
+        y:(p[23].y+p[24].y)/2,
+        z:(p[23].z+p[24].z)/2
+    };
+
+    const v_down = {x:c_med.x,y:c_med.y+0.5,z:c_med.z};
+
+    const ang = {
+        cabeza: angulo3D(p[0],h_med,c_med),
+        abdomen: angulo3D(h_med,c_med,v_down),
+        brazo_der: angulo3D(p[12],p[14],p[16]),
+        brazo_izq: angulo3D(p[11],p[13],p[15]),
+        pierna_der: angulo3D(p[24],p[26],p[28]),
+        pierna_izq: angulo3D(p[23],p[25],p[27])
+    };
+
+    function draw(a,b,parte,ang,vis){
+        ctx.beginPath();
+        ctx.moveTo(a.x,a.y);
+        ctx.lineTo(b.x,b.y);
+        ctx.strokeStyle = getColor(parte,ang,0,vis);
+        ctx.lineWidth = 6;
+        ctx.stroke();
+    }
+
+    // tronco
+    draw(pt(0), {x:h_med.x*canvas.width,y:h_med.y*canvas.height}, "cabeza", ang.cabeza, v(0));
+    draw({x:h_med.x*canvas.width,y:h_med.y*canvas.height}, {x:c_med.x*canvas.width,y:c_med.y*canvas.height}, "abdomen", ang.abdomen, 1);
+
+    // brazos
+    draw(pt(12), pt(14), "brazo_der", ang.brazo_der, v(14));
+    draw(pt(11), pt(13), "brazo_izq", ang.brazo_izq, v(13));
+
+    // piernas
+    draw(pt(24), pt(26), "pierna_der", ang.pierna_der, v(26));
+    draw(pt(23), pt(25), "pierna_izq", ang.pierna_izq, v(25));
+
+    statusTxt.innerText = "ACTIVO";
+}
+
+// =========================
+// LOOP
+// =========================
+async function loop(){
+    await pose.send({image:video});
+    requestAnimationFrame(loop);
+}
+
+// =========================
+// CAMARA
+// =========================
+navigator.mediaDevices.getUserMedia({video:true})
+.then(stream=>{
+    video.srcObject = stream;
+    video.onloadeddata = loop;
+});
+</script>
+
+</body>
+</html>
