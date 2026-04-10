@@ -1,0 +1,33 @@
+async function iniciarApp(fuente) {
+    const menu = document.getElementById('menu-inicial');
+    const app = document.getElementById('contenedor-analisis');
+
+    if (fuente === 'camara') {
+        try {
+            // PASO CRÍTICO: Solicitar permiso antes de mostrar la interfaz
+            status.innerText = "SOLICITANDO CÁMARA...";
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode } 
+            });
+            
+            // Si llegamos aquí, el permiso fue concedido
+            stream.getTracks().forEach(track => track.stop()); // Cerramos prueba
+            
+            menu.style.display = 'none';
+            app.style.display = 'block';
+            await habilitarCamara();
+            
+        } catch (err) {
+            console.error(err);
+            alert("BLOQUEO DE CÁMARA: " + err.name + "\n\nPor favor, asegúrate de estar usando HTTPS y de haber permitido el acceso a la cámara en los ajustes del navegador.");
+        }
+    } else {
+        menu.style.display = 'none';
+        app.style.display = 'block';
+        document.getElementById('btn-flip').style.display = 'none';
+        const file = document.getElementById('fileInput').files[0];
+        video.src = URL.createObjectURL(file);
+        video.play();
+        renderFrame();
+    }
+}
