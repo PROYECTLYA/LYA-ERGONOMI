@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ERGO-SENSING PRO v7 EMPRESA</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { background:#0d1117; color:white; margin:0; overflow:hidden; font-family:sans-serif; }
+
+#menu-inicial { 
+    position:absolute; width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#0d1117; z-index:2000;
+}
+
+.btn-menu { width:85%; max-width:320px; padding:20px; margin:12px; border-radius:15px; font-weight:bold; }
+
+#contenedor-analisis { display:none; width:100vw; height:100vh; position:relative; background:#000; }
+
+canvas { width:100%; height:100%; object-fit:contain; }
+video { display:none; }
+
+.status-badge {
+    position:absolute; top:15px; left:15px;
+    background:rgba(0,0,0,0.7);
+    padding:8px 15px; border-radius:10px;
+    border-left:4px solid #00ff00;
+    font-size:12px; z-index:3000; font-weight:bold;
+}
+
+.barra-controles {
+    position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+    display:flex; gap:12px; padding:15px;
+    background:rgba(255,255,255,0.1);
+    backdrop-filter:blur(15px);
+    border-radius:35px;
+    z-index:4000;
+    width:92%; justify-content:space-around;
+}
+
+.btn-circular {
+    width:65px; height:65px; border-radius:50%;
+    border:none;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    font-size:10px; font-weight:bold;
+}
+
+.btn-back { background:#34495e; }
+.btn-flip { background:#00d2d3; color:#000; }
+.btn-calib { background:#f1c40f; color:#000; }
+.btn-record { background:#ff4d4d; width:85px; border-radius:30px; }
+
+.recording { animation:pulse 1s infinite; background:white; color:#ff4d4d; }
+
+@keyframes pulse { 50% { transform:scale(0.92); } }
+</style>
+</head>
+
+<body>
+
+<div id="menu-inicial">
+<h2 style="color:#00d2d3;">ERGO-SENSING PRO</h2>
+<button class="btn btn-success btn-menu" onclick="iniciarApp('camara')">🎥 EN VIVO</button>
+<button class="btn btn-primary btn-menu" onclick="fileInput.click()">📁 VIDEO</button>
+<input type="file" id="fileInput" hidden accept="video/*" onchange="iniciarApp('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+<div class="status-badge" id="txt-status">INICIALIZANDO...</div>
+<canvas id="output_canvas"></canvas>
+<video id="input_video" playsinline muted></video>
+
+<div class="barra-controles">
+<button class="btn-circular btn-back" onclick="location.reload()">⬅</button>
+<button id="btn-flip" class="btn-circular btn-flip" onclick="cambiarCamara()">🔄</button>
+<button class="btn-circular btn-calib" onclick="calibrar()">⚖️</button>
+<button id="recordBtn" class="btn-circular btn-record" onclick="toggleGrabacion()">🔴</button>
+</div>
+</div>
+
+<script>
+const video = document.getElementById('input_video');
+const canvas = document.getElementById('output_canvas');
+const ctx = canvas.getContext('2d');
+const txtStatus = document.getElementById('txt-status');
+
+let currentFacingMode = "user";
+let cameraInstance = null;
+let poseSolver = null;
+let isVideoFile = false;
+
+// =====================
+// BUFFER TIPO PYTHON
+// =====================
+const BUFFER = 8;
+const historial = Array.from({length:33},()=>[]);
+const ultimosAngulos = {};
+let offsets = {};
+
+// =====================
+// FILTRO
+// =====================
+function filtrar(i,p){
+    historial[i].push(p);
+    if(historial[i].length>BUFFER) historial[i].shift();
+
+    let x=0,y=0,z=0;
+    historial[i].forEach(e=>{x+=e.x;y+=e.y;z+=e.z});
+
+    return {x:x/historial[i].length,y:y/historial[i].length,z:z/historial[i].length};
+}
+
+// =====================
+// ANGULO 3D
+// =====================
+function angulo(a,b,c){
+    const v1={x:a.x-b.x,y:a.y-b.y,z:a.z-b.z};
+    const v2={x:c.x-b.x,y:c.y-b.y,z:c.z-b.z};
+
+    const dot=v1.x*v2.x+v1.y*v2.y+v1.z*v2.z;
+    const m1=Math.hypot(v1.x,v1.y,v1.z);
+    const m2=Math.hypot(v2.x,v2.y,v2.z);
+
+    if(m1===0||m2===0) return 0;
+
+    let cos=dot/(m1*m2);
+    cos=Math.max(-1,Math.min(1,cos));
+
+    return Math.acos(cos)*180/Math.PI;
+}
+
+// =====================
+// COLOR ERGONÓMICO
+// =====================
+function getColor(parte,ang,vis){
+    if(vis<0.4){
+        ang = ultimosAngulos[parte] || 0;
+    }else{
+        ultimosAngulos[parte]=ang;
+    }
+
+    const d = Math.abs(ang - (offsets[parte]||0));
+
+    if(d>50) return "red";
+    if(d>30) return "orange";
+    if(d>15) return "yellow";
+    return "lime";
+}
+
+// =====================
+// POSE
+// =====================
+function initPose(){
+    poseSolver = new Pose({
+        locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+    });
+
+    poseSolver.setOptions({
+        modelComplexity:2,
+        smoothLandmarks:true,
+        minDetectionConfidence:0.5,
+        minTrackingConfidence:0.6
+    });
+
+    poseSolver.onResults(render);
+}
+
+// =====================
+// RENDER
+// =====================
+function render(res){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.save();
+
+    if(!isVideoFile && currentFacingMode==="user"){
+        ctx.translate(canvas.width,0);
+        ctx.scale(-1,1);
+    }
+
+    ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+
+    if(res.poseLandmarks){
+        const lm=res.poseLandmarks;
+        const p={};
+
+        for(let i=0;i<33;i++) p[i]=filtrar(i,lm[i]);
+
+        const pt=i=>({x:p[i].x*canvas.width,y:p[i].y*canvas.height});
+        const v=i=>lm[i].visibility;
+
+        const h_med={
+            x:(p[11].x+p[12].x)/2,
+            y:(p[11].y+p[12].y)/2,
+            z:(p[11].z+p[12].z)/2
+        };
+
+        const c_med={
+            x:(p[23].x+p[24].x)/2,
+            y:(p[23].y+p[24].y)/2,
+            z:(p[23].z+p[24].z)/2
+        };
+
+        const angCabeza=angulo(p[0],h_med,c_med);
+        const angTronco=angulo(h_med,c_med,{x:c_med.x,y:c_med.y+0.5,z:c_med.z});
+
+        function draw(a,b,tipo,ang,vis){
+            ctx.beginPath();
+            ctx.moveTo(a.x,a.y);
+            ctx.lineTo(b.x,b.y);
+            ctx.strokeStyle=getColor(tipo,ang,vis);
+            ctx.lineWidth=6;
+            ctx.stroke();
+        }
+
+        draw(pt(0),{x:h_med.x*canvas.width,y:h_med.y*canvas.height},"cabeza",angCabeza,v(0));
+        draw({x:h_med.x*canvas.width,y:h_med.y*canvas.height},{x:c_med.x*canvas.width,y:c_med.y*canvas.height},"tronco",angTronco,1);
+
+        txtStatus.innerText="ANÁLISIS ACTIVO";
+    }
+
+    ctx.restore();
+}
+
+// =====================
+// ARRANQUE
+// =====================
+async function iniciarApp(tipo){
+
+    initPose();
+
+    document.getElementById('menu-inicial').style.display='none';
+    document.getElementById('contenedor-analisis').style.display='block';
+
+    if(tipo==="camara"){
+        isVideoFile=false;
+        await habilitarCamara();
+    }else{
+        isVideoFile=true;
+        video.src=URL.createObjectURL(fileInput.files[0]);
+        video.play();
+        loopVideo();
+    }
+}
+
+async function habilitarCamara(){
+    if(cameraInstance) await cameraInstance.stop();
+
+    cameraInstance = new Camera(video,{
+        onFrame: async ()=>{
+            canvas.width=video.videoWidth;
+            canvas.height=video.videoHeight;
+            await poseSolver.send({image:video});
+        },
+        facingMode:currentFacingMode
+    });
+
+    await cameraInstance.start();
+}
+
+async function cambiarCamara(){
+    currentFacingMode = currentFacingMode==="user"?"environment":"user";
+    await habilitarCamara();
+}
+
+function loopVideo(){
+    if(!video.paused){
+        canvas.width=video.videoWidth;
+        canvas.height=video.videoHeight;
+        poseSolver.send({image:video});
+        requestAnimationFrame(loopVideo);
+    }
+}
+
+// =====================
+// CALIBRACIÓN
+// =====================
+function calibrar(){
+    offsets = {...ultimosAngulos};
+    txtStatus.innerText="CALIBRADO";
+}
+
+// =====================
+// GRABACIÓN
+// =====================
+let rec; let chunks=[];
+
+function toggleGrabacion(){
+    const b=document.getElementById('recordBtn');
+
+    if(!rec || rec.state==="inactive"){
+        chunks=[];
+        rec=new MediaRecorder(canvas.captureStream(30));
+        rec.ondataavailable=e=>chunks.push(e.data);
+        rec.onstop=()=>{
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(new Blob(chunks));
+            a.download="reporte.webm";
+            a.click();
+        };
+        rec.start();
+        b.classList.add("recording");
+    }else{
+        rec.stop();
+        b.classList.remove("recording");
+    }
+}
+</script>
+
+</body>
+</html>
