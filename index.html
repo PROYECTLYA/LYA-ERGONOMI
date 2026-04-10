@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ERGO-SENSING PRO v8.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        
+        #menu-inicial { display: flex; width: 100%; height: 100vh; flex-direction: column; align-items: center; justify-content: center; background: #0d1117; position: fixed; z-index: 5000; transition: 0.5s; }
+        .btn-menu { width: 85%; max-width: 320px; padding: 18px; margin: 10px; border-radius: 12px; font-weight: bold; border: none; font-size: 1.1rem; }
+
+        #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        video { display: none; }
+
+        /* HUD de Estado Mejorado */
+        .status-badge { 
+            position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); 
+            color: #fff; padding: 12px 18px; border-radius: 10px; 
+            border-left: 5px solid #fff; font-size: 12px; z-index: 3000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .barra-controles { 
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); 
+            display: flex; gap: 12px; z-index: 4000; width: 92%; justify-content: center;
+        }
+
+        .btn-circular { 
+            width: 62px; height: 62px; border-radius: 50%; border: none; 
+            font-size: 10px; font-weight: bold; color: white; 
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;
+        }
+        .btn-circular:active { transform: scale(0.95); }
+
+        /* Estilo para botón grabar activo */
+        .rec-active { background: #fff !important; color: #ff4d4d !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 77, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); } }
+    </style>
+</head>
+<body>
+
+<div id="menu-inicial">
+    <h1 style="color: #00ff00; letter-spacing: 1px; margin-bottom: 0;">ERGO-SENSING PRO</h1>
+    <p style="color: #8b949e; margin-bottom: 40px;">v8.0 - Flujo Bajo Demanda</p>
+    <button class="btn btn-menu" style="background:#27ae60; color:white;" onclick="iniciarApp('camara')">🎥 INICIAR CÁMARA</button>
+    <button class="btn btn-menu" style="background:#2980b9; color:white;" onclick="document.getElementById('fileInput').click()">📁 VIDEO LOCAL</button>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="iniciarApp('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">PASO 1: POSICIONE A LA PERSONA</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" playsinline muted autocomplete></video>
+
+    <div class="barra-controles">
+        <button class="btn-circular btn-dark" onclick="location.reload()">MENÚ</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">🔄<br>CAM</button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="UI_IniciarCalibracion()">⚖️<br>CALIB</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d;" onclick="toggleGrabacion()">🔴<br>REC</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    const btnCalib = document.getElementById('btn-calib');
+    const btnRec = document.getElementById('recordBtn');
+    
+    let currentFacingMode = "environment"; 
+    let poseSolver = null;
+    let streamActual = null;
+    let isStarting = false;
+
+    // --- FLAGS DE FLUJO LOGICO ---
+    let IA_Activada = false;       // Capa 2: Muestra esqueleto
+    let CalibracionOK = false;     // Capa 3: Esqueleto Verde
+    let GrabandoYCalculando = false;// Capa 4: Cálculos y Semáforo
+
+    // --- DATOS BIOMECÁNICOS ---
+    let calibrando_proceso = false;
+    let startTimeCalib = 0;
+    let offsets = {};
+    let bases = {};
+    const THRESHOLDS = { 'cabeza': { amar: 15, rojo: 25 }, 'abdomen': { amar: 20, rojo: 40 }, 'ext': { amar: 30, rojo: 55 } };
+    const historial = Array.from({ length: 33 }, () => []);
+
+    // --- PASO 1: APAGADO Y ENCENDIDO LIMPIO DE CÁMARA ---
+    async function apagarCamara() {
+        if (streamActual) {
+            streamActual.getTracks().forEach(track => track.stop());
+            streamActual = null;
+        }
+        video.pause();
+        video.srcObject = null;
+        video.load();
+        await new Promise(r => setTimeout(r, 500)); // Espera de seguridad hardware
+    }
+
+    async function iniciarApp(fuente) {
+        if (isStarting) return;
+        isStarting = true;
+        document.getElementById('menu-inicial').style.opacity = '0';
+        setTimeout(() => document.getElementById('menu-inicial').style.display = 'none', 500);
+        document.getElementById('contenedor-analisis').style.display = 'block';
+
+        if (fuente === 'camara') {
+            await apagarCamara();
+            try {
+                // Constraints relajadas para compatibilidad móvil total
+                streamActual = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
+                });
+                video.srcObject = streamActual;
+                
+                video.onloadedmetadata = async () => {
+                    try {
+                        await video.play();
+                        actualizarHUD("PASO 1: POSICIONE A LA PERSONA Y PULSE CALIB", "#fff");
+                        requestAnimationFrame(renderLoopNoIA); // Loop simple de video
+                        isStarting = false;
+                    } catch(e) { isStarting = false; }
+                };
+            } catch (err) {
+                actualizarHUD("ERROR DE CÁMARA", "#f00");
+                isStarting = false;
+            }
+        } else {
+            // Lógica para video local
+            const file = document.getElementById('fileInput').files[0];
+            if(!file) { location.reload(); return; }
+            video.src = URL.createObjectURL(file);
+            actualizarHUD("PASO 1: VIDEO CARGADO. PULSE CALIB", "#fff");
+            video.play(); requestAnimationFrame(renderLoopNoIA);
+            isStarting = false;
+        }
+    }
+
+    // --- PASO 2 Y 3: INTERFAZ DE CALIBRACIÓN ---
+    function UI_IniciarCalibracion() {
+        if (calibrando_proceso || isStarting) return;
+        
+        actualizarHUD("INICIALIZANDO MOTOR IA...", "#f1c40f");
+        IA_Activada = true; // Activamos el render con IA
+        calibrando_proceso = true; // Iniciamos cuenta regresiva
+        CalibracionOK = false;
+        GrabandoYCalculando = false;
+        startTimeCalib = 0; // Reset timer
+        bases = {}; // Limpiar datos previos
+
+        // Deshabilitar botones durante proceso
+        btnCalib.style.opacity = "0.5";
+        btnRec.style.opacity = "0.5";
+    }
+
+    // --- PASO 4: INTERFAZ DE GRABACIÓN Y CÁLCULOS ---
+    let recorder; let chunks = [];
+    function toggleGrabacion() {
+        if (!CalibracionOK || calibrando_proceso) {
+            alert("Primero debe calibrar la postura base."); return;
+        }
+
+        if (!recorder || recorder.state === "inactive") {
+            // INICIAR GRABACIÓN Y CÁLCULOS
+            chunks = [];
+            GrabandoYCalculando = true; // <-- AQUÍ SE ACTIVAN LOS CÁLCULOS MATEMÁTICOS
+            
+            // Captura canvas a 20fps para ahorrar CPU
+            recorder = new MediaRecorder(canvas.captureStream(20), { mimeType: 'video/webm;codecs=vp8' });
+            recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `ERGO_${Date.now()}.webm`; link.click();
+            };
+            
+            recorder.start();
+            btnRec.classList.add('rec-active');
+            btnRec.innerHTML = "⏹<br>STOP";
+            actualizarHUD("GRABANDO Y ANALIZANDO RIESGO...", "#ff4d4d");
+        } else {
+            // DETENER GRABACIÓN Y CÁLCULOS
+            recorder.stop();
+            GrabandoYCalculando = false; // <-- DESACTIVAMOS CÁLCULOS
+            btnRec.classList.remove('rec-active');
+            btnRec.innerHTML = "🔴<br>REC";
+            actualizarHUD("ANÁLISIS FINALIZADO. VIDEO DESCARGADO.", "#00ff00");
+        }
+    }
+
+    // --- MOTOR DE DIBUJO Y LÓGICA (onResults) ---
+    function onResults(res) {
+        if (!IA_Activada || !res.poseLandmarks) return;
+        
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Espejo
+        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        
+        // Suavizado rápido (5 frames)
+        const p = lm.map((l, i) => {
+            historial[i].push(l);
+            if(historial[i].length > 5) historial[i].shift();
+            const s = historial[i].reduce((a,b)=>({x:a.x+b.x, y:a.y+b.y, z:a.z+b.z}),{x:0,y:0,z:0});
+            return {x: s.x/historial[i].length, y: s.y/historial[i].length, z: s.z/historial[i].length};
+        });
+
+        const pt = (i) => ({ x: p[i].x * w, y: p[i].y * h });
+        const h_m = { x:(p[11].x+p[12].x)/2, y:(p[11].y+p[12].y)/2, z:(p[11].z+p[12].z)/2 };
+        const c_m = { x:(p[23].x+p[24].x)/2, y:(p[23].y+p[24].y)/2, z:(p[23].z+p[24].z)/2 };
+
+        // --- LÓGICA DE CALIBRACIÓN (Acumulación de datos) ---
+        if (calibrando_proceso) {
+            if (startTimeCalib === 0) startTimeCalib = Date.now();
+            const segs = Math.max(0, Math.ceil((5000 - (Date.now() - startTimeCalib)) / 1000));
+            actualizarHUD(`CALIBRANDO POSTURA BASE: ${segs}s`, "#f1c40f");
+            
+            // Calculamos ángulos base (Necesario para promediar)
+            const angBase = calcularCodigosAngulares(p, h_m, c_m);
+            Object.keys(angBase).forEach(k => { if(!bases[k]) bases[k]=[]; bases[k].push(angBase[k]); });
+            
+            if (Date.now() - startTimeCalib > 5000) {
+                // Finalizar Calibración
+                Object.keys(bases).forEach(k => offsets[k] = bases[k].reduce((a,b)=>a+b)/bases[k].length);
+                calibrando_proceso = false; 
+                CalibracionOK = true; // Capa 3 activada
+                actualizarHUD("CALIBRACIÓN OK. POSTURA EN VERDE. PULSE REC.", "#00ff00");
+                
+                // Re-habilitar botones
+                btnCalib.style.opacity = "1";
+                btnRec.style.opacity = "1";
+            }
+        }
+
+        // --- DIBUJO JERÁRQUICO DE VECTORES ---
+        const ph = {x:h_m.x*w, y:h_m.y*h}, pc = {x:c_m.x*w, y:c_m.y*h};
+        
+        // Color por defecto (Gris Capa 2)
+        let colorVectores = "rgba(200,200,200,0.6)";
+        if (CalibracionOK) colorVectores = "#00ff00"; // Verde Capa 3
+
+        const drawV = (p1, p2, k, th=6) => {
+            ctx.lineWidth = th; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            
+            // --- CÁLCULOS Y SEMAFORIZACIÓN (Solo en Capa 4: Grabando) ---
+            if (GrabandoYCalculando) {
+                // Recalculamos ángulo actual para este frame
+                const angulosFrame = calcularCodigosAngulares(p, h_m, c_m);
+                const a = angulosFrame[k] || angulosFrame['ext']; // Fallback para extremidades
+                const diff = Math.abs(a - (offsets[k]||0));
+                
+                // Mismo diccionario de Python
+                const c = THRESHOLDS[k] || THRESHOLDS['ext'];
+                if (diff > c.rojo) ctx.strokeStyle = "#ff0000"; // Rojo
+                else if (diff > c.amar) ctx.strokeStyle = "#ff8c00"; // Naranja/Amarillo fuerte
+                else ctx.strokeStyle = "#00ff00"; // Verde
+            } else {
+                ctx.strokeStyle = colorVectores; // Gris o Verde estático
+            }
+            ctx.stroke();
+        };
+
+        // Jerarquía de dibujo
+        drawV(pt(0), ph, 'cabeza', 5);
+        drawV(ph, pc, 'abdomen', 10);
+        drawV(pt(11), pt(12), 'tronco', 8); // Hombros
+        drawV(pt(23), pt(24), 'tronco', 8); // Cadera
+        
+        // Extremidades (Usan fallback 'ext')
+        drawV(pt(12), pt(14), 'brazo_d');
+        drawV(pt(14), pt(16), 'brazo_d');
+        drawV(pt(11), pt(13), 'brazo_i');
+        drawV(pt(13), pt(15), 'brazo_i');
+        drawV(pt(24), pt(26), 'pierna_d');
+        drawV(pt(23), pt(25), 'pierna_i');
+
+        ctx.restore();
+    }
+
+    // --- FUNCIONES AUXILIARES MATEMÁTICAS ---
+    function calcularCodigosAngulares(p, h_m, c_m) {
+        // Encapsulamos los cálculos para llamarlos solo cuando sea necesario
+        return {
+            'cabeza': calcAng(p[0], h_m, c_m),
+            'abdomen': calcAng(h_m, c_m, {x:c_m.x, y:c_m.y+0.5, z:c_m.z}), // Inclinación vertical
+            'brazo_d': calcAng(p[12], p[14], p[16]),
+            'brazo_i': calcAng(p[11], p[13], p[15]),
+            'pierna_d': calcAng(p[24], p[26], p[28]),
+            'pierna_i': calcAng(p[23], p[25], p[27])
+        };
+    }
+
+    function calcAng(a,b,c) {
+        const v1={x:a.x-b.x,y:a.y-b.y,z:a.z-b.z}, v2={x:c.x-b.x,y:c.y-b.y,z:c.z-b.z};
+        const dot=v1.x*v2.x+v1.y*v2.y+v1.z*v2.z, m1=Math.sqrt(v1.x**2+v1.y**2+v1.z**2), m2=Math.sqrt(v2.x**2+v2.y**2+v2.z**2);
+        return Math.acos(Math.max(-1,Math.min(1,dot/(m1*m2+1e-6))))*(180/Math.PI);
+    }
+
+    // --- BUCLES DE RENDERIZADO OPTIMIZADOS ---
+    async function renderLoopIA() { 
+        // Capas 2, 3 y 4 (MediaPipe Pose activo)
+        if(!video.paused && streamActual && IA_Activada){ 
+            canvas.width=video.videoWidth; canvas.height=video.videoHeight; 
+            await poseSolver.send({image:video}); 
+            requestAnimationFrame(renderLoopIA); 
+        } 
+    }
+
+    function renderLoopNoIA() {
+        // Capa 1 (Solo video, CPU libre)
+        if (!video.paused && streamActual && !IA_Activada) {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(renderLoopNoIA);
+        }
+    }
+    
+    // --- UTILIDADES ---
+    function actualizarHUD(txt, color) { txtStatus.innerText = txt; txtStatus.style.borderLeftColor = color; }
+    
+    async function cambiarCamara() { 
+        if (isStarting) return;
+        CalibracionOK = false; IA_Activada = false; // Reset flujos
+        currentFacingMode = (currentFacingMode === "user") ? "environment" : "user"; 
+        await iniciarApp('camara'); 
+    }
+</script>
+</body>
+</html>
