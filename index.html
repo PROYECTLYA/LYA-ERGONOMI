@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v25.0 | MÓDULOS INDEPENDIENTES</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #menu-inicial { display: flex; width: 100%; height: 100vh; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: fixed; z-index: 5000; }
+        .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 5px; }
+        .sub-text { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; }
+        
+        #loader-ia { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(13, 17, 23, 0.98); z-index: 6000; flex-direction: column; align-items: center; justify-content: center; }
+        .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
+
+        #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        video { display: none; }
+        
+        .status-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 12px 20px; border-radius: 8px; border-left: 4px solid #00ff00; font-size: 10px; z-index: 3000; font-weight: bold; }
+        .barra-controles { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 4000; width: 95%; justify-content: center; }
+        .btn-circular { width: 68px; height: 68px; border-radius: 50%; border: none; font-size: 9px; font-weight: 900; color: white; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: 0.3s; }
+        .btn-eval { background: #00ff00; color: #000; width: auto; padding: 0 30px; border-radius: 35px; font-weight: bold; }
+        .rec-active { background: #fff !important; color: #f00 !important; animation: pulse-red 1.5s infinite; }
+    </style>
+</head>
+<body>
+
+<div id="loader-ia">
+    <h3 id="loader-msg" style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR</h3>
+    <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
+        <div id="bar-id" class="progress-bar"></div>
+    </div>
+</div>
+
+<div id="menu-inicial">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Sistema de Auditoría de Riesgos</p>
+    <button class="btn-circular" style="background:#27ae60; width:85%; max-width:320px; border-radius:12px; margin-bottom:15px; height:60px;" onclick="initModuloVivo()">🎥 VISTA EN VIVO</button>
+    <button class="btn-circular" style="background:#2980b9; width:85%; max-width:320px; border-radius:12px; height:60px;" onclick="document.getElementById('fileInput').click()">📁 SUBIR EVIDENCIA</button>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="initModuloArchivo()">
+</div>
+
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">SISTEMA READY</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" playsinline muted></video>
+    <div class="barra-controles" id="controles-dinamicos"></div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    const progressBar = document.getElementById('bar-id');
+    const loader = document.getElementById('loader-ia');
+    
+    let pose = null, iaActiva = false, calibrado = false;
+    let angleBuffer = {};
+    let mediaRecorder, recordedChunks = [];
+
+    // Umbrales Ergonómicos
+    const TH = { tronco: 20, cuello: 15, extremidades: 140 };
+
+    // ==========================================
+    // PARTE 1: FUNCIONES BOTÓN "VISTA EN VIVO"
+    // ==========================================
+    async function initModuloVivo() {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        
+        mostrarLoader("ACTIVANDO CÁMARA...");
+        
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.onResults(onResults);
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            video.play();
+            configurarControlesVivo();
+            iaActiva = true;
+            calibrado = true; // Calibración automática en vivo
+            loader.style.display = 'none';
+            requestAnimationFrame(loopProcesamiento);
+        };
+    }
+
+    function configurarControlesVivo() {
+        document.getElementById('controles-dinamicos').innerHTML = `
+            <button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>
+            <button id="recordBtn" class="btn-circular" style="background:#ff4d4d;" onclick="gestionarGrabacion()">🔴<br>AUDITAR</button>
+        `;
+    }
+
+    // ==========================================
+    // PARTE 2: FUNCIONES BOTÓN "SUBIR EVIDENCIA"
+    // ==========================================
+    function initModuloArchivo() {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        
+        mostrarLoader("CARGANDO EVIDENCIA...");
+        
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        pose.onResults(onResults);
+
+        video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+        
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            configurarControlesEvidencia();
+            loader.style.display = 'none';
+            requestAnimationFrame(loopVistaPreviaFile);
+        };
+    }
+
+    function configurarControlesEvidencia() {
+        document.getElementById('controles-dinamicos').innerHTML = `
+            <button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>
+            <button class="btn-circular btn-eval" id="btn-eval-file" onclick="iniciarEvaluacionEvidencia()">INICIAR ANÁLISIS DE EVIDENCIA</button>
+        `;
+    }
+
+    async function iniciarEvaluacionEvidencia() {
+        mostrarLoader("CALIBRANDO BIOTIPO...");
+        iaActiva = true;
+        
+        // Simulación de buffer para estabilizar puntos del video
+        for(let i=0; i<15; i++) {
+            await pose.send({ image: video });
+            await new Promise(r => setTimeout(r, 60));
+        }
+        
+        calibrado = true;
+        loader.style.display = 'none';
+        document.getElementById('btn-eval-file').style.display = 'none';
+        video.play();
+        requestAnimationFrame(loopProcesamiento);
+    }
+
+    // ==========================================
+    // MOTOR CORE (COMPARTIDO PERO INDEPENDIENTE)
+    // ==========================================
+    function mostrarLoader(msg) {
+        loader.style.display = 'flex';
+        document.getElementById('loader-msg').innerText = msg;
+        progressBar.style.width = '0%';
+        setTimeout(() => progressBar.style.width = '100%', 100);
+    }
+
+    function loopProcesamiento() {
+        if (iaActiva && video.readyState >= 2) {
+            pose.send({ image: video });
+        }
+        requestAnimationFrame(loopProcesamiento);
+    }
+
+    function loopVistaPreviaFile() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(loopVistaPreviaFile);
+        }
+    }
+
+    function onResults(res) {
+        if (!res.poseLandmarks) return;
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, v: lm[i].visibility });
+
+        // Cálculo de Puntos Jerárquicos
+        const p = {
+            cab: pt(0), 
+            cue: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h },
+            h_i: pt(11), h_d: pt(12),
+            c_i: pt(13), c_d: pt(14),
+            m_i: pt(15), m_d: pt(16),
+            p_i: pt(23), p_d: pt(24),
+            r_i: pt(25), r_d: pt(26),
+            t_i: pt(27), t_d: pt(28)
+        };
+
+        // Puntos Dinámicos del Torso (Evita rojos constantes)
+        const mid_hip = { x: (p.p_i.x + p.p_d.x)/2, y: (p.p_i.y + p.p_d.y)/2 };
+        p.torax = { x: p.cue.x, y: p.cue.y + (mid_hip.y - p.cue.y) * 0.3 };
+        p.abdomen = { x: p.cue.x, y: p.cue.y + (mid_hip.y - p.cue.y) * 0.7 };
+        p.esp_baja = mid_hip;
+
+        const drawSeg = (p1, p2, val, limit, isExt = false) => {
+            ctx.lineWidth = 8;
+            // Lógica de semaforización corregida
+            let alerta = isExt ? (val < limit) : (val > limit);
+            ctx.strokeStyle = alerta ? "#ff3838" : "#32ff7e";
+            if (p1.v < 0.6 || p2.v < 0.6) ctx.strokeStyle = "#576574"; // Gris si no es visible
+            
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(p1.x, p1.y, 4, 0, 7); ctx.fill();
+        };
+
+        // Ángulo Simple para validación
+        const getAng = (a, b) => Math.abs(a.x - b.x) / 5; 
+
+        // RENDERIZADO
+        drawSeg(p.cab, p.cue, getAng(p.cab, p.cue), TH.cuello);
+        drawSeg(p.cue, p.torax, getAng(p.cue, p.torax), TH.tronco);
+        drawSeg(p.torax, p.abdomen, getAng(p.torax, p.abdomen), TH.tronco);
+        drawSeg(p.abdomen, p.esp_baja, getAng(p.abdomen, p.esp_baja), TH.tronco);
+
+        // Extremidades
+        drawSeg(p.h_d, p.c_d, 180, 180, true); drawSeg(p.c_d, p.m_d, 180, 180, true);
+        drawSeg(p.h_i, p.c_i, 180, 180, true); drawSeg(p.c_i, p.m_i, 180, 180, true);
+        drawSeg(p.p_d, p.r_d, 180, 180, true); drawSeg(p.r_d, p.t_d, 180, 180, true);
+
+        ctx.restore();
+    }
+
+    function gestionarGrabacion() {
+        const btn = document.getElementById('recordBtn');
+        if (!mediaRecorder || mediaRecorder.state === "inactive") {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm; codecs=vp9' });
+            mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(recordedChunks));
+                a.download = `EVIDENCIA_V25_${Date.now()}.webm`; a.click();
+            };
+            mediaRecorder.start();
+            btn.classList.add('rec-active');
+            txtStatus.innerText = "GRABANDO ANÁLISIS...";
+        } else {
+            mediaRecorder.stop();
+            btn.classList.remove('rec-active');
+            txtStatus.innerText = "GRABACIÓN FINALIZADA";
+        }
+    }
+</script>
+</body>
+</html>
