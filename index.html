@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v22.0 | AUDITORÍA INTEGRAL</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #menu-inicial { display: flex; width: 100%; height: 100vh; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: fixed; z-index: 5000; }
+        .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 0; }
+        
+        #pantalla-evaluacion { 
+            display: none; position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: rgba(13, 17, 23, 0.95); z-index: 7000; 
+            flex-direction: column; align-items: center; justify-content: center; 
+        }
+        .scanner-line { width: 80%; height: 3px; background: #00ff00; position: absolute; box-shadow: 0 0 20px #00ff00; animation: scan 2s infinite ease-in-out; }
+        @keyframes scan { 0%, 100% { top: 30%; opacity: 0; } 50% { top: 70%; opacity: 1; } }
+
+        #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        video { display: none; }
+        
+        .status-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 12px 20px; border-radius: 8px; border-left: 4px solid #00ff00; font-size: 10px; z-index: 3000; font-weight: bold; }
+        .barra-controles { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 4000; width: 95%; justify-content: center; }
+        .btn-circular { width: 68px; height: 68px; border-radius: 50%; border: none; font-size: 9px; font-weight: 900; color: white; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .btn-eval { background: #00ff00; color: #000; width: auto; padding: 0 30px; border-radius: 35px; font-weight: bold; }
+        .rec-active { background: #fff !important; color: #f00 !important; animation: pulse-red 1.5s infinite; }
+    </style>
+</head>
+<body>
+
+<div id="pantalla-evaluacion">
+    <div class="scanner-line"></div>
+    <h2 id="eval-status-text" style="color:#00ff00; letter-spacing: 4px;">CALIBRANDO CONEXIONES</h2>
+    <p style="color: #8b949e;" id="eval-subtext">Sincronizando Cabeza -> Cuello -> Espalda Baja...</p>
+</div>
+
+<div id="menu-inicial">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Sistema de Auditoría Ergonómica</p>
+    <button style="background:#27ae60; color:white; width:85%; max-width:320px; padding:18px; margin:10px; border-radius:12px; font-weight:bold; border:none;" onclick="prepararSistema('camara')">🎥 VISTA EN VIVO</button>
+    <button style="background:#2980b9; color:white; width:85%; max-width:320px; padding:18px; margin:10px; border-radius:12px; font-weight:bold; border:none;" onclick="document.getElementById('fileInput').click()">📁 SUBIR EVIDENCIA</button>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">STANDBY</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" playsinline muted></video>
+    <div class="barra-controles" id="controles-dinamicos"></div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const pantallaEval = document.getElementById('pantalla-evaluacion');
+    const controles = document.getElementById('controles-dinamicos');
+    const txtStatus = document.getElementById('txt-status');
+    
+    let pose = null, iaActiva = false;
+    let recordedChunks = [], mediaRecorder, grabando = false;
+    let smoothBuffer = {};
+    const BUF_SIZE = 5;
+
+    // Umbrales basados en el diagrama de jerarquía y normas ergonómicas
+    const TH = { 
+        cuello: 20, 
+        tronco: 20, // Afecta tórax y abdomen
+        hombros: 40, 
+        codos: 60, 
+        piernas: 45 
+    };
+
+    async function prepararSistema(fuente) {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.onResults(onResults);
+
+        if (fuente === 'camara') {
+            configurarBotonesVivo();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            video.play();
+            iaActiva = true;
+            requestAnimationFrame(loopProcesamiento);
+        } else {
+            configurarBotonesEvidencia();
+            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                video.currentTime = 1.0; // Captura postura de descanso
+                requestAnimationFrame(loopVistaPrevia);
+            };
+        }
+    }
+
+    function configurarBotonesEvidencia() {
+        controles.innerHTML = `
+            <button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>
+            <button class="btn-circular" style="background:#2ecc71;" onclick="togglePlay()">⏯️</button>
+            <button class="btn-circular btn-eval" id="btn-iniciar-eval" onclick="iniciarEvaluacion()">INICIAR EVALUACIÓN</button>
+            <button class="btn-circular" id="btn-descarga" style="background:#2980b9; display:none;" onclick="gestionarGrabacion()">💾</button>
+        `;
+    }
+
+    function configurarBotonesVivo() {
+        controles.innerHTML = `<button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>`;
+    }
+
+    function togglePlay() { video.paused ? video.play() : video.pause(); }
+
+    async function iniciarEvaluacion() {
+        pantallaEval.style.display = 'flex';
+        iaActiva = true;
+        // Pre-carga de buffers
+        for(let i=0; i<10; i++) {
+            await pose.send({ image: video });
+            await new Promise(r => setTimeout(r, 50));
+        }
+        pantallaEval.style.display = 'none';
+        document.getElementById('btn-descarga').style.display = 'flex';
+        document.getElementById('btn-iniciar-eval').style.display = 'none';
+        video.play();
+        requestAnimationFrame(loopProcesamiento);
+    }
+
+    function loopProcesamiento() {
+        if (iaActiva && video.readyState >= 2) {
+            pose.send({ image: video });
+        }
+        requestAnimationFrame(loopProcesamiento);
+    }
+
+    function loopVistaPrevia() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(loopVistaPrevia);
+        }
+    }
+
+    function getSmoothVal(key, newVal) {
+        if (!smoothBuffer[key]) smoothBuffer[key] = [];
+        smoothBuffer[key].push(newVal);
+        if (smoothBuffer[key].length > BUF_SIZE) smoothBuffer[key].shift();
+        return smoothBuffer[key].reduce((a, b) => a + b) / smoothBuffer[key].length;
+    }
+
+    function onResults(res) {
+        if (!res.poseLandmarks) return;
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, v: lm[i].visibility });
+
+        // --- MAPEO SEGÚN DIAGRAMA CARGADO ---
+        const p = {
+            cabeza: pt(0),
+            cuello: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h },
+            h_i: pt(11), h_d: pt(12),
+            c_i: pt(13), c_d: pt(14),
+            m_i: pt(15), m_d: pt(16),
+            mano_i: pt(19), mano_d: pt(20)
+        };
+
+        // Puntos del Torso (Cálculo proporcional entre hombros y cadera)
+        const cad_x = (lm[23].x + lm[24].x)/2 * w;
+        const cad_y = (lm[23].y + lm[24].y)/2 * h;
+        p.torax = { x: p.cuello.x, y: p.cuello.y + (cad_y - p.cuello.y) * 0.25 };
+        p.abdomen = { x: p.cuello.x, y: p.cuello.y + (cad_y - p.cuello.y) * 0.6 };
+        p.espalda_baja = { x: cad_x, y: cad_y };
+
+        // Piernas
+        p.p_i = pt(23); p.p_d = pt(24);
+        p.r_i = pt(25); p.r_d = pt(26);
+        p.t_i = pt(27); p.t_d = pt(28);
+        p.pie_i = pt(31); p.pie_d = pt(32);
+
+        // --- CÁLCULOS ERGONÓMICOS ---
+        const calcAng = (a, b, c) => {
+            const v1 = { x: a.x - b.x, y: a.y - b.y }, v2 = { x: c.x - b.x, y: c.y - b.y };
+            const m1 = Math.sqrt(v1.x**2 + v1.y**2), m2 = Math.sqrt(v2.x**2 + v2.y**2);
+            return Math.acos(Math.max(-1, Math.min(1, (v1.x*v2.x + v1.y*v2.y) / (m1 * m2)))) * (180 / Math.PI);
+        };
+
+        const angles = {
+            cuello: getSmoothVal('c', calcAng(p.cabeza, p.cuello, p.torax)),
+            tronco: getSmoothVal('t', calcAng(p.torax, p.espalda_baja, {x: p.espalda_baja.x, y: p.espalda_baja.y + 100})),
+            brazo_d: getSmoothVal('bd', calcAng({x: p.h_d.x, y: p.h_d.y + 100}, p.h_d, p.c_d)),
+            brazo_i: getSmoothVal(' bi', calcAng({x: p.h_i.x, y: p.h_i.y + 100}, p.h_i, p.c_i))
+        };
+
+        // --- FUNCIÓN DE DIBUJO CON SEMAFORIZACIÓN ---
+        const drawV = (p1, p2, val, limit) => {
+            ctx.lineWidth = 6;
+            // Si el ángulo supera el límite, cambia color y grosor
+            if (val > limit * 1.5) { ctx.strokeStyle = "#ff3838"; ctx.lineWidth = 12; }
+            else if (val > limit) { ctx.strokeStyle = "#fffa65"; ctx.lineWidth = 9; }
+            else { ctx.strokeStyle = "#32ff7e"; }
+            
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, 7); ctx.fill();
+        };
+
+        // --- RENDERIZADO DEL ESQUELETO (Siguiendo Diagrama) ---
+        // Cabeza -> Cuello -> Tórax -> Abdomen -> Espalda Baja
+        drawV(p.cabeza, p.cuello, angles.cuello, TH.cuello);
+        drawV(p.cuello, p.torax, angles.tronco, TH.tronco);
+        drawV(p.torax, p.abdomen, angles.tronco, TH.tronco);
+        drawV(p.abdomen, p.espalda_baja, angles.tronco, TH.tronco);
+
+        // Hombros -> Brazos -> Codos -> Antebrazos -> Muñecas
+        drawV(p.cuello, p.h_d, angles.brazo_d, TH.hombros);
+        drawV(p.h_d, p.c_d, angles.brazo_d, TH.hombros);
+        drawV(p.c_d, p.m_d, 0, 180);
+        drawV(p.m_d, p.mano_d, 0, 180);
+
+        drawV(p.cuello, p.h_i, angles.brazo_i, TH.hombros);
+        drawV(p.h_i, p.c_i, angles.brazo_i, TH.hombros);
+        drawV(p.c_i, p.m_i, 0, 180);
+        drawV(p.m_i, p.mano_i, 0, 180);
+
+        // Espalda Baja -> Piernas -> Rodillas -> Tobillos -> Pies
+        drawV(p.espalda_baja, p.p_d, 0, 180); drawV(p.p_d, p.r_d, 0, 180); drawV(p.r_d, p.t_d, 0, 180); drawV(p.t_d, p.pie_d, 0, 180);
+        drawV(p.espalda_baja, p.p_i, 0, 180); drawV(p.p_i, p.r_i, 0, 180); drawV(p.r_i, p.t_i, 0, 180); drawV(p.t_i, p.pie_i, 0, 180);
+
+        ctx.restore();
+    }
+
+    function gestionarGrabacion() {
+        if (!grabando) {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm; codecs=vp9' });
+            mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
+                a.download = `AUDITORIA_V22_${Date.now()}.webm`;
+                a.click();
+            };
+            mediaRecorder.start();
+            grabando = true;
+            document.getElementById('btn-descarga').classList.add('rec-active');
+            txtStatus.innerText = "GRABANDO ANÁLISIS...";
+        } else {
+            mediaRecorder.stop();
+            grabando = false;
+            document.getElementById('btn-descarga').classList.remove('rec-active');
+        }
+    }
+</script>
+</body>
+</html>
