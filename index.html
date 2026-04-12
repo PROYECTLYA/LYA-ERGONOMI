@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LYA-ERGO v21 PRO</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{margin:0;background:#0d1117;color:#fff;font-family:'Segoe UI';overflow:hidden}
+#menu{position:fixed;width:100%;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(#161b22,#0d1117);z-index:10}
+.btn-main{padding:18px 30px;margin:10px;border:none;border-radius:12px;font-weight:bold;transition:.3s}
+.btn-main:hover{transform:scale(1.05)}
+#app{display:none;width:100vw;height:100vh;position:relative}
+canvas{width:100%;height:100%}
+.status{position:absolute;top:20px;left:20px;background:#000a;padding:10px;border-left:4px solid #00ff00;border-radius:8px;font-size:12px}
+.controls{position:absolute;bottom:30px;width:100%;display:flex;justify-content:center;gap:15px}
+.btn-circle{width:70px;height:70px;border-radius:50%;border:none;font-size:10px;font-weight:bold}
+.rec{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 red}70%{box-shadow:0 0 0 20px transparent}}
+#riskBar{position:absolute;top:0;left:0;height:6px;background:lime;width:0%;transition:.3s}
+</style>
+</head>
+<body>
+
+<div id="menu">
+<h1 style="color:#00ff00">LYA-ERGO PRO</h1>
+<button class="btn-main" style="background:#27ae60" onclick="start('cam')">VIVO</button>
+<button class="btn-main" style="background:#2980b9" onclick="fileInput.click()">ARCHIVO</button>
+<input type="file" id="fileInput" hidden accept="video/*" onchange="start('file')">
+</div>
+
+<div id="app">
+<div id="riskBar"></div>
+<div class="status" id="status">STANDBY</div>
+<canvas id="c"></canvas>
+<video id="v" playsinline muted></video>
+<div class="controls">
+<button class="btn-circle btn-dark" onclick="exitApp()">SALIR</button>
+<button class="btn-circle" style="background:#00d2d3" onclick="flipCam()">GIRAR</button>
+<button class="btn-circle" style="background:#f1c40f" onclick="initIA()">IA</button>
+<button id="rec" class="btn-circle" style="background:#ff4d4d" onclick="record()">REC</button>
+</div>
+</div>
+
+<script>
+const v=document.getElementById('v'),c=document.getElementById('c'),ctx=c.getContext('2d');
+const statusTxt=document.getElementById('status');
+const riskBar=document.getElementById('riskBar');
+let pose,ia=false,cam='environment',cal=false;
+let base={},buffer={},risk=0;
+let last=0,FPS=15;
+
+function start(type){
+menu.style.display='none';app.style.display='block';
+if(type==='cam')camOn();
+else{
+v.src=URL.createObjectURL(fileInput.files[0]);
+v.onloadeddata=setup;
+}
+}
+
+async function camOn(){
+let s=await navigator.mediaDevices.getUserMedia({video:{facingMode:cam}});
+v.srcObject=s;v.onloadeddata=setup;
+}
+
+function setup(){
+c.width=v.videoWidth;c.height=v.videoHeight;
+v.play();loop();
+}
+
+function loop(){
+ctx.drawImage(v,0,0,c.width,c.height);
+if(!ia)requestAnimationFrame(loop);
+}
+
+async function initIA(){
+pose=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+pose.setOptions({modelComplexity:1});
+pose.onResults(draw);
+ia=true;loopIA();
+}
+
+async function loopIA(t){
+if(!ia)return;
+if(t-last>1000/FPS){last=t;await pose.send({image:v});}
+requestAnimationFrame(loopIA);
+}
+
+function draw(r){
+if(!r.poseLandmarks)return;
+ctx.clearRect(0,0,c.width,c.height);
+ctx.drawImage(r.image,0,0,c.width,c.height);
+
+let lm=r.poseLandmarks;
+let p=i=>({x:lm[i].x*c.width,y:lm[i].y*c.height});
+
+let a=angle(p(11),p(13),p(15));
+
+if(!cal){
+base.a=a;cal=true;statusTxt.innerText='CALIBRADO';
+}
+
+let diff=Math.abs(a-base.a);
+risk=diff;
+updateRisk();
+
+ctx.strokeStyle=diff>20?'red':diff>10?'yellow':'lime';
+ctx.lineWidth=8;
+ctx.beginPath();
+ctx.moveTo(p(11).x,p(11).y);
+ctx.lineTo(p(13).x,p(13).y);
+ctx.lineTo(p(15).x,p(15).y);
+ctx.stroke();
+}
+
+function angle(a,b,c){
+let ab=[a.x-b.x,a.y-b.y];
+let cb=[c.x-b.x,c.y-b.y];
+let dot=ab[0]*cb[0]+ab[1]*cb[1];
+let mag=Math.hypot(...ab)*Math.hypot(...cb);
+return Math.acos(dot/mag)*180/Math.PI;
+}
+
+function updateRisk(){
+riskBar.style.width=Math.min(risk,100)+'%';
+riskBar.style.background=risk>20?'red':risk>10?'yellow':'lime';
+}
+
+function record(){rec.classList.toggle('rec');}
+
+function flipCam(){cam=cam==='environment'?'user':'environment';camOn();}
+
+function exitApp(){
+if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());
+location.reload();
+}
+</script>
+</body>
+</html>
