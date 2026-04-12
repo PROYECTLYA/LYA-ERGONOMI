@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v20.5 | FIX CONGELAMIENTO</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #menu-inicial { display: flex; width: 100%; height: 100vh; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: fixed; z-index: 5000; }
+        .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 0; }
+        .sub-text { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; }
+        .btn-inicio { width: 85%; max-width: 320px; padding: 18px; margin: 10px; border-radius: 12px; font-weight: bold; border: none; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        #loader-ia { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(13, 17, 23, 0.98); z-index: 6000; flex-direction: column; align-items: center; justify-content: center; }
+        .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
+        #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
+        canvas { width: 100%; height: 100%; object-fit: contain; }
+        video { display: none; }
+        .status-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 12px 20px; border-radius: 8px; border-left: 4px solid #00ff00; font-size: 10px; z-index: 3000; font-weight: bold; }
+        .barra-controles { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 4000; width: 95%; justify-content: center; }
+        .btn-circular { width: 68px; height: 68px; border-radius: 50%; border: none; font-size: 9px; font-weight: 900; color: white; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .rec-active { background: #fff !important; color: #f00 !important; border: 3px solid #f00 !important; animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } }
+    </style>
+</head>
+<body>
+
+<div id="loader-ia">
+    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO LYA-IA</h3>
+    <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
+        <div id="bar-id" class="progress-bar"></div>
+    </div>
+</div>
+
+<div id="menu-inicial">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Sistema de Auditoría Postural</p>
+    <button class="btn-inicio" style="background:#27ae60; color:white;" onclick="prepararSistema('camara')">VISTA EN VIVO</button>
+    <button class="btn-inicio" style="background:#2980b9; color:white;" onclick="document.getElementById('fileInput').click()">SUBIR ARCHIVO</button>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">STANDBY</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" playsinline muted crossorigin="anonymous"></video>
+    <div class="barra-controles">
+        <button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">GIRAR</button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">CALIBRAR</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()">AUDITAR</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    const progressBar = document.getElementById('bar-id');
+    
+    let pose = null, iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0;
+    let baseAngles = {}, angleBuffer = {};
+    let mediaRecorder, recordedChunks = [];
+
+    const TH = { tronco: 18, cuello: 12, hombros: 25, codos: 22, munecas: 20, piernas: 25, pies: 18 };
+
+    async function prepararSistema(fuente) {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        if (fuente === 'camara') await encenderCamara();
+        else {
+            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+            video.onloadeddata = () => { 
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                video.play(); 
+                requestAnimationFrame(loopPreview); 
+            };
+        }
+    }
+
+    async function encenderCamara() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } });
+            video.srcObject = stream;
+            video.onloadeddata = () => { 
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                video.play(); 
+                requestAnimationFrame(loopPreview); 
+            };
+        } catch (e) { alert("Error: " + e.message); }
+    }
+
+    function loopPreview() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(loopPreview);
+        }
+    }
+
+    async function activarIA() {
+        document.getElementById('loader-ia').style.display = 'flex';
+        progressBar.style.width = '30%';
+
+        pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        
+        pose.onResults(onResults);
+        
+        progressBar.style.width = '70%';
+        await video.play(); 
+        
+        setTimeout(() => {
+            progressBar.style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('loader-ia').style.display = 'none';
+                iaActiva = true;
+                startTimeCalib = Date.now();
+                loopIA();
+            }, 500);
+        }, 1000);
+    }
+
+    // FIX: Bucle asíncrono controlado para evitar congelamiento
+    async function loopIA() {
+        if (iaActiva && !video.paused && !video.ended) {
+            await pose.send({ image: video });
+            requestAnimationFrame(loopIA);
+        }
+    }
+
+    function onResults(res) {
+        if (!res.poseLandmarks) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z, v: lm[i].visibility });
+
+        // Esqueleto basado en tu diagrama jerárquico
+        const p = {
+            cab: pt(0),
+            cue: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h, z: (lm[11].z + lm[12].z)/2, v: Math.min(lm[11].visibility, lm[12].visibility) },
+            tor: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h + 35, z: (lm[11].z + lm[12].z)/2, v: 1 },
+            abd: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h - 25, z: (lm[23].z + lm[24].z)/2, v: 1 },
+            esp: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h, z: (lm[23].z + lm[24].z)/2, v: Math.min(lm[23].visibility, lm[24].visibility) },
+            h_d: pt(12), c_d: pt(14), m_d: pt(16), h_i: pt(11), c_i: pt(13), m_i: pt(15),
+            p_d: pt(24), r_d: pt(26), t_d: pt(28), p_i: pt(23), r_i: pt(25), t_i: pt(27)
+        };
+
+        const vertical = (o) => ({ x: o.x, y: o.y + 100, z: o.z, v: 1 });
+
+        const angles = {
+            cue: calcAng3D(p.cab, p.cue, p.tor),
+            abd: calcAng3D(p.tor, p.abd, p.esp),
+            h_d: calcAng3D(vertical(p.h_d), p.h_d, p.c_d),
+            h_i: calcAng3D(vertical(p.h_i), p.h_i, p.c_i),
+            c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
+            c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+            r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
+            r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
+        };
+
+        // Calibración
+        if (!calibrado) {
+            const transcurrido = Date.now() - startTimeCalib;
+            if (transcurrido > 4000) {
+                for (let k in angles) baseAngles[k] = angles[k];
+                calibrado = true;
+                txtStatus.innerText = "ESTADO: ANALIZANDO";
+            } else {
+                txtStatus.innerText = "CALIBRANDO... " + Math.ceil((4000-transcurrido)/1000);
+            }
+        }
+
+        const drawSeg = (p1, p2, angKey, groupKey) => {
+            if (p1.v < 0.55 || p2.v < 0.55) return;
+            ctx.beginPath();
+            ctx.lineWidth = 10;
+            ctx.lineCap = "round";
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+
+            if (analizandoRiesgo && calibrado && angles[angKey] !== undefined) {
+                const diff = Math.abs(angles[angKey] - baseAngles[angKey]);
+                if (diff > TH[groupKey] * 2) ctx.strokeStyle = "#ff0000";
+                else if (diff > TH[groupKey]) ctx.strokeStyle = "#ffff00";
+                else ctx.strokeStyle = "#00ff00";
+            } else { ctx.strokeStyle = "#00ff00"; }
+            ctx.stroke();
+        };
+
+        // Dibujo Jerárquico
+        drawSeg(p.cab, p.cue, 'cue', 'cuello');
+        drawSeg(p.cue, p.tor, 'cue', 'cuello');
+        drawSeg(p.tor, p.abd, 'abd', 'tronco');
+        drawSeg(p.abd, p.esp, 'abd', 'tronco');
+        drawSeg(p.h_d, p.c_d, 'h_d', 'hombros');
+        drawSeg(p.c_d, p.m_d, 'c_d', 'codos');
+        drawSeg(p.h_i, p.c_i, 'h_i', 'hombros');
+        drawSeg(p.c_i, p.m_i, 'c_i', 'codos');
+        drawSeg(p.p_d, p.r_d, 'r_d', 'piernas');
+        drawSeg(p.p_i, p.r_i, 'r_i', 'piernas');
+
+        ctx.restore();
+    }
+
+    function calcAng3D(a, b, c) {
+        if (!a || !b || !c) return 0;
+        const v1 = { x: a.x - b.x, y: a.y - b.y, z: (a.z - b.z) * 0.1 };
+        const v2 = { x: c.x - b.x, y: c.y - b.y, z: (c.z - b.z) * 0.1 };
+        const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+        const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
+        const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
+        return (m1 * m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
+    }
+
+    function toggleGrabacion() {
+        if (!calibrado) return;
+        analizandoRiesgo = !analizandoRiesgo;
+        document.getElementById('recordBtn').classList.toggle('rec-active', analizandoRiesgo);
+        if (analizandoRiesgo) {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm' });
+            mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(recordedChunks));
+                a.download = `AUDIT_${Date.now()}.webm`; a.click();
+            };
+            mediaRecorder.start();
+        } else { mediaRecorder.stop(); }
+    }
+
+    async function cambiarCamara() {
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        iaActiva = false; await encenderCamara();
+    }
+</script>
+</body>
+</html>
