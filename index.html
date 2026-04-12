@@ -1,0 +1,47 @@
+<!-- SOLO TE MUESTRO LA PARTE MODIFICADA -->
+
+<script>
+
+// 🔥 REEMPLAZA SOLO ESTA FUNCIÓN
+async function encenderCamara() {
+    try {
+        // Compatibilidad total (iPhone incluido)
+        video.setAttribute("playsinline", true);
+        video.setAttribute("autoplay", true);
+        video.muted = true;
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        });
+
+        video.srcObject = stream;
+
+        video.onloadedmetadata = async () => {
+            try {
+                await video.play();
+
+                // 🔥 FIX universal (evita freeze / canvas 0)
+                setTimeout(() => {
+                    canvas.width = video.videoWidth || 1280;
+                    canvas.height = video.videoHeight || 720;
+
+                    requestAnimationFrame(loopPreview); // tu flujo original
+                }, 300);
+
+            } catch (e) {
+                console.error("Error al reproducir video:", e);
+            }
+        };
+
+    } catch (e) {
+        alert("Error de cámara: " + e.message);
+        console.error(e);
+    }
+}
+
+</script>
