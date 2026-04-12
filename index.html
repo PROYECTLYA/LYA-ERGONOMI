@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v20.7 | STABLE VISUAL</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Corrección de fondo y scroll */
+        * { box-sizing: border-box; }
+        body, html { 
+            background-color: #0d1117; 
+            color: white; 
+            margin: 0; 
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Menú Inicial Centrado */
+        #menu-inicial { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            width: 100%; 
+            height: 100%;
+            background: radial-gradient(circle, #1c2128 0%, #0d1117 100%);
+            position: absolute;
+            z-index: 100;
+        }
+
+        .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 5px; margin: 0; font-size: 3rem; text-shadow: 0 0 10px rgba(0,255,0,0.3); }
+        .sub-text { color: #8b949e; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 30px; }
+
+        /* Contenedor de Análisis a Pantalla Completa */
+        #contenedor-analisis { 
+            display: none; 
+            width: 100vw; 
+            height: 100vh; 
+            position: relative; 
+            background: #000; 
+        }
+
+        /* Canvas optimizado para no deformar la imagen */
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            display: block;
+        }
+
+        video { display: none; }
+
+        /* UI Overlays */
+        .status-badge { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            background: rgba(13, 17, 23, 0.9); 
+            padding: 12px 20px; 
+            border-radius: 8px; 
+            border-left: 4px solid #00ff00; 
+            font-size: 12px; 
+            z-index: 1000; 
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .barra-controles { 
+            position: absolute; 
+            bottom: 40px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            display: flex; 
+            gap: 20px; 
+            z-index: 1000; 
+            width: auto;
+        }
+
+        .btn-circular { 
+            width: 75px; 
+            height: 75px; 
+            border-radius: 50%; 
+            border: 2px solid rgba(255,255,255,0.1); 
+            font-size: 10px; 
+            font-weight: 800; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            flex-direction: column; 
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn-circular:active { transform: scale(0.9); }
+
+        /* Loader */
+        #loader-ia { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: #0d1117; 
+            z-index: 2000; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+        }
+
+        .progress-container { width: 250px; height: 4px; background: #21262d; border-radius: 10px; margin-top: 20px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: #00ff00; box-shadow: 0 0 15px #00ff00; transition: 0.3s; }
+
+        .rec-active { 
+            background: #fff !important; 
+            color: #f00 !important; 
+            border: 4px solid #f00 !important; 
+            animation: pulse-red 1.5s infinite; 
+        }
+
+        @keyframes pulse-red { 
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 
+            70% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); } 
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } 
+        }
+    </style>
+</head>
+<body>
+
+<div id="loader-ia">
+    <h3 style="color:#00ff00; letter-spacing: 3px; font-weight: 900;">INICIALIZANDO LYA-IA</h3>
+    <div class="progress-container">
+        <div id="bar-id" class="progress-bar"></div>
+    </div>
+</div>
+
+<div id="menu-inicial">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Auditoría Ergonómica Industrial</p>
+    <div class="d-flex flex-column gap-3 w-100 align-items-center">
+        <button class="btn btn-success btn-lg px-5 py-3 fw-bold" style="border-radius:15px; width:280px;" onclick="prepararSistema('camara')">VISTA EN VIVO</button>
+        <button class="btn btn-primary btn-lg px-5 py-3 fw-bold" style="border-radius:15px; width:280px;" onclick="document.getElementById('fileInput').click()">SUBIR ARCHIVO</button>
+    </div>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">SISTEMA: STANDBY</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" playsinline muted crossorigin="anonymous"></video>
+    
+    <div class="barra-controles">
+        <button class="btn-circular" style="background:#21262d;" onclick="location.reload()">SALIR</button>
+        <button class="btn-circular" style="background:#1f6feb;" onclick="cambiarCamara()">GIRAR</button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">CALIBRAR</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()">AUDITAR</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    const progressBar = document.getElementById('bar-id');
+    
+    let pose = null, iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0;
+    let baseAngles = {};
+    let mediaRecorder, recordedChunks = [];
+
+    const TH = { tronco: 15, cuello: 12, hombros: 20, codos: 25, munecas: 20, piernas: 25 };
+
+    async function prepararSistema(fuente) {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        if (fuente === 'camara') await encenderCamara();
+        else {
+            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+            video.onloadeddata = () => iniciarVideo();
+        }
+    }
+
+    async function encenderCamara() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            video.srcObject = stream;
+            video.onloadeddata = () => iniciarVideo();
+        } catch (e) { alert("Error de acceso a cámara."); location.reload(); }
+    }
+
+    function iniciarVideo() {
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        video.play(); 
+        requestAnimationFrame(loopPreview);
+    }
+
+    function loopPreview() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(loopPreview);
+        }
+    }
+
+    async function activarIA() {
+        document.getElementById('loader-ia').style.display = 'flex';
+        pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.onResults(onResults);
+        
+        let p = 0;
+        const iv = setInterval(() => { p += 5; progressBar.style.width = p+'%'; if(p>=100) clearInterval(iv); }, 50);
+        
+        setTimeout(() => { 
+            document.getElementById('loader-ia').style.display='none'; 
+            iaActiva=true; 
+            startTimeCalib=Date.now(); 
+            loopIA(); 
+        }, 1500);
+    }
+
+    async function loopIA() {
+        if (iaActiva && !video.paused) {
+            await pose.send({ image: video });
+            requestAnimationFrame(loopIA);
+        }
+    }
+
+    function onResults(res) {
+        if (!res.poseLandmarks) return;
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Espejo solo en cámara frontal
+        if (currentFacingMode === "user") { 
+            ctx.translate(canvas.width, 0); 
+            ctx.scale(-1, 1); 
+        }
+        
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z, v: lm[i].visibility });
+
+        // Nodos Jerárquicos
+        const p = {
+            cab: pt(0),
+            cue: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h, v: Math.min(lm[11].visibility, lm[12].visibility) },
+            tor: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h + 50, v: 1 },
+            abd: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h - 30, v: 1 },
+            esp: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h, v: Math.min(lm[23].visibility, lm[24].visibility) },
+            h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
+            h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19)
+        };
+
+        const angles = {
+            cue: calcAng3D(p.cab, p.cue, p.tor),
+            abd: calcAng3D(p.tor, p.abd, p.esp),
+            h_d: calcAng3D(p.cue, p.h_d, p.c_d),
+            c_d: calcAng3D(p.h_d, p.c_d, p.m_d)
+        };
+
+        if (!calibrado) {
+            const trans = Date.now() - startTimeCalib;
+            if (trans > 4000) {
+                for (let k in angles) baseAngles[k] = angles[k];
+                calibrado = true;
+                txtStatus.innerText = "SISTEMA: AUDITORÍA ACTIVA";
+                document.getElementById('recordBtn').style.opacity = "1";
+            } else { 
+                txtStatus.innerText = "CALIBRANDO BIOTIPO... " + Math.ceil((4000 - trans) / 1000); 
+            }
+        }
+
+        const drawSeg = (p1, p2, angKey, groupKey) => {
+            if (p1.v < 0.65 || p2.v < 0.65) return; 
+            ctx.beginPath();
+            ctx.lineWidth = 8;
+            ctx.lineCap = "round";
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+
+            if (analizandoRiesgo && calibrado) {
+                const diff = Math.abs(angles[angKey] - baseAngles[angKey]);
+                const threshold = TH[groupKey] || 20;
+                if (diff <= 5) ctx.strokeStyle = "#00ff00";
+                else if (diff > threshold * 1.8) ctx.strokeStyle = "#ff0000";
+                else if (diff > threshold) ctx.strokeStyle = "#ffff00";
+                else ctx.strokeStyle = "#00ff00";
+            } else { 
+                ctx.strokeStyle = calibrado ? "#00ff00" : "rgba(255,255,255,0.4)"; 
+            }
+            ctx.stroke();
+        };
+
+        // Renderizado de Esqueleto
+        drawSeg(p.cab, p.cue, 'cue', 'cuello');
+        drawSeg(p.cue, p.tor, 'cue', 'cuello');
+        drawSeg(p.tor, p.abd, 'abd', 'tronco');
+        drawSeg(p.abd, p.esp, 'abd', 'tronco');
+        drawSeg(p.h_d, p.c_d, 'h_d', 'hombros');
+        drawSeg(p.c_d, p.m_d, 'c_d', 'codos');
+        drawSeg(p.h_i, p.c_i, 'h_i', 'hombros');
+        drawSeg(p.c_i, p.m_i, 'c_i', 'codos');
+
+        ctx.restore();
+    }
+
+    function calcAng3D(a, b, c) {
+        if (!a || !b || !c) return 0;
+        const v1 = { x: a.x - b.x, y: a.y - b.y, z: (a.z - b.z) * 0.05 };
+        const v2 = { x: c.x - b.x, y: c.y - b.y, z: (c.z - b.z) * 0.05 };
+        const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+        const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2), m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
+        return (m1 * m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
+    }
+
+    function toggleGrabacion() {
+        if (!calibrado) return;
+        analizandoRiesgo = !analizandoRiesgo;
+        document.getElementById('recordBtn').classList.toggle('rec-active', analizandoRiesgo);
+        
+        if (analizandoRiesgo) {
+            recordedChunks = [];
+            const stream = canvas.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+            mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const a = document.createElement('a'); 
+                a.href = URL.createObjectURL(blob);
+                a.download = `LYA_AUDIT_${Date.now()}.webm`; 
+                a.click();
+            };
+            mediaRecorder.start();
+        } else { mediaRecorder.stop(); }
+    }
+
+    async function cambiarCamara() {
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        iaActiva = false; 
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        await encenderCamara();
+    }
+</script>
+</body>
+</html>
