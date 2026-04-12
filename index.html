@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v21.0 | PRECISIÓN TOTAL</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body { background-color: #0d1117; margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; font-family: 'Segoe UI', sans-serif; }
+        #menu-inicial { display: flex; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: absolute; z-index: 5000; }
+        #contenedor-analisis { display: none; width: 100%; height: 100%; position: relative; background: #000; }
+        canvas { width: 100% !important; height: 100% !important; object-fit: cover; position: absolute; top: 0; left: 0; }
+        video { display: none; }
+        .status-badge { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.85); padding: 8px 15px; border-radius: 8px; border-left: 4px solid #00ff00; font-size: 10px; z-index: 3000; color: #fff; }
+        .barra-controles { position: absolute; bottom: 0; left: 0; width: 100%; height: 110px; background: linear-gradient(transparent, rgba(0,0,0,0.9)); display: flex; justify-content: center; align-items: center; gap: 12px; z-index: 4000; padding-bottom: 20px; }
+        .btn-circular { width: 65px; height: 65px; border-radius: 50%; border: none; font-size: 9px; font-weight: 900; color: white; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: 0.2s; }
+        .btn-inicio { width: 85%; max-width: 300px; padding: 15px; margin: 10px; border-radius: 12px; font-weight: bold; border: none; }
+        .rec-active { background: #fff !important; color: #f00 !important; animation: pulse 1s infinite; border: 3px solid #f00 !important; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div id="menu-inicial">
+    <h1 style="color:#00ff00; font-weight: 800; letter-spacing: 3px;">LYA-ERGO</h1>
+    <p style="color: #8b949e; font-size: 0.7rem; letter-spacing: 2px;">SISTEMA DE BIOMECÁNICA</p>
+    <button class="btn-inicio" style="background:#27ae60; color:white;" onclick="prepararSistema('camara')">🎥 VISTA EN VIVO</button>
+    <button class="btn-inicio" style="background:#2980b9; color:white;" onclick="document.getElementById('fileInput').click()">📁 ANALIZAR ARCHIVO</button>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <canvas id="output_canvas"></canvas>
+    <div class="status-badge" id="txt-status">CALIBRACIÓN PENDIENTE</div>
+    <video id="input_video" playsinline muted></video>
+    <div class="barra-controles">
+        <button class="btn-circular btn-dark" onclick="location.reload()">SALIR</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">🔄<br>GIRAR</button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">⚖️<br>CALIBRAR</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity:0.5" onclick="toggleGrabacion()">🔴<br>AUDITAR</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    
+    let pose = null, iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", baseAngles = {};
+    let mediaRecorder, recordedChunks = [];
+
+    const TOLERANCIA = { cuello: 15, tronco: 20, brazos: 30, piernas: 25 };
+
+    async function prepararSistema(fuente) {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+        if (fuente === 'camara') {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: 1280, height: 720 } });
+            video.srcObject = stream;
+        } else {
+            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+        }
+        video.onloadedmetadata = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            video.play();
+            requestAnimationFrame(previsualizacion);
+        };
+    }
+
+    function previsualizacion() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(previsualizacion);
+        }
+    }
+
+    function activarIA() {
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.onResults(onResults);
+        iaActiva = true;
+        document.getElementById('btn-calib').style.display = 'none';
+        document.getElementById('recordBtn').style.opacity = '1';
+        loopIA();
+    }
+
+    async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
+
+    function calcularAngulo(p1, p2, p3) {
+        let v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+        let v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+        let dot = v1.x * v2.x + v1.y * v2.y;
+        let mag1 = Math.sqrt(v1.x**2 + v1.y**2);
+        let mag2 = Math.sqrt(v2.x**2 + v2.y**2);
+        return Math.acos(dot / (mag1 * mag2)) * (180 / Math.PI);
+    }
+
+    // Función para dibujar etiquetas (No modifica la lógica original)
+    function drawLabel(punto, angulo, color) {
+        if (!punto || !calibrado) return;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(punto.x + 10, punto.y - 15, 40, 20);
+        ctx.strokeStyle = color;
+        ctx.strokeRect(punto.x + 10, punto.y - 15, 40, 20);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(Math.round(angulo) + "°", punto.x + 15, punto.y);
+    }
+
+    function onResults(res) {
+        if (!res.poseLandmarks) return;
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, v: lm[i].visibility });
+
+        const p = {
+            cab: pt(0),
+            cue: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h },
+            trx: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h + 30 },
+            abd: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h - 30 },
+            eba: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h },
+            h_d: pt(12), c_d: pt(14), m_d: pt(16),
+            h_i: pt(11), c_i: pt(13), m_i: pt(15),
+            p_d: pt(24), r_d: pt(26), t_d: pt(28),
+            p_i: pt(23), r_i: pt(25), t_i: pt(27)
+        };
+
+        const angs = {
+            cuello: calcularAngulo(p.cab, p.cue, p.trx),
+            tronco: calcularAngulo(p.trx, p.abd, p.eba),
+            codo_d: calcularAngulo(p.h_d, p.c_d, p.m_d),
+            codo_i: calcularAngulo(p.h_i, p.c_i, p.m_i),
+            rodilla_d: calcularAngulo(p.p_d, p.r_d, p.t_d),
+            rodilla_i: calcularAngulo(p.p_i, p.r_i, p.t_i)
+        };
+
+        if (!calibrado) {
+            baseAngles = {...angs};
+            calibrado = true;
+            txtStatus.innerText = "SISTEMA CALIBRADO - MONITOREANDO";
+        }
+
+        const drawSeg = (p1, p2, tipo, showAngle = false) => {
+            if (p1.v < 0.5 || p2.v < 0.5) return;
+            let diff = Math.abs(angs[tipo] - baseAngles[tipo]);
+            let limite = TOLERANCIA[tipo] || 20;
+            let color = "#00d2d3";
+
+            if (analizandoRiesgo) {
+                color = diff > (limite * 1.5) ? "#ff3838" : (diff > limite ? "#fffa65" : "#32ff7e");
+            }
+
+            ctx.lineWidth = 6;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = color;
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p1.x, p1.y, 4, 0, 7); ctx.fill();
+            
+            if(showAngle) drawLabel(p2, angs[tipo], color);
+        };
+
+        // Renderizado Original con Etiquetas añadidas
+        drawSeg(p.cab, p.cue, 'cuello', true);
+        drawSeg(p.cue, p.trx, 'tronco', true);
+        drawSeg(p.trx, p.abd, 'tronco');
+        drawSeg(p.abd, p.eba, 'tronco');
+        drawSeg(p.h_d, p.c_d, 'codo_d'); drawSeg(p.c_d, p.m_d, 'codo_d', true);
+        drawSeg(p.h_i, p.c_i, 'codo_i'); drawSeg(p.c_i, p.m_i, 'codo_i', true);
+        drawSeg(p.eba, p.r_d, 'rodilla_d'); drawSeg(p.r_d, p.t_d, 'rodilla_d', true);
+        drawSeg(p.eba, p.r_i, 'rodilla_i'); drawSeg(p.r_i, p.t_i, 'rodilla_i', true);
+
+        ctx.restore();
+    }
+
+    function toggleGrabacion() {
+        if (!iaActiva) return;
+        analizandoRiesgo = !analizandoRiesgo;
+        const btn = document.getElementById('recordBtn');
+        btn.classList.toggle('rec-active', analizandoRiesgo);
+        
+        if (analizandoRiesgo) {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(canvas.captureStream(30));
+            mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(recordedChunks));
+                a.download = `ERGO_AUDIT_${Date.now()}.webm`; a.click();
+            };
+            mediaRecorder.start();
+            txtStatus.innerText = "AUDITORÍA EN CURSO (GRABANDO)";
+        } else {
+            mediaRecorder.stop();
+            txtStatus.innerText = "AUDITORÍA FINALIZADA";
+        }
+    }
+
+    async function cambiarCamara() {
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        await prepararSistema('camara');
+    }
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+</script>
+</body>
+</html>
