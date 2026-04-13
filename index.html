@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYA-ERGO v23.1 | Multi-Device</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --accent-color: #00ff00; --bg-dark: #0d1117; --panel-bg: #161b22; }
+        
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: var(--bg-dark); color: white; 
+            overflow: hidden; font-family: sans-serif;
+        }
+
+        /* Contenedor principal Flexible */
+        #main-container {
+            display: flex; flex-direction: column; height: 100vh; width: 100vw;
+        }
+
+        /* Área de Visualización (Canvas) */
+        #view-area {
+            flex: 1; position: relative; display: flex;
+            align-items: center; justify-content: center;
+            background: #000; overflow: hidden;
+        }
+
+        canvas {
+            max-width: 100%; max-height: 100%;
+            object-fit: contain; /* Mantiene proporción sin estirar */
+        }
+
+        /* Barra de Controles Inferior */
+        .controls-bar {
+            height: 100px; background: var(--panel-bg);
+            display: flex; justify-content: center; align-items: center;
+            gap: 15px; border-top: 1px solid #30363d; padding: 10px;
+            z-index: 100;
+        }
+
+        .btn-action {
+            width: 65px; height: 65px; border-radius: 50%;
+            border: 2px solid #30363d; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; cursor: pointer;
+            transition: all 0.2s; color: white; background: #21262d;
+        }
+
+        .btn-action:active { transform: scale(0.9); }
+        .btn-rec.active { background: #ff4d4d !important; border-color: white; animation: blink 1.5s infinite; }
+        
+        #status-overlay {
+            position: absolute; top: 15px; left: 0; width: 100%;
+            text-align: center; color: var(--accent-color);
+            font-weight: 900; text-transform: uppercase;
+            letter-spacing: 2px; pointer-events: none; z-index: 50;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Pantalla de Inicio */
+        #splash {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            z-index: 1000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="splash">
+    <h1 style="color: var(--accent-color); font-weight: 900;">LYA-ERGO</h1>
+    <div class="d-grid gap-3 w-75" style="max-width: 300px;">
+        <button class="btn btn-success btn-lg" onclick="startApp('cam')">VISTA EN VIVO</button>
+        <button class="btn btn-outline-light" onclick="document.getElementById('fileIn').click()">SUBIR ARCHIVO</button>
+    </div>
+    <input type="file" id="fileIn" hidden accept="video/*" onchange="startApp('file')">
+</div>
+
+<div id="main-container" style="display: none;">
+    <div id="view-area">
+        <div id="status-overlay">MODO: STANDBY</div>
+        <canvas id="output_canvas"></canvas>
+    </div>
+    
+    <div class="controls-bar">
+        <button class="btn-action" onclick="location.reload()">SALIR</button>
+        <button class="btn-action" style="color: #00d2d3;" onclick="switchCam()">GIRAR</button>
+        <button id="btn-ia" class="btn-action" style="color: #f1c40f;" onclick="initIA()">CALIBRAR</button>
+        <button id="btn-rec" class="btn-action btn-rec" style="opacity: 0.4;" onclick="toggleRec()">AUDITAR</button>
+    </div>
+</div>
+
+<video id="input_video" playsinline muted style="display:none"></video>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status-overlay');
+    
+    let pose, iaReady = false, isAuditing = false, facingMode = "environment";
+
+    // Ajuste dinámico del Canvas
+    function resize() {
+        if (!video.videoWidth) return;
+        const container = document.getElementById('view-area');
+        const ratio = video.videoWidth / video.videoHeight;
+        
+        // Calculamos el tamaño máximo posible sin desbordar
+        let w = container.clientWidth;
+        let h = w / ratio;
+
+        if (h > container.clientHeight) {
+            h = container.clientHeight;
+            w = h * ratio;
+        }
+
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+    }
+
+    async function startApp(type) {
+        document.getElementById('splash').style.display = 'none';
+        document.getElementById('main-container').style.display = 'flex';
+        
+        if (type === 'cam') {
+            await openCam();
+        } else {
+            video.src = URL.createObjectURL(document.getElementById('fileIn').files[0]);
+            video.play();
+        }
+        
+        video.onloadeddata = () => {
+            resize();
+            requestAnimationFrame(drawNormal);
+        };
+    }
+
+    async function openCam() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode, width: {ideal: 1280}, height: {ideal: 720} }
+        });
+        video.srcObject = stream;
+        video.play();
+    }
+
+    function drawNormal() {
+        if (iaReady) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(drawNormal);
+    }
+
+    async function initIA() {
+        status.innerText = "CARGANDO MODELOS...";
+        pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
+        pose.onResults(onResults);
+
+        iaReady = true;
+        document.getElementById('btn-rec').style.opacity = "1";
+        status.innerText = "SISTEMA LISTO";
+        
+        async function detectionLoop() {
+            await pose.send({image: video});
+            requestAnimationFrame(detectionLoop);
+        }
+        detectionLoop();
+    }
+
+    function onResults(results) {
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+        
+        if (results.poseLandmarks) {
+            // Aquí va tu lógica de dibujo de esqueleto
+            // El color cambia si isAuditing es true
+            drawSkeleton(results.poseLandmarks);
+        }
+        ctx.restore();
+    }
+
+    function drawSkeleton(landmarks) {
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = isAuditing ? "#00ff00" : "#ffffff";
+        // Ejemplo simple: Línea entre hombros
+        const p1 = landmarks[11], p2 = landmarks[12];
+        ctx.beginPath();
+        ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+        ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+        ctx.stroke();
+    }
+
+    function toggleRec() {
+        if (!iaReady) return;
+        isAuditing = !isAuditing;
+        document.getElementById('btn-rec').classList.toggle('active');
+        status.innerText = isAuditing ? "AUDITANDO..." : "SISTEMA CALIBRADO";
+    }
+
+    async function switchCam() {
+        facingMode = (facingMode === "user") ? "environment" : "user";
+        await openCam();
+    }
+
+    window.addEventListener('resize', resize);
+</script>
+</body>
+</html>
