@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LYA-ERGO v26.1 | AUTO-ADAPTIVE</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --accent: #00ff00; --bg: #000000; --panel: rgba(20, 20, 20, 0.95); }
+        
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: var(--bg); color: white; 
+            overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Pantalla de Inicio */
+        #menu-inicial { 
+            position: fixed; inset: 0; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%); z-index: 5000; 
+        }
+
+        /* CONTENEDOR FLEXIBLE: La clave para la visibilidad */
+        #contenedor-analisis { 
+            display: none; 
+            flex-direction: column; 
+            width: 100%; 
+            height: 100vh; /* Ocupa el alto total disponible */
+        }
+
+        /* El área de video se expande pero respeta a los botones */
+        #canvas-wrapper {
+            flex: 1; /* Toma todo el espacio sobrante */
+            width: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; /* Mantiene la proporción sin deformar */
+        }
+        
+        video { display: none; }
+
+        /* BARRA INFERIOR SIEMPRE VISIBLE */
+        .barra-inferior {
+            width: 100%;
+            min-height: 100px; /* Altura fija para asegurar visibilidad */
+            background: var(--panel);
+            border-top: 2px solid #333;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: env(safe-area-inset-bottom); /* Espacio para iPhone/Android Gesture Bar */
+            z-index: 4000;
+        }
+
+        .btn-accion { 
+            width: 70px; height: 70px; border-radius: 20px; border: 1px solid #444;
+            font-size: 11px; font-weight: bold; color: white; 
+            display: flex; align-items: center; justify-content: center; 
+            flex-direction: column; background: #222; transition: 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .btn-accion:active { transform: scale(0.9); background: #333; }
+        .btn-record.active { background: #ff3838; border-color: #fff; animation: pulse 1.5s infinite; }
+
+        .badge-ia { 
+            position: absolute; top: 15px; left: 15px; 
+            background: rgba(0,0,0,0.8); padding: 5px 15px; border-radius: 20px;
+            font-size: 11px; border-left: 3px solid var(--accent); z-index: 3000;
+        }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,56,56,0.7); } 70% { box-shadow: 0 0 0 15px rgba(255,56,56,0); } 100% { box-shadow: 0 0 0 0 rgba(255,56,56,0); } }
+    </style>
+</head>
+<body>
+
+<div id="menu-inicial">
+    <h1 style="color: var(--accent); font-weight: 900;">LYA-ERGO IA</h1>
+    <p style="color: #666; font-size: 12px; letter-spacing: 2px;">AUDITORÍA ERGONÓMICA V26.1</p>
+    <div class="d-grid gap-3 w-75">
+        <button class="btn btn-outline-light btn-lg" onclick="iniciar('camara')">CÁMARA IA</button>
+        <button class="btn btn-outline-info btn-lg" onclick="document.getElementById('fileInput').click()">SUBIR VIDEO</button>
+    </div>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="iniciar('archivo')">
+</div>
+
+<div id="contenedor-analisis">
+    <div id="canvas-wrapper">
+        <div class="badge-ia" id="txt-status">SISTEMA STANDBY</div>
+        <canvas id="output_canvas"></canvas>
+    </div>
+    
+    <div class="barra-inferior">
+        <button class="btn-accion" onclick="location.reload()">✖<br>SALIR</button>
+        <button class="btn-accion" onclick="cambiarCamara()">🔄<br>GIRAR</button>
+        <button id="btn-calib" class="btn-accion" style="color: #f1c40f;" onclick="bootIA()">⚖️<br>CALIB</button>
+        <button id="recordBtn" class="btn-accion btn-record" onclick="toggleAudit()">🔴<br>AUDITAR</button>
+    </div>
+</div>
+
+<video id="input_video" playsinline muted></video>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const txtStatus = document.getElementById('txt-status');
+    
+    let pose, iaActiva = false, calibrado = false, grabando = false;
+    let mode = "environment", baseAngles = {}, recorder, chunks = [];
+
+    const TH = { cuello: 15, tronco: 20, hombros: 25, codos: 30, lumbar: 20 };
+
+    async function iniciar(tipo) {
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'flex';
+        if(tipo === 'camara') await startCam();
+        else {
+            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+            video.onloadedmetadata = () => { syncCanvas(); video.play(); requestAnimationFrame(previewLoop); };
+        }
+    }
+
+    async function startCam() {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: mode, width: {ideal: 1280}, height: {ideal: 720} } 
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => { syncCanvas(); video.play(); requestAnimationFrame(previewLoop); };
+    }
+
+    function syncCanvas() {
+        // Sincroniza el canvas interno con la resolución real del video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+    }
+
+    function previewLoop() {
+        if (!iaActiva) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(previewLoop);
+        }
+    }
+
+    function bootIA() {
+        txtStatus.innerText = "CARGANDO IA...";
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
+        pose.onResults(drawEsqueleto);
+        iaActiva = true;
+        
+        let startTime = Date.now();
+        const runIA = async () => { 
+            await pose.send({image: video}); 
+            if(!calibrado && (Date.now() - startTime > 3000)) { 
+                calibrado = true; 
+                txtStatus.innerText = "CALIBRACIÓN COMPLETA"; 
+            }
+            if(!calibrado) txtStatus.innerText = "ESTABLECIENDO BIOTIPO...";
+            requestAnimationFrame(runIA); 
+        };
+        runIA();
+    }
+
+    function drawEsqueleto(res) {
+        if (!res.poseLandmarks) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const getP = (i) => ({ x: lm[i].x * w, y: lm[i].y * h });
+
+        const p = {
+            cabeza: getP(0),
+            cuello: { x: (lm[11].x + lm[12].x)/2 * w, y: (lm[11].y + lm[12].y)/2 * h },
+            h_izq: getP(11), h_der: getP(12),
+            torax: { x: (lm[11].x + lm[12].x)/2 * w, y: ((lm[11].y + lm[12].y)/2 * h) + 30 },
+            c_izq: getP(13), c_der: getP(14),
+            m_izq: getP(15), m_der: getP(16),
+            cad_izq: getP(23), cad_der: getP(24),
+            lumbar: { x: (lm[23].x + lm[24].x)/2 * w, y: (lm[23].y + lm[24].y)/2 * h }
+        };
+
+        const angulosActuales = {
+            cuello: calcAng(p.cabeza, p.cuello, p.torax),
+            h_der: calcAng(p.torax, p.h_der, p.c_der),
+            h_izq: calcAng(p.torax, p.h_izq, p.c_izq),
+            c_der: calcAng(p.h_der, p.c_der, p.m_der),
+            c_izq: calcAng(p.h_izq, p.c_izq, p.m_izq),
+            lumbar: calcAng(p.torax, p.lumbar, p.cad_der)
+        };
+
+        if(calibrado && Object.keys(baseAngles).length === 0) baseAngles = {...angulosActuales};
+
+        function dibujarHueso(a, b, key, thKey) {
+            ctx.beginPath(); ctx.lineWidth = 6; ctx.lineCap = "round";
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            
+            if (grabando && calibrado) {
+                const diff = Math.abs(angulosActuales[key] - baseAngles[key]);
+                ctx.strokeStyle = diff > (TH[thKey]*2) ? "#ff3838" : (diff > TH[thKey] ? "#fffa65" : "#00ff00");
+            } else { ctx.strokeStyle = "#00ff00"; }
+            ctx.stroke();
+        }
+
+        dibujarHueso(p.cabeza, p.cuello, 'cuello', 'cuello');
+        dibujarHueso(p.cuello, p.h_izq, 'h_izq', 'hombros');
+        dibujarHueso(p.cuello, p.h_der, 'h_der', 'hombros');
+        dibujarHueso(p.h_izq, p.c_izq, 'c_izq', 'codos');
+        dibujarHueso(p.h_der, p.c_der, 'c_der', 'codos');
+        dibujarHueso(p.cuello, p.torax, 'lumbar', 'tronco');
+        dibujarHueso(p.torax, p.lumbar, 'lumbar', 'lumbar');
+    }
+
+    function calcAng(a,b,c) {
+        const v1={x:a.x-b.x, y:a.y-b.y}, v2={x:c.x-b.x, y:c.y-b.y};
+        const dot = v1.x*v2.x + v1.y*v2.y;
+        const m1 = Math.sqrt(v1.x**2 + v1.y**2), m2 = Math.sqrt(v2.x**2 + v2.y**2);
+        return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
+    }
+
+    function toggleAudit() {
+        if (!calibrado) return;
+        grabando = !grabando;
+        document.getElementById('recordBtn').classList.toggle('active');
+        if (grabando) {
+            chunks = [];
+            recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm' });
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, {type: 'video/webm'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `ERGO_V26_${Date.now()}.webm`; a.click();
+            };
+            recorder.start();
+            txtStatus.innerText = "REC: GRABANDO AUDITORÍA";
+        } else { recorder.stop(); txtStatus.innerText = "AUDITORÍA GUARDADA"; }
+    }
+
+    async function cambiarCamara() {
+        mode = (mode === "environment") ? "user" : "environment";
+        await startCam();
+    }
+
+    window.addEventListener('resize', syncCanvas);
+</script>
+</body>
+</html>
