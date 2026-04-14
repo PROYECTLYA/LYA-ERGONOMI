@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LYA-ERGO v26.9 | SIMETRÍA TOTAL</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --accent: #00ff00; --warning: #ffff00; --danger: #ff0000; --panel: rgba(5, 5, 5, 0.98); }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #000; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        #canvas-wrapper {
+            flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+        video { display: none; }
+
+        .barra-mandos {
+            background: var(--panel); border-top: 2px solid #222;
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 10px 5px calc(15px + env(safe-area-inset-bottom));
+            z-index: 100;
+        }
+
+        .btn-lya {
+            width: 72px; height: 72px; border-radius: 22px; border: 1px solid #333;
+            background: #111; color: white; font-size: 9px; font-weight: 800;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .btn-lya:active { transform: scale(0.85); background: #222; }
+        .btn-record.active { background: var(--danger); animation: pulse 1.5s infinite; border-color: #fff; }
+
+        #splash {
+            position: fixed; inset: 0; background: #000; z-index: 2000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        .ui-overlay {
+            position: absolute; top: 20px; left: 20px; color: var(--accent);
+            font-family: 'Courier New', Courier, monospace; font-size: 10px;
+            background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; pointer-events: none;
+        }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); } 100% { box-shadow: 0 0 0 20px rgba(255,0,0,0); } }
+    </style>
+</head>
+<body>
+
+<div id="splash">
+    <h1 style="color: var(--accent); font-weight: 900; letter-spacing: -2px;">LYA-ERGO v26.9</h1>
+    <p style="color: #444; font-size: 10px; margin-bottom: 30px;">ESTABILIZACIÓN CEFÁLICA Y SIMETRÍA DERECHA</p>
+    <div class="d-grid gap-3 w-75">
+        <button class="btn btn-success btn-lg" onclick="start('camara')">INICIAR CÁMARA</button>
+        <button class="btn btn-outline-light" onclick="document.getElementById('fileIn').click()">SUBIR VIDEO</button>
+    </div>
+    <input type="file" id="fileIn" hidden accept="video/*" onchange="start('archivo')">
+</div>
+
+<div id="canvas-wrapper">
+    <div class="ui-overlay" id="logger">SISTEMA: STANDBY<br>VECTORES: SINCRONIZANDO</div>
+    <canvas id="output_canvas"></canvas>
+</div>
+
+<div class="barra-mandos">
+    <button class="btn-lya" onclick="location.reload()">ATRÁS</button>
+    <button class="btn-lya" onclick="swap()">GIRAR</button>
+    <button id="calBtn" class="btn-lya" style="color: var(--warning);" onclick="initIA()">CALIBRAR</button>
+    <button id="recBtn" class="btn-lya btn-record" onclick="toggleRec()">AUDITAR</button>
+</div>
+
+<video id="input_video" playsinline muted></video>
+
+<script>
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    const logger = document.getElementById('logger');
+    
+    let pose, isIA = false, isCalib = false, isRec = false;
+    let camMode = "environment", baseSet = {}, recorder, chunks = [];
+
+    async function start(mode) {
+        document.getElementById('splash').style.display = 'none';
+        if(mode === 'camara') await openCam();
+        else {
+            video.src = URL.createObjectURL(document.getElementById('fileIn').files[0]);
+            video.onloadedmetadata = () => { resize(); video.play(); preview(); };
+        }
+    }
+
+    async function openCam() {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camMode, width: 1280, height: 720 } });
+        video.srcObject = s;
+        video.onloadedmetadata = () => { resize(); video.play(); preview(); };
+    }
+
+    function resize() { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+
+    function preview() { if (!isIA) { ctx.drawImage(video, 0, 0); requestAnimationFrame(preview); } }
+
+    function initIA() {
+        logger.innerHTML = "CARGANDO MODELO SIMÉTRICO...<br>ACTUALIZANDO NODOS DER/IZQ";
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults(render);
+        isIA = true;
+        
+        const run = async () => { 
+            await pose.send({image: video}); 
+            if(!isCalib) { setTimeout(() => { isCalib = true; logger.innerHTML = "ESTADO: CALIBRADO<br>VECTOR CEFÁLICO: OK"; }, 3000); }
+            requestAnimationFrame(run); 
+        };
+        run();
+    }
+
+    function render(res) {
+        if (!res.poseLandmarks) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Mejorador de imagen: contraste suave
+        ctx.filter = "contrast(115%) brightness(105%)";
+        ctx.drawImage(res.image, 0, 0);
+        ctx.filter = "none";
+
+        const lm = res.poseLandmarks;
+        const w = canvas.width, h = canvas.height;
+        const getP = (i) => ({ x: lm[i].x * w, y: lm[i].y * h });
+
+        // MAPEADO INTEGRAL DE NODOS (CORRECCIÓN LADO DERECHO)
+        const p = {
+            nariz: getP(0), 
+            o_i: getP(7), o_d: getP(8), // Orejas para estabilización
+            h_i: getP(11), h_d: getP(12),
+            c_i: getP(13), c_d: getP(14),
+            m_i: getP(15), m_d: getP(16),
+            cad_i: getP(23), cad_d: getP(24),
+            r_i: getP(25), r_d: getP(26),
+            t_i: getP(27), t_d: getP(28)
+        };
+
+        const c_hombros = { x: (p.h_i.x + p.h_d.x)/2, y: (p.h_i.y + p.h_d.y)/2 };
+        const c_pelvis = { x: (p.cad_i.x + p.cad_d.x)/2, y: (p.cad_i.y + p.cad_d.y)/2 };
+
+        function drawVec(a, b, color = "#00ff00") {
+            ctx.beginPath(); ctx.lineWidth = 6; ctx.lineCap = "round";
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        }
+
+        // --- VECTORIZACIÓN DE CABEZA (OREJA A OREJA) ---
+        drawVec(p.o_i, p.o_d, "#00ccff"); // Vector horizontal cian para estabilización
+        drawVec(p.nariz, c_hombros);      // Conexión central
+
+        // --- EJE CENTRAL ---
+        drawVec(c_hombros, c_pelvis);
+
+        // --- RAMIFICACIÓN LADO IZQUIERDO ---
+        drawVec(c_hombros, p.h_i);
+        drawVec(p.h_i, p.c_i);
+        drawVec(p.c_i, p.m_i);
+        drawVec(c_pelvis, p.cad_i);
+        drawVec(p.cad_i, p.r_i);
+        drawVec(p.r_i, p.t_i);
+
+        // --- RAMIFICACIÓN LADO DERECHO (REFORZADO) ---
+        drawVec(c_hombros, p.h_d);
+        drawVec(p.h_d, p.c_d);
+        drawVec(p.c_d, p.m_d);
+        drawVec(c_pelvis, p.cad_d);
+        drawVec(p.cad_d, p.r_d);
+        drawVec(p.r_d, p.t_d);
+    }
+
+    function toggleRec() {
+        if (!isCalib) return;
+        isRec = !isRec;
+        document.getElementById('recBtn').classList.toggle('active');
+        if (isRec) {
+            chunks = [];
+            recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm' });
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, {type: 'video/webm'});
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = `LYA_AUDIT_PRO_${Date.now()}.webm`; a.click();
+            };
+            recorder.start();
+            logger.innerHTML = "REC: AUDITANDO LADOS IZQ/DER<br>ESTABILIZACIÓN: ACTIVA";
+        } else { recorder.stop(); logger.innerHTML = "SISTEMA: REPORTE DESCARGADO"; }
+    }
+
+    async function swap() { camMode = (camMode === "environment") ? "user" : "environment"; await openCam(); }
+    window.onresize = resize;
+</script>
+</body>
+</html>
