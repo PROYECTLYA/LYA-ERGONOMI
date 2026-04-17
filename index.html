@@ -1,4 +1,3 @@
-V.01
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -60,13 +59,13 @@ V.01
     const ctx = canvas.getContext('2d');
     const txtStatus = document.getElementById('txt-status');
     const progressBar = document.getElementById('bar-id');
-    
-    let pose = null, iaActiva = false, calibrado = false, analizandoRiesgo = false;
-    let currentFacingMode = "environment", startTimeCalib = 0;
-    let baseAngles = {}, angleBuffer = {};
-    let mediaRecorder, recordedChunks = [];
 
-    // UMBRALES DE AUDITORÍA BASADOS EN NORMAS ERGONÓMICAS
+    let baseAngles = {}, angleBuffer = {};
+    const HISTORIAL_MAX = 10;
+    let iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0;
+    let mediaRecorder, recordedChunks = [], pose;
+
     const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
 
     async function prepararSistema(fuente) {
@@ -74,70 +73,69 @@ V.01
         document.getElementById('contenedor-analisis').style.display = 'block';
         if (fuente === 'camara') await encenderCamara();
         else {
-            video.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
-            video.onloadedmetadata = () => { video.play(); requestAnimationFrame(loopVideoSimple); };
+            const file = document.getElementById('fileInput').files[0];
+            video.src = URL.createObjectURL(file);
+            video.onloadedmetadata = () => { 
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                video.play(); 
+                requestAnimationFrame(loopVideoSimple); 
+            };
         }
     }
 
     async function encenderCamara() {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: 1280, height: 720 } });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+        });
         video.srcObject = stream;
-        video.onloadedmetadata = () => { video.play(); requestAnimationFrame(loopVideoSimple); };
+        video.onloadedmetadata = () => { 
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            video.play(); 
+            requestAnimationFrame(loopVideoSimple); 
+        };
     }
 
     function loopVideoSimple() {
         if (!iaActiva) {
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             requestAnimationFrame(loopVideoSimple);
         }
     }
 
-   function activarIA() {
-        iaActiva = false; 
+    function activarIA() {
         document.getElementById('loader-ia').style.display = 'flex';
         canvas.style.opacity = "0"; 
-        txtStatus.innerText = "DESCARGANDO PAQUETES DE IA...";
+        txtStatus.innerText = "INICIALIZANDO LYA-ENGINE...";
 
         pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ 
-            modelComplexity: 1, 
-            smoothLandmarks: true, 
-            minDetectionConfidence: 0.7, 
-            minTrackingConfidence: 0.7 
-        });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
-        let p = 0;
-        const iv = setInterval(() => { 
-            p += Math.random() * 10; 
-            progressBar.style.width = p + '%'; 
-            if(p >= 95) clearInterval(iv); 
-        }, 100);
+        let progress = 0;
+        const interval = setInterval(() => { 
+            progress += 5; 
+            progressBar.style.width = progress + '%'; 
+            if(progress >= 100) clearInterval(interval); 
+        }, 50);
 
         pose.onResults((res) => {
             if (!iaActiva) { 
-                clearInterval(iv);
-                progressBar.style.width = '100%';
-                setTimeout(() => {
-                    document.getElementById('loader-ia').style.display = 'none';
-                    canvas.style.opacity = "1";
-                    iaActiva = true;
-                    startTimeCalib = Date.now();
-                    txtStatus.innerText = "SISTEMA ACTIVO - CALIBRANDO";
-                    loopIA(); 
-                }, 600);
+                clearInterval(interval);
+                document.getElementById('loader-ia').style.display = 'none';
+                canvas.style.opacity = "1";
+                iaActiva = true;
+                startTimeCalib = Date.now();
+                loopIA(); 
             }
             onResults(res);
         });
-
         pose.send({image: video});
     }
 
     async function loopIA() { 
-        if (iaActiva) { 
-            if (video.readyState >= 2) {
-                await pose.send({image: video}); 
-            }
+        if (iaActiva && video.readyState >= 2) { 
+            await pose.send({image: video}); 
             requestAnimationFrame(loopIA); 
         } 
     }
@@ -153,80 +151,64 @@ V.01
         const w = canvas.width, h = canvas.height;
         const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
         
-        // MAPEADO SEGÚN DIAGRAMA DE FLUJO DEL USUARIO
         const p = {
             cab: pt(0), 
             cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
             tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
             abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
-            esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 }, // NODO CENTRAL
+            esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
             h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
             h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
             p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
             p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
         };
 
-        const vertical = (o) => ({ x: o.x, y: o.y + 100, z: o.z });
-
-        const angles = {
+        const currentAngles = {
             cue: calcAng3D(p.cab, p.cue, p.tor),
             abd: calcAng3D(p.tor, p.abd, p.esp_baja),
-            h_d: calcAng3D(vertical(p.h_d), p.h_d, p.c_d),
-            h_i: calcAng3D(vertical(p.h_i), p.h_i, p.c_i),
-            c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
-            c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-            m_d: calcAng3D(p.c_d, p.m_d, p.mano_d),
-            m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
-            r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-            r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-            t_d: calcAng3D(p.r_d, p.t_d, p.pie_d),
-            t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+            c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+            m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
+            h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
+            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+            t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
         };
 
-        // FILTRO DE AUDITORÍA (5 frames de persistencia)
-        for(let key in angles) {
+        for(let key in currentAngles) {
             if(!angleBuffer[key]) angleBuffer[key] = [];
-            angleBuffer[key].push(angles[key]);
-            if(angleBuffer[key].length > 5) angleBuffer[key].shift();
+            angleBuffer[key].push(currentAngles[key]);
+            if(angleBuffer[key].length > HISTORIAL_MAX) angleBuffer[key].shift();
         }
 
         if (!calibrado) {
             const t = Date.now() - startTimeCalib;
-            if (t > 5000) { baseAngles = {...angles}; calibrado = true; txtStatus.innerText = "AUDITORÍA INICIALIZADA"; }
-            else { txtStatus.innerText = `CALIBRANDO BIOTIPO... ${Math.ceil((5000-t)/1000)}s`; }
+            if (t > 5000) { baseAngles = {...currentAngles}; calibrado = true; txtStatus.innerText = "BIOTIPO CALIBRADO - READY"; }
+            else { txtStatus.innerText = `CALIBRANDO... ${Math.ceil((5000-t)/1000)}s`; }
         }
 
         const drawV = (p1, p2, angKey, groupKey) => {
+            if (!angleBuffer[angKey]) return;
             const avgAngle = angleBuffer[angKey].reduce((a,b)=>a+b,0) / angleBuffer[angKey].length;
             ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             
             if (analizandoRiesgo && calibrado) {
-                const diff = Math.abs(avgAngle - baseAngles[angKey]);
+                const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
                 const t = TH[groupKey];
-                if (diff > (t*2)) { ctx.strokeStyle = "#ff3838"; ctx.lineWidth = 12; } // RIESGO ALTO
-                else if (diff > t) { ctx.strokeStyle = "#fffa65"; ctx.lineWidth = 8; }  // RIESGO MEDIO
-                else { ctx.strokeStyle = "#32ff7e"; }                                  // SEGURO
+                if (diff > (t*2)) { ctx.strokeStyle = "#ff3838"; ctx.lineWidth = 12; } 
+                else if (diff > t) { ctx.strokeStyle = "#fffa65"; ctx.lineWidth = 8; }  
+                else { ctx.strokeStyle = "#32ff7e"; }                                   
             } else { ctx.strokeStyle = calibrado ? "#32ff7e" : "#4b4b4b"; }
             ctx.stroke();
         };
 
-        // RENDERIZADO FIEL AL DIAGRAMA (JERARQUÍA DESCENDENTE)
-        drawV(p.cab, p.cue, 'cue', 'cuello'); 
-        drawV(p.cue, p.tor, 'cue', 'cuello'); 
-        drawV(p.tor, p.abd, 'abd', 'tronco');
-        drawV(p.abd, p.esp_baja, 'abd', 'tronco');
-        
-        // Rama Superior Derecha/Izquierda
+        // Renderizado simétrico
+        drawV(p.cab, p.cue, 'cue', 'cuello'); drawV(p.cue, p.tor, 'cue', 'cuello'); 
+        drawV(p.tor, p.abd, 'abd', 'tronco'); drawV(p.abd, p.esp_baja, 'abd', 'tronco');
         drawV(p.cue, p.h_d, 'h_d', 'hombros'); drawV(p.h_d, p.c_d, 'h_d', 'hombros'); 
         drawV(p.c_d, p.m_d, 'c_d', 'codos'); drawV(p.m_d, p.mano_d, 'm_d', 'munecas');
-        
         drawV(p.cue, p.h_i, 'h_i', 'hombros'); drawV(p.h_i, p.c_i, 'h_i', 'hombros'); 
         drawV(p.c_i, p.m_i, 'c_i', 'codos'); drawV(p.m_i, p.mano_i, 'm_i', 'munecas');
-        
-        // Rama Inferior (Desde Espalda Baja)
         drawV(p.esp_baja, p.p_d, 'r_d', 'piernas'); drawV(p.p_d, p.r_d, 'r_d', 'piernas'); 
         drawV(p.r_d, p.t_d, 'r_d', 'piernas'); drawV(p.t_d, p.pie_d, 't_d', 'pies');
-        
         drawV(p.esp_baja, p.p_i, 'r_i', 'piernas'); drawV(p.p_i, p.r_i, 'r_i', 'piernas'); 
         drawV(p.r_i, p.t_i, 'r_i', 'piernas'); drawV(p.t_i, p.pie_i, 't_i', 'pies');
 
@@ -246,20 +228,27 @@ V.01
         document.getElementById('recordBtn').classList.toggle('rec-active', analizandoRiesgo);
         if (analizandoRiesgo) {
             recordedChunks = [];
-            mediaRecorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm; codecs=vp9' });
+            const stream = canvas.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
             mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
             mediaRecorder.onstop = () => {
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(recordedChunks));
-                a.download = `EVIDENCIA_ERGO_${Date.now()}.webm`; a.click();
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
+                link.download = `LYA_AUDIT_${Date.now()}.webm`;
+                link.click();
             };
             mediaRecorder.start();
-            txtStatus.innerText = "CAPTURANDO EVIDENCIA...";
-        } else { mediaRecorder.stop(); txtStatus.innerText = "AUDITORÍA FINALIZADA"; }
+            txtStatus.innerText = "REC: ANALIZANDO POSTURAS...";
+        } else {
+            mediaRecorder.stop();
+            txtStatus.innerText = "AUDITORÍA COMPLETADA";
+        }
     }
 
     async function cambiarCamara() {
         currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        iaActiva = false; await encenderCamara();
+        iaActiva = false;
+        await encenderCamara();
     }
 </script>
 </body>
