@@ -61,7 +61,7 @@
     const progressBar = document.getElementById('bar-id');
 
     let baseAngles = {}, angleBuffer = {};
-    const HISTORIAL_MAX = 10;
+    const HISTORIAL_MAX = 20; // Subido para mayor estabilidad
     let iaActiva = false, calibrado = false, analizandoRiesgo = false;
     let currentFacingMode = "environment", startTimeCalib = 0;
     let mediaRecorder, recordedChunks = [], pose;
@@ -109,19 +109,19 @@
         canvas.style.opacity = "0"; 
         txtStatus.innerText = "INICIALIZANDO LYA-ENGINE...";
 
-        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose = new Pose({ 
+            locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+        });
 
-        let progress = 0;
-        const interval = setInterval(() => { 
-            progress += 5; 
-            progressBar.style.width = progress + '%'; 
-            if(progress >= 100) clearInterval(interval); 
-        }, 50);
+        pose.setOptions({
+            modelComplexity: 2, 
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.8,
+            minTrackingConfidence: 0.8
+        });
 
         pose.onResults((res) => {
             if (!iaActiva) { 
-                clearInterval(interval);
                 document.getElementById('loader-ia').style.display = 'none';
                 canvas.style.opacity = "1";
                 iaActiva = true;
@@ -130,6 +130,14 @@
             }
             onResults(res);
         });
+
+        let progress = 0;
+        const interval = setInterval(() => { 
+            progress += 5; 
+            progressBar.style.width = progress + '%'; 
+            if(progress >= 100) clearInterval(interval); 
+        }, 50);
+
         pose.send({image: video});
     }
 
@@ -139,6 +147,36 @@
             requestAnimationFrame(loopIA); 
         } 
     }
+
+    // --- FUNCIÓN DE DIBUJO ROBUSTA ---
+    const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+        ctx.beginPath();
+        ctx.lineCap = "round";
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+
+        // Filtro de Visibilidad para evitar distorsiones de perspectiva
+        if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
+            ctx.strokeStyle = "#4b4b4b"; 
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            return; 
+        }
+
+        const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
+
+        if (analizandoRiesgo && calibrado) {
+            const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+            const t = TH[groupKey];
+            if (diff > (t * 2)) { ctx.strokeStyle = "#ff3838"; ctx.lineWidth = 12; } 
+            else if (diff > t) { ctx.strokeStyle = "#fffa65"; ctx.lineWidth = 8; }  
+            else { ctx.strokeStyle = "#32ff7e"; ctx.lineWidth = 6; }                
+        } else {
+            ctx.strokeStyle = calibrado ? "#32ff7e" : "#4b4b4b";
+            ctx.lineWidth = 6;
+        }
+        ctx.stroke();
+    };
 
     function onResults(res) {
         if (!res.poseLandmarks) return;
@@ -185,32 +223,31 @@
             else { txtStatus.innerText = `CALIBRANDO... ${Math.ceil((5000-t)/1000)}s`; }
         }
 
-        const drawV = (p1, p2, angKey, groupKey) => {
-            if (!angleBuffer[angKey]) return;
-            const avgAngle = angleBuffer[angKey].reduce((a,b)=>a+b,0) / angleBuffer[angKey].length;
-            ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
-            
-            if (analizandoRiesgo && calibrado) {
-                const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-                const t = TH[groupKey];
-                if (diff > (t*2)) { ctx.strokeStyle = "#ff3838"; ctx.lineWidth = 12; } 
-                else if (diff > t) { ctx.strokeStyle = "#fffa65"; ctx.lineWidth = 8; }  
-                else { ctx.strokeStyle = "#32ff7e"; }                                   
-            } else { ctx.strokeStyle = calibrado ? "#32ff7e" : "#4b4b4b"; }
-            ctx.stroke();
-        };
-
-        // Renderizado simétrico
-        drawV(p.cab, p.cue, 'cue', 'cuello'); drawV(p.cue, p.tor, 'cue', 'cuello'); 
-        drawV(p.tor, p.abd, 'abd', 'tronco'); drawV(p.abd, p.esp_baja, 'abd', 'tronco');
-        drawV(p.cue, p.h_d, 'h_d', 'hombros'); drawV(p.h_d, p.c_d, 'h_d', 'hombros'); 
-        drawV(p.c_d, p.m_d, 'c_d', 'codos'); drawV(p.m_d, p.mano_d, 'm_d', 'munecas');
-        drawV(p.cue, p.h_i, 'h_i', 'hombros'); drawV(p.h_i, p.c_i, 'h_i', 'hombros'); 
-        drawV(p.c_i, p.m_i, 'c_i', 'codos'); drawV(p.m_i, p.mano_i, 'm_i', 'munecas');
-        drawV(p.esp_baja, p.p_d, 'r_d', 'piernas'); drawV(p.p_d, p.r_d, 'r_d', 'piernas'); 
-        drawV(p.r_d, p.t_d, 'r_d', 'piernas'); drawV(p.t_d, p.pie_d, 't_d', 'pies');
-        drawV(p.esp_baja, p.p_i, 'r_i', 'piernas'); drawV(p.p_i, p.r_i, 'r_i', 'piernas'); 
-        drawV(p.r_i, p.t_i, 'r_i', 'piernas'); drawV(p.t_i, p.pie_i, 't_i', 'pies');
+        // --- RENDERIZADO SIMÉTRICO ---
+        drawV(p.cab, p.cue, 'cue', 'cuello', lm[0], lm[11]); 
+        drawV(p.cue, p.tor, 'cue', 'cuello', lm[11], lm[12]); 
+        drawV(p.tor, p.abd, 'abd', 'tronco', lm[11], lm[23]); 
+        drawV(p.abd, p.esp_baja, 'abd', 'tronco', lm[23], lm[24]);
+        
+        drawV(p.cue, p.h_d, 'h_d', 'hombros', lm[11], lm[12]); 
+        drawV(p.h_d, p.c_d, 'h_d', 'hombros', lm[12], lm[14]); 
+        drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]); 
+        drawV(p.m_d, p.mano_d, 'm_d', 'munecas', lm[16], lm[20]);
+        
+        drawV(p.cue, p.h_i, 'h_i', 'hombros', lm[12], lm[11]); 
+        drawV(p.h_i, p.c_i, 'h_i', 'hombros', lm[11], lm[13]); 
+        drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]); 
+        drawV(p.m_i, p.mano_i, 'm_i', 'munecas', lm[15], lm[19]);
+        
+        drawV(p.esp_baja, p.p_d, 'r_d', 'piernas', lm[23], lm[24]); 
+        drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
+        drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]); 
+        drawV(p.t_d, p.pie_d, 't_d', 'pies', lm[28], lm[32]);
+        
+        drawV(p.esp_baja, p.p_i, 'r_i', 'piernas', lm[24], lm[23]); 
+        drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
+        drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]); 
+        drawV(p.t_i, p.pie_i, 't_i', 'pies', lm[27], lm[31]);
 
         ctx.restore();
     }
