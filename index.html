@@ -95,18 +95,54 @@ CODIGO DE EVALUACION EN TIEMPO REAL
         }
     }
 
-    function activarIA() {
+   function activarIA() {
+        iaActiva = false; 
         document.getElementById('loader-ia').style.display = 'flex';
+        canvas.style.opacity = "0"; 
+        txtStatus.innerText = "DESCARGANDO PAQUETES DE IA...";
+
         pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
-        pose.onResults(onResults);
-        
+        pose.setOptions({ 
+            modelComplexity: 1, 
+            smoothLandmarks: true, 
+            minDetectionConfidence: 0.7, 
+            minTrackingConfidence: 0.7 
+        });
+
         let p = 0;
-        const iv = setInterval(() => { p += 5; progressBar.style.width = p+'%'; if(p>=100) clearInterval(iv); }, 50);
-        setTimeout(() => { document.getElementById('loader-ia').style.display='none'; iaActiva=true; startTimeCalib=Date.now(); loopIA(); }, 1500);
+        const iv = setInterval(() => { 
+            p += Math.random() * 10; 
+            progressBar.style.width = p + '%'; 
+            if(p >= 95) clearInterval(iv); 
+        }, 100);
+
+        pose.onResults((res) => {
+            if (!iaActiva) { 
+                clearInterval(iv);
+                progressBar.style.width = '100%';
+                setTimeout(() => {
+                    document.getElementById('loader-ia').style.display = 'none';
+                    canvas.style.opacity = "1";
+                    iaActiva = true;
+                    startTimeCalib = Date.now();
+                    txtStatus.innerText = "SISTEMA ACTIVO - CALIBRANDO";
+                    loopIA(); 
+                }, 600);
+            }
+            onResults(res);
+        });
+
+        pose.send({image: video});
     }
 
-    async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
+    async function loopIA() { 
+        if (iaActiva) { 
+            if (video.readyState >= 2) {
+                await pose.send({image: video}); 
+            }
+            requestAnimationFrame(loopIA); 
+        } 
+    }
 
     function onResults(res) {
         if (!res.poseLandmarks) return;
