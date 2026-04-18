@@ -1,3 +1,4 @@
+LYA V6:49 PM
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LYA-ERGO v20.2 | AUDITORÍA CERVECERA</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
@@ -36,17 +39,12 @@
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría de Procesos</p>
-    
-  <div style="width: 85%; max-width: 320px; margin-bottom: 20px;">
-    <label style="color: #8b949e; font-size: 0.7rem; display: block; text-align: left; margin-bottom: 5px;">PUESTO DE TRABAJO:</label>
-    <input type="text" id="puestoTrabajo" placeholder="Ej: Operador Línea 4" 
-           style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white; margin-bottom: 10px;">
-    
-    <label style="color: #8b949e; font-size: 0.7rem; display: block; text-align: left; margin-bottom: 5px;">PESO DE LA CARGA (KG):</label>
-    <input type="number" id="pesoCarga" placeholder="Ej: 10" 
-           style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white;">
-</div>
-
+    <div style="width: 85%; max-width: 320px; margin-bottom: 20px;">
+        <label style="color: #8b949e; font-size: 0.7rem; display: block; text-align: left; margin-bottom: 5px;">PUESTO DE TRABAJO:</label>
+        <input type="text" id="puestoTrabajo" placeholder="Ej: Operador Línea 4" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white; margin-bottom: 10px;">
+        <label style="color: #8b949e; font-size: 0.7rem; display: block; text-align: left; margin-bottom: 5px;">PESO DE LA CARGA (KG):</label>
+        <input type="number" id="pesoCarga" placeholder="Ej: 10" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white;">
+    </div>
     <button class="btn-inicio" style="background:#27ae60; color:white;" onclick="prepararSistema('camara')">🎥 VISTA EN VIVO</button>
     <button class="btn-inicio" style="background:#2980b9; color:white;" onclick="document.getElementById('fileInput').click()">📁 SUBIR EVIDENCIA</button>
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
@@ -71,26 +69,18 @@
     const txtStatus = document.getElementById('txt-status');
     const progressBar = document.getElementById('bar-id');
 
-    // --- CONFIGURACIÓN DE UMBRALES WBA ---
-    const TH = { 
-        tronco: 18, 
-        cuello: 12, 
-        hombros: 28, 
-        codos: 25, 
-        munecas: 20, 
-        piernas: 25, 
-        pies: 18 
-    };
-
-    let wbaStats = {
-        riesgoAltoTotal: 0,
-        framesAnalizados: 0,
-        zonasAfectadas: new Set(),
-        inicioAuditoria: null
-    };
-
+    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
+  // Añade 'ciclos' y 'lastHandY' a tu objeto de estadísticas
+let wbaStats = { 
+    riesgoAltoTotal: 0, 
+    framesAnalizados: 0, 
+    zonasAfectadas: new Set(), 
+    inicioAuditoria: null,
+    ciclos: 0, // <--- Nueva línea
+    lastHandY: null // <--- Nueva línea
+};
     let baseAngles = {}, angleBuffer = {};
-    const HISTORIAL_MAX = 20; 
+    const HISTORIAL_MAX = 20;
     let iaActiva = false, calibrado = false, analizandoRiesgo = false;
     let currentFacingMode = "environment", startTimeCalib = 0;
     let mediaRecorder, recordedChunks = [], pose;
@@ -113,16 +103,18 @@
     }
 
     async function encenderCamara() {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
-        });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => { 
-            canvas.width = video.videoWidth; 
-            canvas.height = video.videoHeight;
-            video.play(); 
-            requestAnimationFrame(loopVideoSimple); 
-        };
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => { 
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                video.play(); 
+                requestAnimationFrame(loopVideoSimple); 
+            };
+        } catch (e) { alert("Error al acceder a la cámara"); }
     }
 
     function loopVideoSimple() {
@@ -132,254 +124,6 @@
         }
     }
 
-function generarReporteWBA() {
-    // 1. Obtención de datos base
-    const nombrePuesto = document.getElementById('puestoTrabajo')?.value || "No_especificado";
-    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
-    
-    // 2. Cálculos métricos (Deben ir primero para evitar errores de referencia)
-    const duracionSegundos = wbaStats.inicioAuditoria 
-        ? ((Date.now() - wbaStats.inicioAuditoria) / 1000).toFixed(1) 
-        : 0;
-    
-    const porcentajeRiesgoPostural = wbaStats.framesAnalizados > 0 
-        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
-        : 0;
-
-    // 3. Evaluación de Riesgos (NOM-036 y WBA)
-    const zonasCriticas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna';
-    
-    let alertaPeso = peso > 25 ? "!!! RIESGO CRÍTICO: EXCESO DE CARGA (NOM-036) !!!" : 
-                    (peso > 15 ? "!!! RIESGO POTENCIAL: LÍMITE MUJERES/MENORES (NOM-036) !!!" : "PESO DENTRO DE LÍMITES");
-
-    let recomendacion = (peso > 25 || porcentajeRiesgoPostural > 25) 
-        ? `NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA. Riesgo detectado en: ${zonasCriticas}.` 
-        : "OPERACIÓN ESTABLE / RIESGO BAJO O MODERADO.";
-
-    // 4. Construcción del contenido del reporte
-    let contenido = `
-=========================================
-REPORTE MIXTO: WBA + NOM-036-STPS
-=========================================
-PUESTO: ${nombrePuesto}
-FECHA: ${new Date().toLocaleString()}
-DURACIÓN EVALUADA: ${duracionSegundos} segundos
------------------------------------------
-ANÁLISIS DE CARGA (NOM-036):
-Peso registrado: ${peso} kg
-Estatus: ${alertaPeso}
-
-ANÁLISIS POSTURAL (WBA):
-Tiempo en Postura Crítica: ${porcentajeRiesgoPostural}%
-Zonas afectadas detectadas: ${zonasCriticas}
-
-CONCLUSIÓN Y RECOMENDACIÓN:
-${recomendacion}
-=========================================
-    `;
-
-    // 5. Generación y descarga del archivo
-    const blob = new Blob([contenido.trim()], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `REPORTE_${nombrePuesto.replace(/\s+/g, '_')}_${Date.now()}.txt`;
-    link.click();
-}
-    
-    
-
-    function activarIA() {
-        document.getElementById('loader-ia').style.display = 'flex';
-        canvas.style.opacity = "0"; 
-        txtStatus.innerText = "INICIALIZANDO LYA-ENGINE...";
-
-        pose = new Pose({ 
-            locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-        });
-
-        pose.setOptions({
-            modelComplexity: 2, 
-            smoothLandmarks: true,
-            minDetectionConfidence: 0.8,
-            minTrackingConfidence: 0.8
-        });
-
-        pose.onResults((res) => {
-            if (!iaActiva) { 
-                document.getElementById('loader-ia').style.display = 'none';
-                canvas.style.opacity = "1";
-                iaActiva = true;
-                startTimeCalib = Date.now();
-                loopIA(); 
-            }
-            onResults(res);
-        });
-
-        let progress = 0;
-        const interval = setInterval(() => { 
-            progress += 5; 
-            progressBar.style.width = progress + '%'; 
-            if(progress >= 100) clearInterval(interval); 
-        }, 50);
-
-        pose.send({image: video});
-    }
-
-    async function loopIA() { 
-        if (iaActiva && video.readyState >= 2) { 
-            await pose.send({image: video}); 
-            requestAnimationFrame(loopIA); 
-        } 
-    }
-
-   const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-    // 1. Configuración de dibujo base
-    ctx.beginPath();
-    ctx.lineCap = "round";
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-
-    // Si la visibilidad es baja, dibujamos en gris y salimos
-    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
-        ctx.strokeStyle = "#4b4b4b"; 
-        ctx.lineWidth = 4;
-        ctx.stroke();
-        return; 
-    }
-
-    // Cálculo del promedio suavizado
-    const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
-    
-    // Variables de estilo dinámico
-    let color = "#00ff00";
-    let thickness = 4;
-    let statusLabel = "SEGURO";
-
-    // 2. Lógica de Evaluación de Umbrales
-    if (analizandoRiesgo && calibrado) {
-        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const t = TH[groupKey];
-        
-        wbaStats.framesAnalizados++;
-
-        if (diff > (t * 2)) { 
-            wbaStats.riesgoAltoTotal++;
-            wbaStats.zonasAfectadas.add(groupKey);
-            color = "#ff3838"; // Rojo
-            thickness = 12; 
-            statusLabel = "CRÍTICO";
-        } else if (diff > t) {
-            color = "#f1c40f"; // Amarillo
-            thickness = 8;
-            statusLabel = "ADVERTENCIA";
-        }
-    } else {
-        color = "#00ff00"; // Verde (Modo vista o pre-auditoría)
-        thickness = 4;
-    }
-
-    // Dibujar la línea del segmento corporal
-    ctx.strokeStyle = color;
-    ctx.lineWidth = thickness;
-    ctx.stroke();
-
-    // 3. RENDERIZADO DE ETIQUETAS (UI en Tiempo Real)
-    if (calibrado) {
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-
-        // Configuración de texto
-        const txtAngle = `${avgAngle.toFixed(1)}°`;
-        const txtInfo = `${groupKey.toUpperCase()} [${statusLabel}]`;
-        
-        ctx.font = "bold 11px 'Segoe UI', Arial";
-        const measure = ctx.measureText(txtInfo);
-        const padding = 8;
-        const rectW = measure.width + (padding * 2);
-        const rectH = 34;
-
-        // Sombra y fondo de la etiqueta (neցro semi-transparente)
-        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-        ctx.roundRect(midX + 15, midY - 15, rectW, rectH, 5);
-        ctx.fill();
-
-        // Borde indicador de estado en la etiqueta
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Renderizado de texto: Resultado del cálculo
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(txtAngle, midX + 20, midY + 2);
-        
-        // Renderizado de texto: Tipo de umbral y zona
-        ctx.fillStyle = color;
-        ctx.font = "900 9px 'Segoe UI', Arial";
-        ctx.fillText(txtInfo, midX + 20, midY + 14);
-    }
-};
-
-    function onResults(res) {
-        if (!res.poseLandmarks) return;
-        ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
-
-        const lm = res.poseLandmarks;
-        const w = canvas.width, h = canvas.height;
-        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        
-        const p = {
-            cab: pt(0), 
-            cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
-            tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
-            abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
-            esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
-            h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
-            h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
-            p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
-            p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
-        };
-
-        const currentAngles = {
-            cue: calcAng3D(p.cab, p.cue, p.tor),
-            abd: calcAng3D(p.tor, p.abd, p.esp_baja),
-            c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-            m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
-            h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
-            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-            t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
-        };
-
-        for(let key in currentAngles) {
-            if(!angleBuffer[key]) angleBuffer[key] = [];
-            angleBuffer[key].push(currentAngles[key]);
-            if(angleBuffer[key].length > HISTORIAL_MAX) angleBuffer[key].shift();
-        }
-
-        if (!calibrado) {
-            const t = Date.now() - startTimeCalib;
-            if (t > 5000) { baseAngles = {...currentAngles}; calibrado = true; txtStatus.innerText = "BIOTIPO CALIBRADO - READY"; }
-            else { txtStatus.innerText = `CALIBRANDO... ${Math.ceil((5000-t)/1000)}s`; }
-        }
-
-        drawV(p.cab, p.cue, 'cue', 'cuello', lm[0], lm[11]); 
-        drawV(p.cue, p.tor, 'cue', 'cuello', lm[11], lm[12]); 
-        drawV(p.tor, p.abd, 'abd', 'tronco', lm[11], lm[23]); 
-        drawV(p.abd, p.esp_baja, 'abd', 'tronco', lm[23], lm[24]);
-        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
-        drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]); 
-        drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
-        drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]); 
-        drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
-        drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]); 
-        drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
-        drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
-
-        ctx.restore();
-    }
-
     function calcAng3D(a,b,c) {
         const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
         const dot = v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
@@ -387,37 +131,283 @@ ${recomendacion}
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 
-    function toggleGrabacion() {
-        if (!calibrado) return;
-        analizandoRiesgo = !analizandoRiesgo;
-        document.getElementById('recordBtn').classList.toggle('rec-active', analizandoRiesgo);
-        
-        if (analizandoRiesgo) {
-            wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now() };
-            recordedChunks = [];
-            const stream = canvas.captureStream(30);
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `EVIDENCIA_AUDITORIA_${Date.now()}.webm`;
-                link.click();
-            };
-            mediaRecorder.start();
-            txtStatus.innerText = "REC: ANALIZANDO POSTURAS...";
-        } else {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-            generarReporteWBA(); 
-            txtStatus.innerText = "AUDITORÍA COMPLETADA";
+    const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+        ctx.beginPath();
+        ctx.lineCap = "round";
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+
+        if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
+            ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke();
+            return; 
         }
+
+        const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
+        let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
+
+        if (analizandoRiesgo && calibrado) {
+            const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+            const t = TH[groupKey];
+            wbaStats.framesAnalizados++;
+            if (diff > (t * 2)) { 
+                wbaStats.riesgoAltoTotal++; wbaStats.zonasAfectadas.add(groupKey);
+                color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
+            } else if (diff > t) {
+                color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
+            }
+        }
+
+        ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.stroke();
+
+        if (calibrado) {
+            const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+            let offsetX = (groupKey === "munecas") ? 45 : 15;
+            let offsetY = (groupKey === "munecas") ? 20 : -15;
+
+            ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+            ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
+            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
+            ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
+            ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
+            ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
+        }
+    };
+
+ function onResults(res) {
+    if (!res.poseLandmarks) return;
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+    const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
+    const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
+    
+    // Puntos de articulación
+    const p = {
+        cab: pt(0), 
+        cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
+        tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
+        abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
+        esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
+        h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
+        h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
+        p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
+        p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
+    };
+
+    // --- LÓGICA DE FRECUENCIA ---
+    if (analizandoRiesgo) {
+        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
+        if (wbaStats.lastHandY !== null) {
+            const desplazamiento = wbaStats.lastHandY - currentHandY;
+            if (desplazamiento > 50 && !wbaStats.subiendo) {
+                wbaStats.ciclos++; 
+                wbaStats.subiendo = true;
+            } else if (desplazamiento < -50) {
+                wbaStats.subiendo = false;
+            }
+        }
+        wbaStats.lastHandY = currentHandY;
     }
+
+    // --- CÁLCULO DE ÁNGULOS ---
+    const currentAngles = {
+        cue: calcAng3D(p.cab, p.cue, p.tor), abd: calcAng3D(p.tor, p.abd, p.esp_baja),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
+        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
+        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+    };
+
+    Object.keys(currentAngles).forEach(k => {
+        if (!angleBuffer[k]) angleBuffer[k] = [];
+        angleBuffer[k].push(currentAngles[k]);
+        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+    });
+
+    // --- CALIBRACIÓN ---
+    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
+        Object.keys(angleBuffer).forEach(k => { 
+            baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0) / angleBuffer[k].length; 
+        });
+        wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
+        calibrado = true; 
+        document.getElementById('recordBtn').style.opacity = "1";
+        txtStatus.innerText = "CALIBRADO - LISTO";
+    }
+
+    // --- DIBUJADO DE VECTORES CORREGIDO (CONEXIÓN TIPO ESQUELETO) ---
+    
+    // 1. Líneas Base (Hombros y Cadera)
+    ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
+
+    // 2. Torso y Cuello
+    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
+    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
+
+    // 3. Brazos (Derecho e Izquierdo)
+    drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
+    drawV(p.m_d, p.mano_d, 'm_d', 'munecas', lm[16], lm[20]);
+
+    drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]);
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+    drawV(p.m_i, p.mano_i, 'm_i', 'munecas', lm[15], lm[19]);
+
+    // 4. Piernas (Derecha e Izquierda)
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
+
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+
+    ctx.restore();
+}
+    function activarIA() {
+        document.getElementById('loader-ia').style.display = 'flex';
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.onResults((res) => {
+            if (!iaActiva) { 
+                document.getElementById('loader-ia').style.display = 'none';
+                iaActiva = true; startTimeCalib = Date.now(); loopIA(); 
+            }
+            onResults(res);
+        });
+        pose.send({image: video});
+    }
+
+    async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
+
+    
+  function generarReporteWBA() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Obtención de variables dinámicas
+    const puesto = document.getElementById('puestoTrabajo')?.value || "OFICINA";
+    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
+    const porcentajeRiesgo = wbaStats.framesAnalizados > 0 
+        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
+        : 0;
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
+
+    // --- CÁLCULO DE FRECUENCIA (NOM-036) ---
+    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const duracionSegundos = (msTranscurridos / 1000).toFixed(1);
+    const duracionMinutos = msTranscurridos / 60000;
+    // Frecuencia: ciclos detectados entre minutos totales (mínimo 1 seg para evitar división por 0)
+    const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
+
+    // Lógica de Semaforización ampliada con Frecuencia
+    let colorHex = "#27ae60"; // Verde (Seguro)
+    let conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
+
+    // Si el peso es >25kg, frecuencia >4 lev/min o postura crítica >60%
+    if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) {
+        colorHex = "#c0392b"; // Rojo (Crítico)
+        conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA";
+    } else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) {
+        colorHex = "#f1c40f"; // Amarillo (Advertencia)
+        conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS Y MONITOREO";
+    }
+
+    // Diseño del Encabezado
+    doc.setFillColor(13, 17, 23);
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(0, 255, 0);
+    doc.setFontSize(22);
+    doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
+
+    // Datos Generales
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.text(`PUESTO: ${puesto.toUpperCase()}`, 20, 50);
+    doc.text(`FECHA: ${new Date().toLocaleString()}`, 20, 57);
+    doc.text(`DURACIÓN EVALUADA: ${duracionSegundos} s`, 20, 64);
+    doc.text(`CICLOS DETECTADOS: ${wbaStats.ciclos}`, 140, 64);
+
+    // Tabla de Análisis Postural y Carga (Actualizada con Frecuencia)
+    doc.autoTable({
+        startY: 75,
+        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS NOM-036']],
+        body: [
+            ['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],
+            ['Frecuencia de Tarea', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],
+            ['Postura Crítica (WBA)', `${porcentajeRiesgo}%`, zonas]
+        ],
+        headStyles: { fillColor: [41, 128, 185] },
+        styles: { fontSize: 10 }
+    });
+
+    // Recuadro de Conclusión Semaforizado
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setDrawColor(colorHex);
+    doc.setLineWidth(1.5);
+    doc.rect(15, finalY, 180, 40);
+    
+    doc.setTextColor(colorHex);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONCLUSIÓN TÉCNICA Y RECOMENDACIÓN:", 20, finalY + 10);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const recomendacionTexto = `${conclusion}. El análisis detectó estrés biomecánico en: ${zonas}. Se recomienda revisar el método de trabajo para reducir los ${wbaStats.ciclos} levantamientos observados.`;
+    doc.text(recomendacionTexto, 20, finalY + 20, { maxWidth: 170 });
+
+    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+}
+
+
+    
+    function toggleGrabacion() {
+    if (!calibrado) return;
+
+    analizandoRiesgo = !analizandoRiesgo;
+    const btn = document.getElementById('recordBtn');
+    
+    btn.classList.toggle('rec-active', analizandoRiesgo);
+
+    if (analizandoRiesgo) {
+        // REINICIO TOTAL DE ESTADÍSTICAS PARA NUEVA AUDITORÍA
+        wbaStats = { 
+            riesgoAltoTotal: 0, 
+            framesAnalizados: 0, 
+            zonasAfectadas: new Set(), 
+            inicioAuditoria: Date.now(),
+            // Nuevas variables de frecuencia NOM-036
+            ciclos: 0, 
+            lastHandY: null,
+            subiendo: false 
+        };
+        
+        txtStatus.innerText = "ANALIZANDO...";
+        btn.innerHTML = "⏹️<br>DETENER"; // Cambio visual opcional para UX
+    } else {
+        // FINALIZACIÓN Y GENERACIÓN DE REPORTE
+        txtStatus.innerText = "GENERANDO REPORTE...";
+        btn.innerHTML = "🔴<br>AUDITAR";
+        
+        // Pequeño delay para asegurar que el último frame se procese
+        setTimeout(() => {
+            generarReporteWBA();
+            txtStatus.innerText = "FIN AUDITORÍA";
+        }, 300);
+    }
+}
 
     async function cambiarCamara() {
         currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        iaActiva = false;
-        await encenderCamara();
+        iaActiva = false; await encenderCamara();
     }
 </script>
 </body>
