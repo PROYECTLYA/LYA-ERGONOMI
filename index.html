@@ -4,7 +4,7 @@ VERSION NUEVA:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYA-ERGO v21.0 | AUDITORÍA NOM-036</title>
+    <title>LYA-ERGO v22.0 | AUDITORÍA CON VIDEO</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,7 +19,6 @@ VERSION NUEVA:
             font-family: 'Segoe UI', Roboto, sans-serif; 
         }
 
-        /* Menú Principal */
         #menu-inicial { 
             display: flex; width: 100vw; height: 100vh; flex-direction: column; 
             align-items: center; justify-content: center;
@@ -45,7 +44,6 @@ VERSION NUEVA:
             transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.4); cursor: pointer;
         }
 
-        /* Contenedor de Análisis */
         #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
         canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
         video { display: none; }
@@ -86,9 +84,7 @@ VERSION NUEVA:
 
 <div id="loader-ia">
     <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">LYA-AUDITOR ENGINE</h3>
-    <div class="progress-bar-container">
-        <div id="bar-id" class="progress-bar-fill"></div>
-    </div>
+    <div class="progress-bar-container"><div id="bar-id" class="progress-bar-fill"></div></div>
 </div>
 
 <div id="menu-inicial">
@@ -123,14 +119,14 @@ VERSION NUEVA:
     const ctx = canvas.getContext('2d');
     const txtStatus = document.getElementById('txt-status');
 
-    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
     let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
-    
-    let baseAngles = {}, angleBuffer = {};
-    const HISTORIAL_MAX = 20;
-    let iaActiva = false, calibrado = false, analizandoRiesgo = false;
-    let currentFacingMode = "environment", startTimeCalib = 0;
-    let pose;
+    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
+    let baseAngles = {}, angleBuffer = {}, iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0, pose;
+
+    // --- VARIABLES DE GRABACIÓN ---
+    let mediaRecorder;
+    let recordedChunks = [];
 
     async function prepararSistema(fuente) {
         document.getElementById('menu-inicial').style.display = 'none';
@@ -139,34 +135,20 @@ VERSION NUEVA:
         else {
             const file = document.getElementById('fileInput').files[0];
             if (!file) return;
-            if (video.src) URL.revokeObjectURL(video.src); // Liberar memoria
             video.src = URL.createObjectURL(file);
-            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
+            video.onloadedmetadata = () => { canvas.width = video.videoWidth; canvas.height = video.videoHeight; video.play(); requestAnimationFrame(loopVideoSimple); };
         }
-    }
-
-    function setupCanvas() {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
     }
 
     async function encenderCamara() {
         try {
-            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } });
             video.srcObject = stream;
-            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
-        } catch (e) { alert("Error al acceder a la cámara"); }
+            video.onloadedmetadata = () => { canvas.width = video.videoWidth; canvas.height = video.videoHeight; video.play(); requestAnimationFrame(loopVideoSimple); };
+        } catch (e) { alert("Error cámara"); }
     }
 
-    function loopVideoSimple() {
-        if (!iaActiva) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            requestAnimationFrame(loopVideoSimple);
-        }
-    }
+    function loopVideoSimple() { if (!iaActiva) { ctx.drawImage(video, 0, 0, canvas.width, canvas.height); requestAnimationFrame(loopVideoSimple); } }
 
     function calcAng3D(a,b,c) {
         const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
@@ -176,45 +158,19 @@ VERSION NUEVA:
     }
 
     const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-        ctx.beginPath();
-        ctx.lineCap = "round";
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
         if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
-            ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke();
-            return; 
+            ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke(); return; 
         }
-
         const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
-        let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
-
+        let color = "#00ff00", thickness = 4;
         if (analizandoRiesgo && calibrado) {
             const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-            const t = TH[groupKey];
+            if (diff > (TH[groupKey] * 2)) { color = "#ff3838"; thickness = 10; wbaStats.zonasAfectadas.add(groupKey); wbaStats.riesgoAltoTotal++; }
+            else if (diff > TH[groupKey]) { color = "#f1c40f"; thickness = 7; }
             wbaStats.framesAnalizados++;
-            if (diff > (t * 2)) { 
-                wbaStats.riesgoAltoTotal++; wbaStats.zonasAfectadas.add(groupKey);
-                color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
-            } else if (diff > t) {
-                color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
-            }
         }
-
         ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.stroke();
-
-        if (calibrado) {
-            const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
-            let offsetX = (groupKey === "munecas") ? 45 : 15;
-            let offsetY = (groupKey === "munecas") ? 20 : -15;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-            ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
-            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
-            ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
-            ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
-            ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
-        }
     };
 
     function onResults(res) {
@@ -226,77 +182,51 @@ VERSION NUEVA:
 
         const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
         const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        
         const p = {
-            cab: pt(0), 
-            cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
+            cab: pt(0), cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
             tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
             abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
             esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
-            h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
-            h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
-            p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
-            p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
+            h_d: pt(12), c_d: pt(14), m_d: pt(16), h_i: pt(11), c_i: pt(13), m_i: pt(15),
+            p_d: pt(24), r_d: pt(26), t_d: pt(28), p_i: pt(23), r_i: pt(25), t_i: pt(27)
         };
 
-        // --- LÓGICA DE FRECUENCIA MEJORADA (Normalizada por altura del torso) ---
         if (analizandoRiesgo) {
-            const alturaTorso = Math.abs(p.h_d.y - p.p_d.y); // Referencia dinámica
             const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-            const umbralMovimiento = alturaTorso * 0.3; // 30% del tamaño del torso para contar un ciclo
-
-            if (wbaStats.lastHandY !== null) {
-                const desplazamiento = wbaStats.lastHandY - currentHandY;
-                if (desplazamiento > umbralMovimiento && !wbaStats.subiendo) {
-                    wbaStats.ciclos++; wbaStats.subiendo = true;
-                } else if (desplazamiento < -umbralMovimiento) {
-                    wbaStats.subiendo = false;
-                }
+            if (wbaStats.lastHandY && Math.abs(wbaStats.lastHandY - currentHandY) > 60) {
+                if (currentHandY < wbaStats.lastHandY && !wbaStats.subiendo) { wbaStats.ciclos++; wbaStats.subiendo = true; }
+                else if (currentHandY > wbaStats.lastHandY) { wbaStats.subiendo = false; }
             }
             wbaStats.lastHandY = currentHandY;
         }
 
-        const currentAngles = {
+        const angles = {
             cue: calcAng3D(p.cab, p.cue, p.tor), abd: calcAng3D(p.tor, p.abd, p.esp_baja),
             c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-            m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
-            h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
-            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-            t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
         };
 
-        Object.keys(currentAngles).forEach(k => {
+        Object.keys(angles).forEach(k => {
             if (!angleBuffer[k]) angleBuffer[k] = [];
-            angleBuffer[k].push(currentAngles[k]);
-            if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+            angleBuffer[k].push(angles[k]); if (angleBuffer[k].length > 20) angleBuffer[k].shift();
         });
 
         if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
-            Object.keys(angleBuffer).forEach(k => { baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0) / angleBuffer[k].length; });
-            wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
-            calibrado = true; document.getElementById('recordBtn').style.opacity = "1";
-            txtStatus.innerText = "CALIBRADO - LISTO";
+            Object.keys(angleBuffer).forEach(k => { baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0)/20; });
+            calibrado = true; document.getElementById('recordBtn').style.opacity = "1"; txtStatus.innerText = "LISTO";
         }
 
-        // Esqueleto
-        ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
         drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
-        drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
-        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
-        drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
-        drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
-        drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]);
         ctx.restore();
     }
 
     function activarIA() {
         document.getElementById('loader-ia').style.display = 'flex';
         pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6 });
         pose.onResults((res) => {
-            if (!iaActiva) { document.getElementById('loader-ia').style.display = 'none'; iaActiva = true; startTimeCalib = Date.now(); loopIA(); }
+            if (!iaActiva) { iaActiva = true; document.getElementById('loader-ia').style.display = 'none'; startTimeCalib = Date.now(); loopIA(); }
             onResults(res);
         });
         pose.send({image: video});
@@ -304,62 +234,65 @@ VERSION NUEVA:
 
     async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
 
-    function generarReporteWBA() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
-        const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
-        const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
-        const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
-        const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
-        const duracionMinutos = msTranscurridos / 60000;
-        const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
-
-        let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
-        if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { colorHex = "#c0392b"; conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA"; }
-        else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { colorHex = "#f1c40f"; conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS"; }
-
-        doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
-        doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
-
-        doc.autoTable({
-            startY: 75,
-            head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS']],
-            body: [['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],['Postura Crítica', `${porcentajeRiesgo}%`, zonas]],
-            headStyles: { fillColor: [41, 128, 185] }
-        });
-
-        const finalY = doc.lastAutoTable.finalY + 15;
-        doc.setDrawColor(colorHex); doc.rect(15, finalY, 180, 40);
-        doc.setTextColor(colorHex); doc.text("CONCLUSIÓN Y RECOMENDACIÓN:", 20, finalY + 10);
-        doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-        doc.text(`${conclusion}. Se detectó estrés en: ${zonas}. Ciclos totales: ${wbaStats.ciclos}.`, 20, finalY + 20, { maxWidth: 170 });
-        doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+    // --- FUNCIÓN PARA DESCARGAR VIDEO ---
+    function descargarVideo() {
+        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `EVIDENCIA_LYA_${Date.now()}.mp4`;
+        a.click();
+        recordedChunks = [];
     }
 
     function toggleGrabacion() {
         if (!calibrado) return;
         analizandoRiesgo = !analizandoRiesgo;
         const btn = document.getElementById('recordBtn');
-        btn.classList.toggle('rec-active', analizandoRiesgo);
+        btn.classList.toggle('rec-active');
 
         if (analizandoRiesgo) {
-            wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
-            txtStatus.innerText = "ANALIZANDO...";
-            btn.innerHTML = "⏹️<br>DETENER";
+            // INICIAR CAPTURA DE VIDEO DESDE CANVAS
+            const stream = canvas.captureStream(30); // 30 FPS
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = descargarVideo;
+            mediaRecorder.start();
+
+            wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null };
+            txtStatus.innerText = "GRABANDO Y ANALIZANDO...";
         } else {
-            txtStatus.innerText = "GENERANDO REPORTE...";
-            btn.innerHTML = "🔴<br>AUDITAR";
-            setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "FIN AUDITORÍA"; }, 300);
+            mediaRecorder.stop();
+            generarReporteWBA();
+            txtStatus.innerText = "REPORTES GUARDADOS";
         }
+    }
+
+    function generarReporteWBA() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const puesto = document.getElementById('puestoTrabajo').value || "OPERADOR";
+        const peso = document.getElementById('pesoCarga').value || 0;
+        const duracion = ((Date.now() - wbaStats.inicioAuditoria)/1000).toFixed(1);
+        
+        doc.setFontSize(20); doc.text("REPORTE DE AUDITORÍA ERGONÓMICA", 10, 20);
+        doc.setFontSize(12);
+        doc.text(`Puesto: ${puesto}`, 10, 40);
+        doc.text(`Carga: ${peso} kg`, 10, 50);
+        doc.text(`Duración: ${duracion} seg`, 10, 60);
+        doc.text(`Ciclos Detectados: ${wbaStats.ciclos}`, 10, 70);
+        
+        doc.autoTable({
+            startY: 80,
+            head: [['Zona', 'Estado']],
+            body: Array.from(wbaStats.zonasAfectadas).map(z => [z, 'RIESGO DETECTADO'])
+        });
+        doc.save(`REPORTE_${puesto}.pdf`);
     }
 
     async function cambiarCamara() {
         currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        iaActiva = false;
-        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-        await encenderCamara();
+        iaActiva = false; await encenderCamara();
     }
 </script>
 </body>
