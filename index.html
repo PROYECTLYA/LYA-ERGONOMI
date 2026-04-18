@@ -1,3 +1,4 @@
+VERSION NUEVA: 
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -80,8 +81,6 @@ let wbaStats = { 
 };
     let baseAngles = {}, angleBuffer = {};
     const HISTORIAL_MAX = 20;
-    let mediaRecorder;
-let recordedChunks = [];
     let iaActiva = false, calibrado = false, analizandoRiesgo = false;
     let currentFacingMode = "environment", startTimeCalib = 0;
     let mediaRecorder, recordedChunks = [], pose;
@@ -369,7 +368,8 @@ let recordedChunks = [];
 }
 
 
-   function toggleGrabacion() {
+    
+    function toggleGrabacion() {
     if (!calibrado) return;
 
     analizandoRiesgo = !analizandoRiesgo;
@@ -378,61 +378,30 @@ let recordedChunks = [];
     btn.classList.toggle('rec-active', analizandoRiesgo);
 
     if (analizandoRiesgo) {
-        // --- 1. CONFIGURACIÓN DE GRABACIÓN DE VÍDEO ---
-        recordedChunks = [];
-        // Capturamos el stream del canvas (incluye el esqueleto y datos de IA)
-        const stream = canvas.captureStream(30); 
-        mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm; codecs=vp9'
-        });
-
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const puesto = document.getElementById('puestoTrabajo')?.value || "AUDITORIA";
-            a.href = url;
-            a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        };
-
-        // Iniciar captura
-        mediaRecorder.start();
-
-        // --- 2. REINICIO DE ESTADÍSTICAS ---
+        // REINICIO TOTAL DE ESTADÍSTICAS PARA NUEVA AUDITORÍA
         wbaStats = { 
             riesgoAltoTotal: 0, 
             framesAnalizados: 0, 
             zonasAfectadas: new Set(), 
             inicioAuditoria: Date.now(),
+            // Nuevas variables de frecuencia NOM-036
             ciclos: 0, 
             lastHandY: null,
             subiendo: false 
         };
         
-        txtStatus.innerText = "GRABANDO EVIDENCIA...";
-        btn.innerHTML = "⏹️<br>DETENER";
-
+        txtStatus.innerText = "ANALIZANDO...";
+        btn.innerHTML = "⏹️<br>DETENER"; // Cambio visual opcional para UX
     } else {
-        // --- 3. CIERRE Y DESCARGA DE ARCHIVOS ---
-        txtStatus.innerText = "GENERANDO ARCHIVOS...";
+        // FINALIZACIÓN Y GENERACIÓN DE REPORTE
+        txtStatus.innerText = "GENERANDO REPORTE...";
         btn.innerHTML = "🔴<br>AUDITAR";
         
-        // Detener grabación de video (esto dispara mediaRecorder.onstop automáticamente)
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-            mediaRecorder.stop();
-        }
-
-        // Delay para asegurar que el proceso de video no interfiera con el PDF
+        // Pequeño delay para asegurar que el último frame se procese
         setTimeout(() => {
             generarReporteWBA();
-            txtStatus.innerText = "AUDITORÍA COMPLETADA";
-        }, 600);
+            txtStatus.innerText = "FIN AUDITORÍA";
+        }, 300);
     }
 }
 
