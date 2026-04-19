@@ -4,7 +4,7 @@ DOMINGO V3
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYA-ERGO Pro v23.0 | NOM-036-1-STPS</title>
+    <title>LYA-ERGO TOTAL v26.0 | NOM-036-1-STPS</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -13,67 +13,67 @@ DOMINGO V3
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
     <style>
-        :root { --primary: #00ff00; --danger: #ff3838; --bg: #0d1117; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; }
+        :root { --primary: #00ff00; --danger: #ff3838; --warning: #f1c40f; --bg: #0d1117; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
         
-        /* Animaciones de Carga IA */
-        #loader-ia { 
-            display: none; position: fixed; inset: 0; background: rgba(13, 17, 23, 0.95); 
-            z-index: 9000; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .scanner-line { width: 300px; height: 2px; background: var(--primary); box-shadow: 0 0 15px var(--primary); animation: scan 2s infinite; }
-        @keyframes scan { 0%, 100% { transform: translateY(-50px); } 50% { transform: translateY(50px); } }
+        /* Loader IA */
+        #loader-ia { display: none; position: fixed; inset: 0; background: rgba(13, 17, 23, 0.98); z-index: 9000; flex-direction: column; align-items: center; justify-content: center; }
+        .scanner-line { width: 350px; height: 3px; background: var(--primary); box-shadow: 0 0 20px var(--primary); animation: scan 2s infinite; }
+        @keyframes scan { 0%, 100% { transform: translateY(-60px); } 50% { transform: translateY(60px); } }
 
-        /* Contenedor Principal */
+        /* App Principal */
         #main-app { display: none; position: relative; width: 100vw; height: 100vh; }
         canvas { width: 100%; height: 100%; object-fit: contain; }
         video { display: none; }
 
-        /* UI Overlays */
-        .hud-top { position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; pointer-events: none; }
-        .badge-info { background: rgba(0,0,0,0.8); padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary); pointer-events: all; }
-        
-        .controls-footer { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; }
-        .btn-action { width: 60px; height: 60px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; transition: 0.3s; }
-        .btn-rec.active { background: white !important; color: red !important; border: 5px solid red; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        /* MINIATURA 3D (Render Estilo Imagen Adjunta) */
+        #canvas-3d { 
+            position: absolute; top: 100px; right: 20px; width: 220px; height: 180px; 
+            background: rgba(0,0,0,0.6); border: 2px solid #30363d; border-radius: 12px; 
+            z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
 
-        /* Menú de Configuración Mejorado */
-        #setup-menu { height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); }
-        .config-card { background: #161b22; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; border: 1px solid #30363d; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .hud-top { position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; z-index: 10; pointer-events: none; }
+        .badge-info { background: rgba(0,0,0,0.85); padding: 12px; border-radius: 10px; border-left: 5px solid var(--primary); pointer-events: all; backdrop-filter: blur(10px); }
+        
+        .controls-footer { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 100; }
+        .btn-action { width: 65px; height: 65px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; transition: 0.3s; }
+        .btn-rec.active { background: white !important; color: red !important; border: 6px solid red; animation: pulse 1s infinite; }
+
+        #setup-menu { height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1c2128 0%, #0d1117 100%); }
+        .config-card { background: #161b22; padding: 40px; border-radius: 20px; width: 95%; max-width: 500px; border: 1px solid #30363d; }
     </style>
 </head>
 <body>
 
 <div id="loader-ia">
     <div class="scanner-line"></div>
-    <h3 class="mt-4 text-uppercase" style="letter-spacing: 3px; color: var(--primary);">Sincronizando Biometría...</h3>
-    <p class="text-secondary">Cargando modelos de Redes Neuronales PoseNet v2</p>
+    <h3 class="mt-4 text-success" style="letter-spacing: 5px;">SISTEMA BIOMÉTRICO 3D</h3>
 </div>
 
 <div id="setup-menu">
     <div class="config-card">
-        <h2 class="text-center mb-4"><i class="bi bi-shield-check text-success"></i> LYA-ERGO PRO</h2>
+        <h2 class="text-center mb-4 text-success font-monospace">LYA-ERGO TOTAL</h2>
         <div class="mb-3">
-            <label class="form-label">Puesto / Actividad</label>
-            <input type="text" id="inp-puesto" class="form-control bg-dark text-white border-secondary" placeholder="Ej. Operador Línea 4">
+            <label class="form-label small fw-bold text-secondary text-uppercase">Puesto de Trabajo</label>
+            <input type="text" id="inp-puesto" class="form-control bg-dark text-white border-secondary" placeholder="Ej. LÍNEA-12">
         </div>
-        <div class="row mb-3">
-            <div class="col">
-                <label class="form-label">Género</label>
+        <div class="row mb-4">
+            <div class="col-6">
+                <label class="form-label small fw-bold text-secondary">GÉNERO</label>
                 <select id="inp-genero" class="form-select bg-dark text-white border-secondary">
-                    <option value="H">Masculino</option>
-                    <option value="M">Femenino</option>
+                    <option value="H">Hombre (25kg)</option>
+                    <option value="M">Mujer (15kg)</option>
                 </select>
             </div>
-            <div class="col">
-                <label class="form-label">Carga (kg)</label>
-                <input type="number" id="inp-peso" class="form-control bg-dark text-white border-secondary" value="10">
+            <div class="col-6">
+                <label class="form-label small fw-bold text-secondary">PESO CARGA</label>
+                <input type="number" id="inp-peso" class="form-control bg-dark text-white border-secondary" value="5">
             </div>
         </div>
         <div class="d-grid gap-2">
-            <button onclick="iniciarApp('camara')" class="btn btn-success btn-lg"><i class="bi bi-camera-video"></i> Usar Cámara Real</button>
-            <button onclick="document.getElementById('file-upload').click()" class="btn btn-outline-info"><i class="bi bi-upload"></i> Evaluar Video Local</button>
+            <button onclick="iniciarApp('camara')" class="btn btn-success btn-lg">INICIAR CÁMARA</button>
+            <button onclick="document.getElementById('file-upload').click()" class="btn btn-outline-info">VIDEO LOCAL</button>
             <input type="file" id="file-upload" hidden accept="video/*" onchange="iniciarApp('video')">
         </div>
     </div>
@@ -82,219 +82,173 @@ DOMINGO V3
 <div id="main-app">
     <div class="hud-top">
         <div class="badge-info">
-            <div id="txt-puesto" class="fw-bold">PUESTO: -</div>
-            <div id="txt-status" class="small text-warning">CALIBRANDO...</div>
+            <div id="txt-puesto" class="fw-bold small">PUESTO: -</div>
+            <div id="txt-limite" class="text-info small">LÍMITE: 25kg</div>
         </div>
         <div class="badge-info text-end">
-            <div class="text-info"><i class="bi bi-arrow-repeat"></i> <span id="txt-ciclos">CICLOS: 0</span></div>
-            <div class="small" id="txt-timer">00:00:00</div>
+            <div class="text-success fw-bold">CICLOS: <span id="txt-ciclos">0</span></div>
+            <div class="text-secondary small">MODO: 3D POSE</div>
         </div>
     </div>
 
-    <video id="input_video" playsinline></video>
+    <canvas id="canvas-3d"></canvas>
+
+    <video id="input_video" playsinline muted></video>
     <canvas id="output_canvas"></canvas>
 
     <div class="controls-footer">
-        <button class="btn-action btn-danger" title="Salir" onclick="salir()"><i class="bi bi-x-lg"></i></button>
-        <button class="btn-action btn-secondary" title="Girar Cámara" onclick="cambiarCamara()"><i class="bi bi-camera-reverse"></i></button>
-        <button id="btn-rec" class="btn-action btn-warning" title="Grabar Auditoría" onclick="toggleAuditoria()"><i class="bi bi-record-circle"></i></button>
-        <button class="btn-action btn-info" title="Exportar PDF" onclick="exportarReporte()"><i class="bi bi-file-earmark-pdf"></i></button>
+        <button class="btn-action btn-danger" onclick="salir()"><i class="bi bi-power"></i></button>
+        <button id="btn-flip" class="btn-action btn-secondary" onclick="cambiarCamara()"><i class="bi bi-camera-reverse"></i></button>
+        <button id="btn-rec" class="btn-action btn-warning" onclick="toggleAuditoria()"><i class="bi bi-record-circle-fill"></i></button>
+        <button class="btn-action btn-info" onclick="exportarReporte()"><i class="bi bi-file-earmark-pdf-fill"></i></button>
     </div>
 </div>
 
 <script>
-    // --- ESTADO GLOBAL ---
     const state = {
-        iaActiva: false, calibrado: false, auditando: false, 
-        ciclos: 0, subiendo: false, lastY: null,
-        startTime: null, pesoMax: 25, 
-        videoRecorder: null, recordedChunks: [],
-        facingMode: 'environment', stream: null
+        iaActiva: false, auditando: false, ciclos: 0, subiendo: false, lastY: null,
+        pesoActual: 0, limiteLegal: 25, facingMode: 'environment', recordedChunks: [], videoRecorder: null
     };
 
-    const videoElement = document.getElementById('input_video');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    const THRESHOLDS = { tronco: 20, codos: 30, cuello: 15 };
+    const video = document.getElementById('input_video');
+    const mainCanvas = document.getElementById('output_canvas');
+    const mainCtx = mainCanvas.getContext('2d');
+    const miniCanvas = document.getElementById('canvas-3d');
+    const miniCtx = miniCanvas.getContext('2d');
 
-    // --- MOTOR DE POSE ---
-    const pose = new Pose({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
+    const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
-    pose.setOptions({
-        modelComplexity: 1, // Balance entre velocidad y calidad (puedes subir a 2 si el PC es potente)
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-    });
+    function getAngle(a, b, c) {
+        const v1 = { x: a.x - b.x, y: a.y - b.y };
+        const v2 = { x: c.x - b.x, y: c.y - b.y };
+        const dot = v1.x * v2.x + v1.y * v2.y;
+        const mag1 = Math.sqrt(v1.x**2 + v1.y**2);
+        const mag2 = Math.sqrt(v2.x**2 + v2.y**2);
+        return Math.round(Math.acos(dot / (mag1 * mag2)) * (180 / Math.PI)) || 0;
+    }
 
-    // --- JERARQUÍA DE VECTORES Y DIBUJO ---
-    function dibujarJerarquia(landmarks) {
-        const w = canvasElement.width;
-        const h = canvasElement.height;
+    function render3DView(landmarks) {
+        miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+        const w = miniCanvas.width; const h = miniCanvas.height;
+        
+        // Estilo de cuadrícula (como tu imagen)
+        miniCtx.strokeStyle = "#ffffff11";
+        for(let i=0; i<w; i+=20) { miniCtx.beginPath(); miniCtx.moveTo(i,0); miniCtx.lineTo(i,h); miniCtx.stroke(); }
+        for(let i=0; i<h; i+=20) { miniCtx.beginPath(); miniCtx.moveTo(0,i); miniCtx.lineTo(w,i); miniCtx.stroke(); }
 
-        const getPt = (idx) => ({ x: landmarks[idx].x * w, y: landmarks[idx].y * h, z: landmarks[idx].z, vis: landmarks[idx].visibility });
-
-        // Definición de huesos (Jerarquía)
-        const huesos = [
-            [11, 12], [11, 23], [12, 24], [23, 24], // Torso
-            [11, 13], [13, 15], [12, 14], [14, 16], // Brazos
-            [23, 25], [25, 27], [24, 26], [26, 28]  // Piernas
-        ];
-
-        huesos.forEach(([start, end]) => {
-            const p1 = getPt(start);
-            const p2 = getPt(end);
-
-            if (p1.vis > 0.5 && p2.vis > 0.5) {
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(p1.x, p1.y);
-                canvasCtx.lineTo(p2.x, p2.y);
-                
-                // Color dinámico basado en riesgo (Lógica simplificada para visualización)
-                canvasCtx.strokeStyle = state.auditando ? (Math.random() > 0.9 ? 'red' : '#00ff00') : '#00ff00';
-                canvasCtx.lineWidth = 5;
-                canvasCtx.lineCap = 'round';
-                canvasCtx.stroke();
-            }
-        });
-
-        // Articulaciones
-        landmarks.forEach(lm => {
-            if (lm.visibility > 0.5) {
-                canvasCtx.beginPath();
-                canvasCtx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
-                canvasCtx.fillStyle = "white";
-                canvasCtx.fill();
-            }
+        const getXY = (i) => ({ x: landmarks[i].x * w, y: landmarks[i].y * h });
+        
+        miniCtx.lineWidth = 3;
+        miniCtx.strokeStyle = "#00ff00";
+        const bones = [[11,12], [11,23], [12,24], [23,24], [11,13], [13,15], [12,14], [14,16], [23,25], [24,26], [25,27], [26,28]];
+        
+        bones.forEach(([s, e]) => {
+            const p1 = getXY(s); const p2 = getXY(e);
+            miniCtx.beginPath();
+            miniCtx.moveTo(p1.x, p1.y);
+            miniCtx.lineTo(p2.x, p2.y);
+            miniCtx.stroke();
         });
     }
 
-    pose.onResults((results) => {
-        if (!results.poseLandmarks) return;
-
-        canvasCtx.save();
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-        dibujarJerarquia(results.poseLandmarks);
-
-        // --- LÓGICA DE CICLOS (UMBRAL DINÁMICO) ---
-        const midHandY = (results.poseLandmarks[15].y + results.poseLandmarks[16].y) / 2;
-        const torsoSize = Math.abs(results.poseLandmarks[11].y - results.poseLandmarks[23].y);
-        const umbral = torsoSize * 0.2;
-
-        if (state.auditando && state.lastY) {
-            const diff = state.lastY - midHandY;
-            if (Math.abs(diff) > umbral) {
-                if (diff > 0 && !state.subiendo) { state.ciclos++; state.subiendo = true; }
-                else if (diff < 0) { state.subiendo = false; }
-            }
-        }
-        state.lastY = midHandY;
-        document.getElementById('txt-ciclos').innerText = `CICLOS: ${state.ciclos}`;
+    function drawLabels(ctx, landmarks, w, h) {
+        const getPt = (i) => ({ x: landmarks[i].x * w, y: landmarks[i].y * h });
+        const pts = { h_i: getPt(11), c_d: getPt(14), cue: { x: (landmarks[11].x + landmarks[12].x)/2 * w, y: (landmarks[11].y + landmarks[12].y)/2 * h } };
         
-        canvasCtx.restore();
+        const labels = [
+            { pt: pts.cue, txt: `TRONCO: ${getAngle(getPt(11), {x: (landmarks[23].x + landmarks[24].x)/2 * w, y: (landmarks[23].y + landmarks[24].y)/2 * h}, {x: (landmarks[23].x + landmarks[24].x)/2 * w, y: 0})}°` },
+            { pt: pts.c_d, txt: `CODO D: ${getAngle(getPt(12), getPt(14), getPt(16))}°` }
+        ];
+
+        labels.forEach(l => {
+            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillRect(l.pt.x + 10, l.pt.y - 20, 110, 30);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 13px Arial";
+            ctx.fillText(l.txt, l.pt.x + 15, l.pt.y);
+        });
+    }
+
+    pose.onResults((res) => {
+        if (!res.poseLandmarks) return;
+        mainCtx.save();
+        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        mainCtx.drawImage(res.image, 0, 0, mainCanvas.width, mainCanvas.height);
+        
+        // Render Principal
+        const w = mainCanvas.width; const h = mainCanvas.height;
+        mainCtx.lineWidth = 5; mainCtx.strokeStyle = "#ffffff55";
+        [[11,12], [11,23], [12,24], [23,24], [11,13], [13,15], [12,14], [14,16]].forEach(([s, e]) => {
+            mainCtx.beginPath();
+            mainCtx.moveTo(res.poseLandmarks[s].x * w, res.poseLandmarks[s].y * h);
+            mainCtx.lineTo(res.poseLandmarks[e].x * w, res.poseLandmarks[e].y * h);
+            mainCtx.stroke();
+        });
+
+        drawLabels(mainCtx, res.poseLandmarks, w, h);
+        render3DView(res.poseLandmarks);
+
+        // Ciclos
+        const midY = (res.poseLandmarks[15].y + res.poseLandmarks[16].y) / 2;
+        if (state.auditando && state.lastY) {
+            if (state.lastY - midY > 0.15 && !state.subiendo) { state.ciclos++; state.subiendo = true; }
+            if (state.lastY - midY < -0.15) { state.subiendo = false; }
+        }
+        state.lastY = midY;
+        document.getElementById('txt-ciclos').innerText = state.ciclos;
+        mainCtx.restore();
     });
 
-    // --- FUNCIONES DE CONTROL ---
     async function iniciarApp(modo) {
         document.getElementById('setup-menu').style.display = 'none';
         document.getElementById('loader-ia').style.display = 'flex';
+        state.pesoActual = parseFloat(document.getElementById('inp-peso').value);
+        state.limiteLegal = document.getElementById('inp-genero').value === 'H' ? 25 : 15;
         
-        const peso = parseFloat(document.getElementById('inp-peso').value);
-        state.pesoMax = document.getElementById('inp-genero').value === 'H' ? 25 : 15;
-        document.getElementById('txt-puesto').innerText = `PUESTO: ${document.getElementById('inp-puesto').value || 'GENERAL'}`;
-
         if (modo === 'camara') {
-            state.stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: state.facingMode, width: 1280, height: 720 } 
-            });
-            videoElement.srcObject = state.stream;
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facingMode, width: 1280, height: 720 } });
+            video.srcObject = s;
         } else {
-            const file = document.getElementById('file-upload').files[0];
-            videoElement.src = URL.createObjectURL(file);
+            video.src = URL.createObjectURL(document.getElementById('file-upload').files[0]);
         }
 
-        videoElement.play();
-        
-        // Sincronizar Canvas
-        videoElement.onloadedmetadata = () => {
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-            procesarFrame();
+        video.play();
+        video.onloadedmetadata = () => {
+            mainCanvas.width = video.videoWidth; mainCanvas.height = video.videoHeight;
+            miniCanvas.width = 220; miniCanvas.height = 180;
+            loop();
         };
-
-        setTimeout(() => {
-            document.getElementById('loader-ia').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            state.iaActiva = true;
-        }, 3000);
+        setTimeout(() => { document.getElementById('loader-ia').style.display = 'none'; document.getElementById('main-app').style.display = 'block'; state.iaActiva = true; }, 2500);
     }
 
-    async function procesarFrame() {
-        if (!state.iaActiva && !videoElement.paused) {
-            await pose.send({ image: videoElement });
-        }
-        requestAnimationFrame(procesarFrame);
-    }
+    async function loop() { if (!video.paused) await pose.send({ image: video }); requestAnimationFrame(loop); }
 
     function toggleAuditoria() {
         state.auditando = !state.auditando;
         const btn = document.getElementById('btn-rec');
         if (state.auditando) {
             btn.classList.add('active');
-            state.ciclos = 0;
-            state.startTime = new Date();
-            iniciarGrabacionVideo();
-        } else {
-            btn.classList.remove('active');
-            detenerGrabacionVideo();
-        }
-    }
-
-    function iniciarGrabacionVideo() {
-        state.recordedChunks = [];
-        const canvasStream = canvasElement.captureStream(30);
-        state.videoRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
-        state.videoRecorder.ondataavailable = (e) => state.recordedChunks.push(e.data);
-        state.videoRecorder.onstop = descargarVideo;
-        state.videoRecorder.start();
-    }
-
-    function detenerGrabacionVideo() { state.videoRecorder.stop(); }
-
-    function descargarVideo() {
-        const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `Auditoria_LYA_${Date.now()}.webm`;
-        a.click();
+            state.recordedChunks = [];
+            state.videoRecorder = new MediaRecorder(mainCanvas.captureStream(30), { mimeType: 'video/webm' });
+            state.videoRecorder.ondataavailable = (e) => state.recordedChunks.push(e.data);
+            state.videoRecorder.onstop = () => {
+                const b = new Blob(state.recordedChunks, { type: 'video/webm' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `Auditoria_LYA.webm`; a.click();
+            };
+            state.videoRecorder.start();
+        } else { btn.classList.remove('active'); state.videoRecorder.stop(); }
     }
 
     function exportarReporte() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.setFontSize(20);
-        doc.text("REPORTE DE AUDITORÍA ERGONÓMICA", 20, 20);
-        doc.setFontSize(12);
-        doc.text(`Puesto: ${document.getElementById('inp-puesto').value}`, 20, 40);
-        doc.text(`Ciclos Detectados: ${state.ciclos}`, 20, 50);
-        doc.text(`Cumplimiento NOM-036: ${state.ciclos > 10 ? 'RIESGO MODERADO' : 'BAJO'}`, 20, 60);
-        doc.save("Reporte_Ergo.pdf");
-    }
-
-    async function cambiarCamara() {
-        state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
-        if (state.stream) {
-            state.stream.getTracks().forEach(t => t.stop());
-            iniciarApp('camara');
-        }
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        doc.text("REPORTE LYA-ERGO", 20, 20);
+        doc.text(`Ciclos: ${state.ciclos} | Carga: ${state.pesoActual}kg`, 20, 40);
+        doc.save("Reporte_NOM036.pdf");
     }
 
     function salir() { location.reload(); }
+    async function cambiarCamara() { state.facingMode = state.facingMode === 'user' ? 'environment' : 'user'; iniciarApp('camara'); }
 </script>
 </body>
 </html>
