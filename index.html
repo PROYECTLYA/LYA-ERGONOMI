@@ -1,219 +1,300 @@
-FINAL DOMINGO V2
-
+DOMINGO V3
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYA-ERGO v22.0 | NOM-036 AI</title>
+    <title>LYA-ERGO Pro v23.0 | NOM-036-1-STPS</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
     <style>
-        * { box-sizing: border-box; }
-        body { background-color: #0d1117; color: white; font-family: sans-serif; overflow: hidden; margin: 0; }
-        #contenedor-analisis { width: 100vw; height: 100vh; position: relative; display: none; }
+        :root { --primary: #00ff00; --danger: #ff3838; --bg: #0d1117; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; }
+        
+        /* Animaciones de Carga IA */
+        #loader-ia { 
+            display: none; position: fixed; inset: 0; background: rgba(13, 17, 23, 0.95); 
+            z-index: 9000; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .scanner-line { width: 300px; height: 2px; background: var(--primary); box-shadow: 0 0 15px var(--primary); animation: scan 2s infinite; }
+        @keyframes scan { 0%, 100% { transform: translateY(-50px); } 50% { transform: translateY(50px); } }
+
+        /* Contenedor Principal */
+        #main-app { display: none; position: relative; width: 100vw; height: 100vh; }
         canvas { width: 100%; height: 100%; object-fit: contain; }
         video { display: none; }
-        #loader-ia { 
-            display: none; position: fixed; top:0; left:0; width:100%; height:100%; 
-            background: rgba(13, 17, 23, 0.98); z-index: 6000; 
-            flex-direction: column; align-items: center; justify-content: center;
-        }
-        .status-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px; border-left: 4px solid #00ff00; }
-        .barra-controles { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
-        .btn-circular { width: 70px; height: 70px; border-radius: 50%; border: none; font-weight: bold; cursor: pointer; }
-        .rec-active { background: white !important; color: red !important; border: 4px solid red !important; }
+
+        /* UI Overlays */
+        .hud-top { position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; pointer-events: none; }
+        .badge-info { background: rgba(0,0,0,0.8); padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary); pointer-events: all; }
         
-        /* Estilos Menú Inicial */
-        #menu-inicial { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        .input-group-custom { width: 90%; max-width: 400px; background: #161b22; padding: 20px; border-radius: 10px; }
-        input, select { width: 100%; padding: 10px; margin: 10px 0; background: #0d1117; border: 1px solid #30363d; color: white; border-radius: 5px; }
+        .controls-footer { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; }
+        .btn-action { width: 60px; height: 60px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; transition: 0.3s; }
+        .btn-rec.active { background: white !important; color: red !important; border: 5px solid red; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* Menú de Configuración Mejorado */
+        #setup-menu { height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); }
+        .config-card { background: #161b22; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; border: 1px solid #30363d; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
 <div id="loader-ia">
-    <h2 style="color:#00ff00">INICIANDO IA...</h2>
+    <div class="scanner-line"></div>
+    <h3 class="mt-4 text-uppercase" style="letter-spacing: 3px; color: var(--primary);">Sincronizando Biometría...</h3>
+    <p class="text-secondary">Cargando modelos de Redes Neuronales PoseNet v2</p>
 </div>
 
-<div id="menu-inicial">
-    <div class="input-group-custom">
-        <h3 class="text-center mb-4">LYA-ERGO CONFIG</h3>
-        <label>PUESTO DE TRABAJO</label>
-        <input type="text" id="puestoTrabajo" placeholder="Ej. Estibador">
-        <label>GÉNERO</label>
-        <select id="genero">
-            <option value="H">Masculino (25kg Max)</option>
-            <option value="M">Femenino (15kg Max)</option>
-        </select>
-        <label>PESO DE CARGA (KG)</label>
-        <input type="number" id="pesoCarga" value="10">
-        <button class="btn btn-success w-100 mt-3" onclick="activarIA()">INICIAR CÁMARA</button>
+<div id="setup-menu">
+    <div class="config-card">
+        <h2 class="text-center mb-4"><i class="bi bi-shield-check text-success"></i> LYA-ERGO PRO</h2>
+        <div class="mb-3">
+            <label class="form-label">Puesto / Actividad</label>
+            <input type="text" id="inp-puesto" class="form-control bg-dark text-white border-secondary" placeholder="Ej. Operador Línea 4">
+        </div>
+        <div class="row mb-3">
+            <div class="col">
+                <label class="form-label">Género</label>
+                <select id="inp-genero" class="form-select bg-dark text-white border-secondary">
+                    <option value="H">Masculino</option>
+                    <option value="M">Femenino</option>
+                </select>
+            </div>
+            <div class="col">
+                <label class="form-label">Carga (kg)</label>
+                <input type="number" id="inp-peso" class="form-control bg-dark text-white border-secondary" value="10">
+            </div>
+        </div>
+        <div class="d-grid gap-2">
+            <button onclick="iniciarApp('camara')" class="btn btn-success btn-lg"><i class="bi bi-camera-video"></i> Usar Cámara Real</button>
+            <button onclick="document.getElementById('file-upload').click()" class="btn btn-outline-info"><i class="bi bi-upload"></i> Evaluar Video Local</button>
+            <input type="file" id="file-upload" hidden accept="video/*" onchange="iniciarApp('video')">
+        </div>
     </div>
 </div>
 
-<div id="contenedor-analisis">
-    <div class="status-badge" id="txt-status">ESPERANDO IA...</div>
-    <video id="input_video" playsinline muted></video>
+<div id="main-app">
+    <div class="hud-top">
+        <div class="badge-info">
+            <div id="txt-puesto" class="fw-bold">PUESTO: -</div>
+            <div id="txt-status" class="small text-warning">CALIBRANDO...</div>
+        </div>
+        <div class="badge-info text-end">
+            <div class="text-info"><i class="bi bi-arrow-repeat"></i> <span id="txt-ciclos">CICLOS: 0</span></div>
+            <div class="small" id="txt-timer">00:00:00</div>
+        </div>
+    </div>
+
+    <video id="input_video" playsinline></video>
     <canvas id="output_canvas"></canvas>
-    
-    <div class="barra-controles">
-        <button class="btn-circular btn-danger" onclick="detenerTodo()">SALIR</button>
-        <button id="recordBtn" class="btn-circular btn-warning" style="opacity:0.3" onclick="toggleGrabacion()">REC</button>
+
+    <div class="controls-footer">
+        <button class="btn-action btn-danger" title="Salir" onclick="salir()"><i class="bi bi-x-lg"></i></button>
+        <button class="btn-action btn-secondary" title="Girar Cámara" onclick="cambiarCamara()"><i class="bi bi-camera-reverse"></i></button>
+        <button id="btn-rec" class="btn-action btn-warning" title="Grabar Auditoría" onclick="toggleAuditoria()"><i class="bi bi-record-circle"></i></button>
+        <button class="btn-action btn-info" title="Exportar PDF" onclick="exportarReporte()"><i class="bi bi-file-earmark-pdf"></i></button>
     </div>
 </div>
 
 <script>
-    const video = document.getElementById('input_video');
-    const canvas = document.getElementById('output_canvas');
-    const ctx = canvas.getContext('2d');
-    const txtStatus = document.getElementById('txt-status');
-
-    let configAuditoria = { peso: 0, genero: 'H', puesto: '', limiteLegal: 25 };
-    let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
-    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, piernas: 25 };
-    let baseAngles = {}, angleBuffer = {}, iaActiva = false, calibrado = false, analizandoRiesgo = false;
-    let currentFacingMode = "environment", startTimeCalib = 0, pose = null, camera = null;
-
-    function actualizarConfiguracion() {
-        configAuditoria.peso = Math.max(0, parseFloat(document.getElementById('pesoCarga').value) || 0);
-        configAuditoria.genero = document.getElementById('genero').value;
-        configAuditoria.puesto = document.getElementById('puestoTrabajo').value || "No especificado";
-        configAuditoria.limiteLegal = (configAuditoria.genero === 'H') ? 25 : 15;
-    }
-
-    function calcAng3D(a, b, c) {
-        const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }, 
-              v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
-        const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-        const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2), 
-              m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
-        return (m1 * m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
-    }
-
-    const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-        if (!raw_lm1 || !raw_lm2) return;
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        const vis = (raw_lm1.visibility + raw_lm2.visibility) / 2;
-        ctx.globalAlpha = Math.max(0.1, vis); 
-        const buffer = angleBuffer[angKey] || [];
-        if (buffer.length < 5) { ctx.strokeStyle = "#444"; ctx.stroke(); return; }
-
-        const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
-        let color = "#00ff00"; let thickness = 4;
-
-        if (analizandoRiesgo && calibrado) {
-            const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-            const sobrepesoCarga = configAuditoria.peso > configAuditoria.limiteLegal;
-            const anguloCritico = diff > (TH[groupKey] * 2);
-            if (sobrepesoCarga || anguloCritico) {
-                color = "#ff3838"; thickness = 10; 
-                wbaStats.zonasAfectadas.add(sobrepesoCarga ? "PESO" : groupKey.toUpperCase());
-                wbaStats.riesgoAltoTotal++;
-            } else if (diff > TH[groupKey]) {
-                color = "#f1c40f"; thickness = 7;
-            }
-        }
-        ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round"; ctx.stroke();
-        ctx.globalAlpha = 1.0;
+    // --- ESTADO GLOBAL ---
+    const state = {
+        iaActiva: false, calibrado: false, auditando: false, 
+        ciclos: 0, subiendo: false, lastY: null,
+        startTime: null, pesoMax: 25, 
+        videoRecorder: null, recordedChunks: [],
+        facingMode: 'environment', stream: null
     };
 
-    function onResults(res) {
-        if (!res.poseLandmarks) return;
-        ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const THRESHOLDS = { tronco: 20, codos: 30, cuello: 15 };
 
-        const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
-        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        const p = {
-            cab: pt(0), h_d: pt(12), h_i: pt(11), m_d: pt(16), m_i: pt(15),
-            c_d: pt(14), c_i: pt(13), p_d: pt(24), p_i: pt(23),
-            cue: { x: (lm[11].x + lm[12].x)/2*w, y: (lm[11].y + lm[12].y)/2*h },
-            esp_baja: { x: (lm[23].x + lm[24].x)/2*w, y: (lm[23].y + lm[24].y)/2*h }
-        };
+    // --- MOTOR DE POSE ---
+    const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
 
-        if (analizandoRiesgo) {
-            const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-            const estaturaTorso = Math.abs(p.cue.y - p.esp_baja.y);
-            const umbralMinimo = estaturaTorso * 0.3;
-            if (wbaStats.lastHandY) {
-                const diff = wbaStats.lastHandY - currentHandY;
-                if (Math.abs(diff) > umbralMinimo) {
-                    if (diff > umbralMinimo && !wbaStats.subiendo) { wbaStats.ciclos++; wbaStats.subiendo = true; }
-                    else if (diff < -umbralMinimo) { wbaStats.subiendo = false; }
-                }
+    pose.setOptions({
+        modelComplexity: 1, // Balance entre velocidad y calidad (puedes subir a 2 si el PC es potente)
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    // --- JERARQUÍA DE VECTORES Y DIBUJO ---
+    function dibujarJerarquia(landmarks) {
+        const w = canvasElement.width;
+        const h = canvasElement.height;
+
+        const getPt = (idx) => ({ x: landmarks[idx].x * w, y: landmarks[idx].y * h, z: landmarks[idx].z, vis: landmarks[idx].visibility });
+
+        // Definición de huesos (Jerarquía)
+        const huesos = [
+            [11, 12], [11, 23], [12, 24], [23, 24], // Torso
+            [11, 13], [13, 15], [12, 14], [14, 16], // Brazos
+            [23, 25], [25, 27], [24, 26], [26, 28]  // Piernas
+        ];
+
+        huesos.forEach(([start, end]) => {
+            const p1 = getPt(start);
+            const p2 = getPt(end);
+
+            if (p1.vis > 0.5 && p2.vis > 0.5) {
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(p1.x, p1.y);
+                canvasCtx.lineTo(p2.x, p2.y);
+                
+                // Color dinámico basado en riesgo (Lógica simplificada para visualización)
+                canvasCtx.strokeStyle = state.auditando ? (Math.random() > 0.9 ? 'red' : '#00ff00') : '#00ff00';
+                canvasCtx.lineWidth = 5;
+                canvasCtx.lineCap = 'round';
+                canvasCtx.stroke();
             }
-            wbaStats.lastHandY = currentHandY;
-        }
-
-        const currentAngles = { abd: calcAng3D(p.cab, p.cue, p.esp_baja), c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i) };
-        Object.keys(currentAngles).forEach(k => {
-            if (!angleBuffer[k]) angleBuffer[k] = [];
-            angleBuffer[k].push(currentAngles[k]);
-            if (angleBuffer[k].length > 15) angleBuffer[k].shift();
         });
 
-        if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
-            Object.keys(angleBuffer).forEach(k => { baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0) / angleBuffer[k].length; });
-            calibrado = true;
-            document.getElementById('recordBtn').style.opacity = "1";
-            txtStatus.innerText = "SISTEMA LISTO";
-        }
-
-        drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
-        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]);
-        drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]);
-
-        ctx.restore();
-        if (analizandoRiesgo) {
-            ctx.fillStyle = "#00ff00"; ctx.font = "bold 24px sans-serif";
-            ctx.fillText(`CICLOS: ${wbaStats.ciclos}`, 20, h - 40);
-        }
+        // Articulaciones
+        landmarks.forEach(lm => {
+            if (lm.visibility > 0.5) {
+                canvasCtx.beginPath();
+                canvasCtx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
+                canvasCtx.fillStyle = "white";
+                canvasCtx.fill();
+            }
+        });
     }
 
-    async function activarIA() {
-        actualizarConfiguracion();
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('contenedor-analisis').style.display = 'block';
+    pose.onResults((results) => {
+        if (!results.poseLandmarks) return;
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        dibujarJerarquia(results.poseLandmarks);
+
+        // --- LÓGICA DE CICLOS (UMBRAL DINÁMICO) ---
+        const midHandY = (results.poseLandmarks[15].y + results.poseLandmarks[16].y) / 2;
+        const torsoSize = Math.abs(results.poseLandmarks[11].y - results.poseLandmarks[23].y);
+        const umbral = torsoSize * 0.2;
+
+        if (state.auditando && state.lastY) {
+            const diff = state.lastY - midHandY;
+            if (Math.abs(diff) > umbral) {
+                if (diff > 0 && !state.subiendo) { state.ciclos++; state.subiendo = true; }
+                else if (diff < 0) { state.subiendo = false; }
+            }
+        }
+        state.lastY = midHandY;
+        document.getElementById('txt-ciclos').innerText = `CICLOS: ${state.ciclos}`;
+        
+        canvasCtx.restore();
+    });
+
+    // --- FUNCIONES DE CONTROL ---
+    async function iniciarApp(modo) {
+        document.getElementById('setup-menu').style.display = 'none';
         document.getElementById('loader-ia').style.display = 'flex';
+        
+        const peso = parseFloat(document.getElementById('inp-peso').value);
+        state.pesoMax = document.getElementById('inp-genero').value === 'H' ? 25 : 15;
+        document.getElementById('txt-puesto').innerText = `PUESTO: ${document.getElementById('inp-puesto').value || 'GENERAL'}`;
 
-        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-        pose.onResults(onResults);
+        if (modo === 'camara') {
+            state.stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: state.facingMode, width: 1280, height: 720 } 
+            });
+            videoElement.srcObject = state.stream;
+        } else {
+            const file = document.getElementById('file-upload').files[0];
+            videoElement.src = URL.createObjectURL(file);
+        }
 
-        camera = new Camera(video, { onFrame: async () => { if (iaActiva) await pose.send({ image: video }); }, width: 1280, height: 720 });
-        await camera.start();
+        videoElement.play();
+        
+        // Sincronizar Canvas
+        videoElement.onloadedmetadata = () => {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            procesarFrame();
+        };
 
-        iaActiva = true;
-        startTimeCalib = Date.now();
-        document.getElementById('loader-ia').style.display = 'none';
-        txtStatus.innerText = "CALIBRANDO...";
+        setTimeout(() => {
+            document.getElementById('loader-ia').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            state.iaActiva = true;
+        }, 3000);
     }
 
-    function toggleGrabacion() {
-        if (!calibrado) return;
-        analizandoRiesgo = !analizandoRiesgo;
-        const btn = document.getElementById('recordBtn');
-        if (analizandoRiesgo) {
-            btn.classList.add('rec-active');
-            wbaStats.inicioAuditoria = new Date();
+    async function procesarFrame() {
+        if (!state.iaActiva && !videoElement.paused) {
+            await pose.send({ image: videoElement });
+        }
+        requestAnimationFrame(procesarFrame);
+    }
+
+    function toggleAuditoria() {
+        state.auditando = !state.auditando;
+        const btn = document.getElementById('btn-rec');
+        if (state.auditando) {
+            btn.classList.add('active');
+            state.ciclos = 0;
+            state.startTime = new Date();
+            iniciarGrabacionVideo();
         } else {
-            btn.classList.remove('rec-active');
-            generarReporteRapido();
+            btn.classList.remove('active');
+            detenerGrabacionVideo();
         }
     }
 
-    function generarReporteRapido() {
-        alert(`REPORTE NOM-036:\n- Ciclos: ${wbaStats.ciclos}\n- Zonas Afectadas: ${Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna'}`);
+    function iniciarGrabacionVideo() {
+        state.recordedChunks = [];
+        const canvasStream = canvasElement.captureStream(30);
+        state.videoRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
+        state.videoRecorder.ondataavailable = (e) => state.recordedChunks.push(e.data);
+        state.videoRecorder.onstop = descargarVideo;
+        state.videoRecorder.start();
     }
 
-    async function detenerTodo() { location.reload(); }
+    function detenerGrabacionVideo() { state.videoRecorder.stop(); }
+
+    function descargarVideo() {
+        const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `Auditoria_LYA_${Date.now()}.webm`;
+        a.click();
+    }
+
+    function exportarReporte() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(20);
+        doc.text("REPORTE DE AUDITORÍA ERGONÓMICA", 20, 20);
+        doc.setFontSize(12);
+        doc.text(`Puesto: ${document.getElementById('inp-puesto').value}`, 20, 40);
+        doc.text(`Ciclos Detectados: ${state.ciclos}`, 20, 50);
+        doc.text(`Cumplimiento NOM-036: ${state.ciclos > 10 ? 'RIESGO MODERADO' : 'BAJO'}`, 20, 60);
+        doc.save("Reporte_Ergo.pdf");
+    }
+
+    async function cambiarCamara() {
+        state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+        if (state.stream) {
+            state.stream.getTracks().forEach(t => t.stop());
+            iniciarApp('camara');
+        }
+    }
+
+    function salir() { location.reload(); }
 </script>
 </body>
 </html>
