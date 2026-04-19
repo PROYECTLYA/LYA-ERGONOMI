@@ -128,6 +128,9 @@ V6
         }
     }
 
+
+    
+
     // --- 3. CÁLCULOS BIOMECÁNICOS ---
     function calcAng3D(a,b,c) {
         const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
@@ -136,126 +139,164 @@ V6
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 
-    const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-        ctx.beginPath();
-        ctx.lineCap = "round";
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
+function onResults(res) {
+    if (!res.poseLandmarks) return;
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (currentFacingMode === "user") { 
+        ctx.translate(canvas.width, 0); 
+        ctx.scale(-1, 1); 
+    }
+    
+    ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
 
-        if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
-            ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke();
-            return; 
-        }
-
-        const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
-        let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
-
-        if (analizandoRiesgo && calibrado) {
-            const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-            const t = TH[groupKey];
-            wbaStats.framesAnalizados++;
-            if (diff > (t * 2)) { 
-                wbaStats.riesgoAltoTotal++; wbaStats.zonasAfectadas.add(groupKey);
-                color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
-            } else if (diff > t) {
-                color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
-            }
-        }
-
-        ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.stroke();
-
-        if (calibrado) {
-            const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
-            let offsetX = (groupKey === "munecas") ? 45 : 15;
-            let offsetY = (groupKey === "munecas") ? 20 : -15;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-            ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
-            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
-            ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
-            ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
-            ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
-        }
+    const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
+    const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
+    
+    const p = {
+        cab: pt(0), 
+        cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
+        tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
+        abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
+        esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
+        h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
+        h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
+        p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
+        p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
     };
 
-    // --- 4. PROCESAMIENTO POSE IA ---
-    function onResults(res) {
-        if (!res.poseLandmarks) return;
-        ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
-
-        const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
-        const pt = (i) => ({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        
-        const p = {
-            cab: pt(0), 
-            cue: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h, z:(lm[11].z+lm[12].z)/2 },
-            tor: { x: (lm[11].x+lm[12].x)/2*w, y:(lm[11].y+lm[12].y)/2*h + 40, z:(lm[11].z+lm[12].z)/2 },
-            abd: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h - 30, z:(lm[23].z+lm[24].z)/2 },
-            esp_baja: { x: (lm[23].x+lm[24].x)/2*w, y:(lm[23].y+lm[24].y)/2*h, z:(lm[23].z+lm[24].z)/2 },
-            h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
-            h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
-            p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
-            p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
-        };
-
-        if (analizandoRiesgo) {
-            const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-            if (wbaStats.lastHandY !== null) {
-                const desplazamiento = wbaStats.lastHandY - currentHandY;
-                if (desplazamiento > 50 && !wbaStats.subiendo) { wbaStats.ciclos++; wbaStats.subiendo = true; } 
-                else if (desplazamiento < -50) { wbaStats.subiendo = false; }
-            }
-            wbaStats.lastHandY = currentHandY;
+    if (analizandoRiesgo) {
+        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
+        if (wbaStats.lastHandY !== null) {
+            const desp = wbaStats.lastHandY - currentHandY;
+            if (desp > 50 && !wbaStats.subiendo) { wbaStats.ciclos++; wbaStats.subiendo = true; } 
+            else if (desp < -50) { wbaStats.subiendo = false; }
         }
-
-        const currentAngles = {
-            cue: calcAng3D(p.cab, p.cue, p.tor), abd: calcAng3D(p.tor, p.abd, p.esp_baja),
-            c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-            m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
-            h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
-            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-            t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
-        };
-
-        Object.keys(currentAngles).forEach(k => {
-            if (!angleBuffer[k]) angleBuffer[k] = [];
-            angleBuffer[k].push(currentAngles[k]);
-            if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-        });
-
-        if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
-            Object.keys(angleBuffer).forEach(k => { 
-                baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0) / angleBuffer[k].length; 
-            });
-            wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
-            calibrado = true; 
-            document.getElementById('recordBtn').style.opacity = "1";
-            txtStatus.innerText = "CALIBRADO - LISTO";
-        }
-
-        ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
-
-        drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
-        drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
-        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
-        drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
-        drawV(p.m_d, p.mano_d, 'm_d', 'munecas', lm[16], lm[20]);
-        drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]);
-        drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
-        drawV(p.m_i, p.mano_i, 'm_i', 'munecas', lm[15], lm[19]);
-        drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
-        drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
-        drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
-        drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
-
-        ctx.restore();
+        wbaStats.lastHandY = currentHandY;
     }
 
+    const currentAngles = {
+        cue: calcAng3D(p.cab, p.cue, p.tor), 
+        abd: calcAng3D(p.tor, p.abd, p.esp_baja),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), 
+        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), 
+        m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
+        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), 
+        h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
+        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), 
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
+        t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+    };
+
+    Object.keys(currentAngles).forEach(k => {
+        if (!angleBuffer[k]) angleBuffer[k] = [];
+        angleBuffer[k].push(currentAngles[k]);
+        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+    });
+
+    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
+        Object.keys(angleBuffer).forEach(k => { 
+            baseAngles[k] = angleBuffer[k].reduce((a,b)=>a+b,0) / angleBuffer[k].length; 
+        });
+        wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
+        calibrado = true; 
+        document.getElementById('recordBtn').style.opacity = "1";
+        txtStatus.innerText = "CALIBRADO - LISTO";
+    }
+
+    // Dibujo de conectores base (Hombros y Caderas)
+    ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
+
+    // Auditoría por segmentos
+    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
+    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
+    drawV(p.h_d, p.c_d, 'h_d', 'hombros', lm[12], lm[14]); 
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
+    drawV(p.m_d, p.mano_d, 'm_d', 'munecas', lm[16], lm[20]);
+    drawV(p.h_i, p.c_i, 'h_i', 'hombros', lm[11], lm[13]);
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+    drawV(p.m_i, p.mano_i, 'm_i', 'munecas', lm[15], lm[19]);
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
+    drawV(p.r_d, p.t_d, 't_d', 'pies', lm[26], lm[28]);
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
+    drawV(p.r_i, p.t_i, 't_i', 'pies', lm[25], lm[27]);
+
+    // Captura de evidencia (Se toma DESPUÉS de dibujar el esqueleto para que el PDF incluya las líneas de riesgo)
+    if (analizandoRiesgo && !screenshotRiesgo && wbaStats.zonasAfectadas.size > 0) {
+        screenshotRiesgo = canvas.toDataURL('image/jpeg', 0.6);
+    }
+
+    ctx.restore();
+}
+
+
+    
+  const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+    ctx.beginPath();
+    ctx.lineCap = "round";
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+
+    // Validación de visibilidad de MediaPipe
+    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
+        ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke();
+        return; 
+    }
+
+    const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
+    let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
+
+    // Lógica de evaluación de riesgo
+    if (analizandoRiesgo && calibrado) {
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+        const t = TH[groupKey] || 20;
+        if (diff > (t * 2)) { 
+            wbaStats.zonasAfectadas.add(groupKey);
+            color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
+        } else if (diff > t) {
+            color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
+        }
+    }
+
+    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.stroke();
+
+    // Dibujo de etiquetas (Corregido para modo espejo)
+    if (calibrado) {
+        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+        
+        ctx.save();
+        // Si estamos en espejo, invertimos el contexto localmente para que el texto sea legible
+        if (currentFacingMode === "user") {
+            ctx.translate(midX, midY);
+            ctx.scale(-1, 1);
+            ctx.translate(-midX, -midY);
+        }
+
+        const rectW = 85, rectH = 30;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+        ctx.beginPath(); 
+        ctx.roundRect(midX + 10, midY - 15, rectW, rectH, 5); 
+        ctx.fill();
+        
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+        
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Arial";
+        ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + 15, midY - 2);
+        
+        ctx.fillStyle = color; ctx.font = "900 8px Arial";
+        ctx.fillText(statusLabel, midX + 15, midY + 10);
+        ctx.restore();
+    }
+};
+
+
+
+    
     function activarIA() {
         document.getElementById('loader-ia').style.display = 'flex';
         pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
@@ -272,32 +313,107 @@ V6
 
     async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
 
-    // --- 5. REPORTES Y GRABACIÓN ---
-    function generarReporteWBA() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const puesto = document.getElementById('puestoTrabajo')?.value || "OFICINA";
-        const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
-        const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
-        const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
-        const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
-        const duracionMinutos = msTranscurridos / 60000;
-        const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
 
-        let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
-        if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { colorHex = "#c0392b"; conclusion = "NO APTO: REQUIERE REDISEÑO"; }
-        else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { colorHex = "#f1c40f"; conclusion = "RIESGO MODERADO"; }
+    
 
-        doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
-        doc.autoTable({
-            startY: 75,
-            head: [['FACTOR', 'VALOR', 'ESTATUS']],
-            body: [['Peso', `${peso} kg`, peso > 25 ? 'RIESGO' : 'OK'], ['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'ALTA' : 'OK'], ['Postura', `${porcentajeRiesgo}%`, zonas]],
-            headStyles: { fillColor: [41, 128, 185] }
-        });
-        doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
-    }
+   function generarReporteWBA() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Configuración de datos
+    const puesto = document.getElementById('puestoTrabajo')?.value || "OFICINA";
+    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
+    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const duracionSegundos = (msTranscurridos / 1000).toFixed(1);
+    const frecuencia = (wbaStats.ciclos / (msTranscurridos / 60000 || 0.01)).toFixed(2);
+    const fecha = new Date().toLocaleString();
+
+    // --- ENCABEZADO ---
+    doc.setFillColor(0, 128, 0); // Verde oscuro LYA
+    doc.rect(0, 0, 210, 25, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.text("LYA – ERGONOMI", 105, 15, { align: "center" });
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 35, { align: "center" });
+
+    // Datos Generales
+    doc.setFontSize(10);
+    doc.text(`PUESTO: ${puesto.toUpperCase()}`, 15, 45);
+    doc.text(`FECHA: ${fecha}`, 15, 52);
+    doc.text(`DURACIÓN EVALUADA: ${duracionSegundos} s`, 15, 59);
+    doc.text(`CICLOS DETECTADOS: ${wbaStats.ciclos}`, 150, 59);
+
+    // --- TABLA 1: ANÁLISIS DE CARGA (NOM-036) ---
+    doc.autoTable({
+        startY: 65,
+        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS NOM-036', 'CRITERIO']],
+        body: [
+            ['Peso de Carga', `${peso} kg`, peso <= 25 ? 'ACEPTABLE' : 'ALTO RIESGO', peso > 25 ? 'Excede Límite' : 'Dentro de Límite'],
+            ['Hombres 18-45 años', '≤ 25 kg', peso <= 25 ? 'ACEPTABLE' : 'CRÍTICO', 'Límite Máximo'],
+            ['Mujeres 18-45 años', '≤ 15 kg', peso <= 15 ? 'ACEPTABLE' : 'REVISAR', 'Recomendación'],
+            ['Frecuencia Levantamiento', `${frecuencia} lev/min`, frecuencia <= 1 ? 'BAJO' : 'MEDIO/ALTO', 'Ritmo de trabajo']
+        ],
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 }, // Azul de la imagen
+        styles: { fontSize: 8, cellPadding: 2 }
+    });
+
+    // --- TABLA 2: FACTORES ERGONÓMICOS INTEGRADOS ---
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.autoTable({
+        startY: finalY,
+        head: [['FACTOR', 'BAJO RIESGO', 'RIESGO MEDIO', 'ALTO RIESGO']],
+        body: [
+            ['Postura Tronco', '0°-20°', '21°-45°', '> 45°'],
+            ['Frecuencia', '< 1 vez/min', '2-5 veces/min', '> 5 veces/min'],
+            ['Zonas de Riesgo', 'Ninguna', '1-2 articulaciones', 'Múltiples']
+        ],
+        headStyles: { fillColor: [41, 128, 185] },
+        styles: { fontSize: 8 },
+        // Colorear celdas según resultados (Ejemplo de lógica)
+        didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 3 && frecuencia > 5) {
+                data.cell.styles.fillColor = [255, 200, 200]; // Rojo suave para resaltar el riesgo
+            }
+        }
+    });
+
+    // --- RECUADROS DE RECOMENDACIONES (ESTILO AMARILLO) ---
+    const rectY = doc.lastAutoTable.finalY + 10;
+    const colWidth = 90;
+    
+    // Caja 1: Recomendaciones Generales
+    doc.setDrawColor(241, 196, 15); // Amarillo
+    doc.setLineWidth(1);
+    doc.rect(15, rectY, colWidth, 40); 
+    doc.setFont(undefined, 'bold');
+    doc.text("RECOMENDACIONES:", 20, rectY + 10);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8);
+    doc.text("* Reducir peso de carga si es > 15kg", 20, rectY + 20);
+    doc.text("* Alternar posturas cada 15 min", 20, rectY + 28);
+    doc.text("* Revisar técnica de levantamiento", 20, rectY + 36);
+
+    // Caja 2: Estatus de Salud
+    doc.rect(110, rectY, colWidth, 40);
+    doc.setFont(undefined, 'bold');
+    doc.text("ALERTAS DETECTADAS:", 115, rectY + 10);
+    doc.setFont(undefined, 'normal');
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
+    doc.text(`* Zonas en tensión: ${zonas}`, 115, rectY + 20);
+    doc.text(`* Fatiga acumulada estimada: ${frecuencia > 3 ? 'ALTA' : 'BAJA'}`, 115, rectY + 28);
+
+    // Pie de página
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("GRACIAS Y ATENCIÓN A LA NOM-036 PARA PREVENIR TME", 105, 285, { align: "center" });
+
+    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+}
+
+    
 
     function toggleGrabacion() {
         if (!calibrado) return;
@@ -325,6 +441,9 @@ V6
             setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "COMPLETADO"; btn.innerHTML = "🔴<br>AUDITAR"; }, 600);
         }
     }
+
+
+    
 
     async function cambiarCamara() { currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment"; iaActiva = false; await encenderCamara(); }
 </script>
