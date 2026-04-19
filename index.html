@@ -72,16 +72,18 @@ V6
     const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
     const HISTORIAL_MAX = 20;
 
-    let iaActiva = false;
-    let calibrado = false;
-    let analizandoRiesgo = false;
-    let currentFacingMode = "environment";
-    let startTimeCalib = 0;
-    let pose; 
-    let mediaRecorder;
-    let recordedChunks = [];
-    let baseAngles = {};
-    let angleBuffer = {};
+   // ... (variables anteriores)
+let mediaRecorder;
+let recordedChunks = [];
+let baseAngles = {};
+let angleBuffer = {};
+let screenshotRiesgo = null; 
+    let iaActiva = false; // Te falta esta
+let calibrado = false; // Te falta esta
+let startTimeCalib = 0; // Te falta esta
+let currentFacingMode = "environment"; // Te falta esta
+    let pose;
+
 
     let wbaStats = { 
         riesgoAltoTotal: 0, 
@@ -207,12 +209,11 @@ function onResults(res) {
         txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    // Dibujo de conectores base (Hombros y Caderas)
+    // --- DIBUJO DEL ESQUELETO ---
     ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
 
-    // Auditoría por segmentos
     drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
     drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', lm[12], lm[14]); 
@@ -226,35 +227,48 @@ function onResults(res) {
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
     drawV(p.r_i, p.t_i, 't_i', 'pies', lm[25], lm[27]);
 
-    // Captura de evidencia (Se toma DESPUÉS de dibujar el esqueleto para que el PDF incluya las líneas de riesgo)
+    // --- IMPLEMENTACIÓN PUNTO 3: CAPTURA DE EVIDENCIA ---
+    // Se ejecuta solo si estamos auditando, no hay captura previa y se detectó al menos una zona roja/naranja
     if (analizandoRiesgo && !screenshotRiesgo && wbaStats.zonasAfectadas.size > 0) {
-        screenshotRiesgo = canvas.toDataURL('image/jpeg', 0.6);
+        // Capturamos el canvas con las líneas de colores dibujadas
+        screenshotRiesgo = canvas.toDataURL('image/jpeg', 0.7);
+        console.log("Evidencia visual capturada con éxito.");
     }
 
     ctx.restore();
 }
 
-
     
-  const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+    // 1. Dibujo de la línea base del esqueleto
     ctx.beginPath();
     ctx.lineCap = "round";
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
 
-    // Validación de visibilidad de MediaPipe
+    // 2. Validación de visibilidad (Si MediaPipe no ve bien el punto, se dibuja gris)
     if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
-        ctx.strokeStyle = "#4b4b4b"; ctx.lineWidth = 4; ctx.stroke();
+        ctx.strokeStyle = "#4b4b4b"; 
+        ctx.lineWidth = 4; 
+        ctx.stroke();
         return; 
     }
 
-    const avgAngle = angleBuffer[angKey].reduce((a, b) => a + b, 0) / angleBuffer[angKey].length;
-    let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
+    // 3. Cálculo del promedio de ángulos (con salvaguarda para evitar NaN)
+    const buffer = angleBuffer[angKey] || [];
+    const avgAngle = buffer.length > 0 
+        ? buffer.reduce((a, b) => a + b, 0) / buffer.length 
+        : 0;
 
-    // Lógica de evaluación de riesgo
+    let color = "#00ff00"; // Verde por defecto (Seguro)
+    let thickness = 4;
+    let statusLabel = "SEGURO";
+
+    // 4. Lógica de evaluación de riesgo (Comparativa contra calibración)
     if (analizandoRiesgo && calibrado) {
         const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const t = TH[groupKey] || 20;
+        const t = TH[groupKey] || 20; // Umbral definido en TH
+
         if (diff > (t * 2)) { 
             wbaStats.zonasAfectadas.add(groupKey);
             color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
@@ -263,34 +277,49 @@ function onResults(res) {
         }
     }
 
-    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.stroke();
+    // 5. Aplicar estilo y dibujar línea de color
+    ctx.strokeStyle = color; 
+    ctx.lineWidth = thickness; 
+    ctx.stroke();
 
-    // Dibujo de etiquetas (Corregido para modo espejo)
+    // 6. Dibujo de etiquetas con soporte para Modo Espejo
     if (calibrado) {
-        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
         
-        ctx.save();
-        // Si estamos en espejo, invertimos el contexto localmente para que el texto sea legible
+        ctx.save(); 
+
+        // --- CORRECCIÓN DE MODO ESPEJO PARA TEXTO ---
         if (currentFacingMode === "user") {
             ctx.translate(midX, midY);
             ctx.scale(-1, 1);
             ctx.translate(-midX, -midY);
         }
 
-        const rectW = 85, rectH = 30;
+        // Fondo de la etiqueta (Rectángulo translúcido)
+        const rectW = 85;
+        const rectH = 30;
         ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
         ctx.beginPath(); 
         ctx.roundRect(midX + 10, midY - 15, rectW, rectH, 5); 
         ctx.fill();
         
-        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+        // Borde de la etiqueta del color del riesgo
+        ctx.strokeStyle = color; 
+        ctx.lineWidth = 1; 
+        ctx.stroke();
         
-        ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Arial";
+        // Texto: Ángulo detectado
+        ctx.fillStyle = "#ffffff"; 
+        ctx.font = "bold 11px Arial";
         ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + 15, midY - 2);
         
-        ctx.fillStyle = color; ctx.font = "900 8px Arial";
+        // Texto: Estatus de riesgo
+        ctx.fillStyle = color; 
+        ctx.font = "900 8px Arial";
         ctx.fillText(statusLabel, midX + 15, midY + 10);
-        ctx.restore();
+
+        ctx.restore(); // Restaurar el estado para no afectar el resto del dibujo
     }
 };
 
@@ -315,137 +344,218 @@ function onResults(res) {
 
 
 
-
-    
-
-   function generarReporteWBA() {
+function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Configuración de datos
-    const puesto = document.getElementById('puestoTrabajo')?.value || "OFICINA";
+    // --- 1. CONFIGURACIÓN DE DATOS DINÁMICOS ---
+    const puesto = (document.getElementById('puestoTrabajo')?.value || "OFICINA").toUpperCase();
     const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
-    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const msTranscurridos = wbaStats.inicioAuditoria ? (Date.now() - wbaStats.inicioAuditoria) : 0;
     const duracionSegundos = (msTranscurridos / 1000).toFixed(1);
     const frecuencia = (wbaStats.ciclos / (msTranscurridos / 60000 || 0.01)).toFixed(2);
     const fecha = new Date().toLocaleString();
 
-    // --- ENCABEZADO ---
-    doc.setFillColor(0, 128, 0); // Verde oscuro LYA
-    doc.rect(0, 0, 210, 25, 'F');
-    doc.setTextColor(255, 255, 255);
+    // Lógica de color de umbral dinámico (Semáforo)
+    let colorUmbral = [46, 204, 113]; // Verde (Bajo)
+    let estatusTexto = "ACEPTABLE";
+
+    if (wbaStats.zonasAfectadas.size > 2 || frecuencia > 5 || peso > 25) {
+        colorUmbral = [231, 76, 60]; // Rojo (Alto)
+        estatusTexto = "ALTO RIESGO";
+    } else if (wbaStats.zonasAfectadas.size > 0 || frecuencia > 2) {
+        colorUmbral = [230, 126, 34]; // Naranja (Moderado)
+        estatusTexto = "RIESGO MEDIO";
+    }
+
+    // --- 2. ENCABEZADO ESTILO "DARK MODE" (IDÉNTICO A IMAGEN) ---
+    doc.setFillColor(26, 32, 44); 
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(46, 204, 113); // "LYA" en Verde
     doc.setFontSize(22);
-    doc.text("LYA – ERGONOMI", 105, 15, { align: "center" });
+    doc.setFont(undefined, 'bold');
+    doc.text("LYA – ERGONOMI", 105, 12, { align: "center" });
     
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 22, { align: "center" });
+
+    // --- 3. INFORMACIÓN GENERAL ---
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(14);
-    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 35, { align: "center" });
-
-    // Datos Generales
     doc.setFontSize(10);
-    doc.text(`PUESTO: ${puesto.toUpperCase()}`, 15, 45);
-    doc.text(`FECHA: ${fecha}`, 15, 52);
-    doc.text(`DURACIÓN EVALUADA: ${duracionSegundos} s`, 15, 59);
-    doc.text(`CICLOS DETECTADOS: ${wbaStats.ciclos}`, 150, 59);
+    doc.text(`PUESTO: ${puesto}`, 15, 38);
+    doc.text(`FECHA: ${fecha}`, 15, 45);
+    doc.text(`DURACIÓN EVALUADA: ${duracionSegundos} s`, 15, 52);
+    doc.text(`CICLOS DETECTADOS: ${wbaStats.ciclos}`, 145, 52);
 
-    // --- TABLA 1: ANÁLISIS DE CARGA (NOM-036) ---
+    // --- 4. TABLA 1: ANÁLISIS DE CARGA (NOM-036) ---
     doc.autoTable({
-        startY: 65,
+        startY: 58,
         head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS NOM-036', 'CRITERIO']],
         body: [
-            ['Peso de Carga', `${peso} kg`, peso <= 25 ? 'ACEPTABLE' : 'ALTO RIESGO', peso > 25 ? 'Excede Límite' : 'Dentro de Límite'],
-            ['Hombres 18-45 años', '≤ 25 kg', peso <= 25 ? 'ACEPTABLE' : 'CRÍTICO', 'Límite Máximo'],
-            ['Mujeres 18-45 años', '≤ 15 kg', peso <= 15 ? 'ACEPTABLE' : 'REVISAR', 'Recomendación'],
-            ['Frecuencia Levantamiento', `${frecuencia} lev/min`, frecuencia <= 1 ? 'BAJO' : 'MEDIO/ALTO', 'Ritmo de trabajo']
+            ['Peso de Carga', `${peso} kg`, peso <= 25 ? 'ACEPTABLE' : 'ALTO RIESGO', 'Límite máximo NOM'],
+            ['Hombres 18-45 años', '≤ 25 kg', peso <= 25 ? 'ACEPTABLE' : 'CRÍTICO', 'Límite Institucional'],
+            ['Mujeres 18-45 años', '≤ 15 kg', peso <= 15 ? 'ACEPTABLE' : 'REVISAR', 'Recomendación']
         ],
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 }, // Azul de la imagen
+        headStyles: { fillColor: [52, 152, 219], fontSize: 9 }, // Azul de la imagen
         styles: { fontSize: 8, cellPadding: 2 }
     });
 
-    // --- TABLA 2: FACTORES ERGONÓMICOS INTEGRADOS ---
-    const finalY = doc.lastAutoTable.finalY + 10;
+    // --- 5. TABLA 2: FACTORES INTEGRADOS (CON TEXTO DINÁMICO) ---
     doc.autoTable({
-        startY: finalY,
+        startY: doc.lastAutoTable.finalY + 5,
         head: [['FACTOR', 'BAJO RIESGO', 'RIESGO MEDIO', 'ALTO RIESGO']],
         body: [
-            ['Postura Tronco', '0°-20°', '21°-45°', '> 45°'],
-            ['Frecuencia', '< 1 vez/min', '2-5 veces/min', '> 5 veces/min'],
-            ['Zonas de Riesgo', 'Ninguna', '1-2 articulaciones', 'Múltiples']
+            ['Frecuencia', '≤ 1 vez/min', '2-5 veces/min', '> 5 veces/min'],
+            ['Giro de Tronco', 'Sin giro', '< + 30°', 'Más crítico'],
+            ['Flexión Espalda', '0°-20°', '21°-45°', '> 45°']
         ],
-        headStyles: { fillColor: [41, 128, 185] },
+        headStyles: { fillColor: [52, 152, 219], fontSize: 9 },
         styles: { fontSize: 8 },
-        // Colorear celdas según resultados (Ejemplo de lógica)
         didParseCell: function(data) {
-            if (data.section === 'body' && data.column.index === 3 && frecuencia > 5) {
-                data.cell.styles.fillColor = [255, 200, 200]; // Rojo suave para resaltar el riesgo
+            // Pintar la columna del factor analizado con el color de riesgo detectado
+            if (data.section === 'body' && data.column.index === 0) {
+                data.cell.styles.textColor = colorUmbral;
+                data.cell.styles.fontStyle = 'bold';
             }
         }
     });
 
-    // --- RECUADROS DE RECOMENDACIONES (ESTILO AMARILLO) ---
-    const rectY = doc.lastAutoTable.finalY + 10;
-    const colWidth = 90;
-    
-    // Caja 1: Recomendaciones Generales
-    doc.setDrawColor(241, 196, 15); // Amarillo
-    doc.setLineWidth(1);
-    doc.rect(15, rectY, colWidth, 40); 
-    doc.setFont(undefined, 'bold');
-    doc.text("RECOMENDACIONES:", 20, rectY + 10);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(8);
-    doc.text("* Reducir peso de carga si es > 15kg", 20, rectY + 20);
-    doc.text("* Alternar posturas cada 15 min", 20, rectY + 28);
-    doc.text("* Revisar técnica de levantamiento", 20, rectY + 36);
+    // --- 6. CUADRÍCULA DE RECOMENDACIONES (GRID 2x2 CON BORDES AMARILLOS) ---
+    const startY = doc.lastAutoTable.finalY + 10;
+    const boxW = 88;
+    const boxH = 32;
+    const margin = 15;
 
-    // Caja 2: Estatus de Salud
-    doc.rect(110, rectY, colWidth, 40);
-    doc.setFont(undefined, 'bold');
-    doc.text("ALERTAS DETECTADAS:", 115, rectY + 10);
-    doc.setFont(undefined, 'normal');
-    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
-    doc.text(`* Zonas en tensión: ${zonas}`, 115, rectY + 20);
-    doc.text(`* Fatiga acumulada estimada: ${frecuencia > 3 ? 'ALTA' : 'BAJA'}`, 115, rectY + 28);
+    const drawBox = (x, y, title, lines, titleColor) => {
+        doc.setDrawColor(241, 196, 15); // Bordes amarillos exactos
+        doc.setLineWidth(0.6);
+        doc.rect(x, y, boxW, boxH);
+        
+        doc.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.text(title, x + 5, y + 7);
+        
+        doc.setTextColor(60, 60, 60);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(7.5);
+        lines.forEach((line, i) => {
+            doc.text(`• ${line}`, x + 5, y + 15 + (i * 5));
+        });
+    };
 
-    // Pie de página
-    doc.setFontSize(10);
-    doc.setTextColor(100);
+    // Recomendaciones dinámicas
+    const recsCarga = peso > 20 ? ["Reducir peso inmediatamente", "Uso de faja lumbar", "Rotación de personal"] : ["Peso bajo control", "Higiene postural óptima"];
+    const zonasTexto = wbaStats.zonasAfectadas.size > 0 ? Array.from(wbaStats.zonasAfectadas).join(', ') : "Ninguna";
+
+    // Dibujar bloques en disposición 2x2
+    drawBox(margin, startY, "MAYORES DE 45 AÑOS", recsCarga, [106, 153, 62]);
+    drawBox(margin + boxW + 4, startY, "MUJERES", ["Considerar capacidad", "Priorizar cargas cercanas", "Evitar posturas extremas"], [106, 153, 62]);
+    drawBox(margin, startY + boxH + 4, "MENORES DE EDAD", ["Actividades limitadas", "Frecuencia baja", "Carga máxima 7kg"], [106, 153, 62]);
+    drawBox(margin + boxW + 4, startY + boxH + 4, "RESULTADO DE EVALUACIÓN", [`ESTATUS: ${estatusTexto}`, `ZONAS: ${zonasTexto}`, `RITMO: ${frecuencia} ciclos/min`], colorUmbral);
+
+    // --- 7. PIE DE PÁGINA ---
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
     doc.text("GRACIAS Y ATENCIÓN A LA NOM-036 PARA PREVENIR TME", 105, 285, { align: "center" });
-
-    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+if (screenshotRiesgo) {
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("EVIDENCIA VISUAL DE RIESGO DETECTADO", 105, 20, { align: "center" });
+    // Ajustar la imagen al ancho del PDF
+    doc.addImage(screenshotRiesgo, 'JPEG', 15, 30, 180, 100); 
+    doc.setFontSize(10);
+    doc.text("Captura automática realizada al detectar ángulos críticos.", 15, 135);
 }
-
+    // Descarga automática
+    doc.save(`REPORTE_LYA_${puesto}_${fecha.split(',')[0]}.pdf`);
+}
     
 
 
-
+function toggleGrabacion() {
+    if (!calibrado) return;
     
-    function toggleGrabacion() {
-        if (!calibrado) return;
-        analizandoRiesgo = !analizandoRiesgo;
-        const btn = document.getElementById('recordBtn');
-        btn.classList.toggle('rec-active', analizandoRiesgo);
+    analizandoRiesgo = !analizandoRiesgo;
+    const btn = document.getElementById('recordBtn');
+    btn.classList.toggle('rec-active', analizandoRiesgo);
 
-        if (analizandoRiesgo) {
-            recordedChunks = [];
-            const stream = canvas.captureStream(30); 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    if (analizandoRiesgo) {
+        // --- 1. LIMPIEZA DE EVIDENCIA ANTERIOR ---
+        screenshotRiesgo = null; 
+        recordedChunks = [];
+
+        // --- 2. SOLUCIÓN AL "ERROR ASESINO": CAPTURA DEL STREAM AQUÍ ---
+        const stream = canvas.captureStream(30); 
+        
+        // --- 3. CONFIGURACIÓN DE FORMATO (WebM con fallback) ---
+        let mimeType = 'video/webm; codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+        }
+        // Si sigue sin soportar webm (como en iOS), podrías usar video/mp4
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/mp4';
+        }
+
+        try {
+            // Inicializamos el recorder con el stream recién creado
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            
+            mediaRecorder.ondataavailable = (e) => { 
+                if (e.data.size > 0) recordedChunks.push(e.data); 
+            };
+            
             mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const blob = new Blob(recordedChunks, { type: mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = `EVIDENCIA_LYA.webm`; a.click();
+                const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                a.href = url; 
+                a.download = `EVIDENCIA_LYA_${Date.now()}.${extension}`; 
+                a.click();
             };
+
             mediaRecorder.start();
-            wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
+
+            // --- 4. REINICIO DE ESTADÍSTICAS ---
+            wbaStats = { 
+                riesgoAltoTotal: 0, 
+                framesAnalizados: 0, 
+                zonasAfectadas: new Set(), 
+                inicioAuditoria: Date.now(), 
+                ciclos: 0, 
+                lastHandY: null, 
+                subiendo: false 
+            };
+            
             txtStatus.innerText = "GRABANDO EVIDENCIA...";
             btn.innerHTML = "⏹️<br>DETENER";
-        } else {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
-            setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "COMPLETADO"; btn.innerHTML = "🔴<br>AUDITAR"; }, 600);
+
+        } catch (e) {
+            console.error("Error al iniciar la grabación:", e);
+            analizandoRiesgo = false;
+            btn.classList.remove('rec-active');
+            alert("No se pudo iniciar la grabación de video.");
         }
+
+    } else {
+        // --- 5. DETENER GRABACIÓN Y PROCESAR REPORTE ---
+        if (mediaRecorder && mediaRecorder.state !== "inactive") { 
+            mediaRecorder.stop(); 
+        }
+        
+        setTimeout(() => { 
+            generarReporteWBA(); 
+            txtStatus.innerText = "COMPLETADO"; 
+            btn.innerHTML = "🔴<br>AUDITAR"; 
+        }, 600);
     }
+}
+
 
 
     
