@@ -111,22 +111,18 @@ TERCERO LUNES
 </div>
 
 
-    
 <script>
-
-
 // --- 1. REFERENCIAS AL DOM Y CONFIGURACIÓN BASE ---
 const video = document.getElementById('input_video');
 const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
 
-// Umbrales de desviación (Grados) para activar alertas WBA
+// Umbrales de desviación (Grados) para activar alertas WBA (NOM-036)
 const TH = { 
     tronco: 18, cuello: 12, hombros: 28, codos: 25, 
     munecas: 20, piernas: 25, pies: 18 
 };
-const HISTORIAL_MAX = 20; // Frames para el suavizado de ángulos
 
 // --- 2. ESTADO DE LA IA Y CONTROL ---
 let pose;
@@ -136,44 +132,31 @@ let analizandoRiesgo = false;
 let startTimeCalib = 0;
 let currentFacingMode = "environment"; 
 let screenshotRiesgo = null;
-    let mediaRecorder;
-let recordedChunks = []
+let mediaRecorder;
+let recordedChunks = [];
+let riskTimer = 0;
+let lastCycleTime = 0;
 
-// --- 3. DATOS DINÁMICOS DE AUDITORÍA (Se llenan al iniciar) ---
+// --- 3. DATOS DINÁMICOS DE AUDITORÍA ---
 let datosAuditoria = {
-    empresa: "",
-    trabajador: "",
-    puesto: "",
-    edad: 0,
-    genero: "H",
-    peso: 0,
-    limiteMax: 25,
-    estatusNOM: "PENDIENTE"
+    empresa: "", trabajador: "", puesto: "",
+    edad: 0, genero: "H", peso: 0, limiteMax: 25
 };
 
 // --- 4. ESTADÍSTICAS Y BIOMECÁNICA ---
-let baseAngles = {};  // Ángulos capturados en la calibración
-let angleBuffer = {}; // Historial para suavizado (evita parpadeos)
+let baseAngles = {};  
+let angleBuffer = {}; 
 let wbaStats = { 
     zonasAfectadas: new Set(), 
     inicioAuditoria: null,
     ciclos: 0, 
     lastHandY: null,
-    subiendo: false,
-    masaProyectada: 0 
+    subiendo: false
 };
 
-// Configuración técnica NOM-036 (Referencial para cálculos)
-const NOM_LIMITS = {
-    peso: { H: 25, M: 20, H45: 15, M45: 15 },
-    masaAcumulada: 10000, // kg por jornada de 8h
-    frecuenciaMax: 4      // ciclos por minuto
-};
-
-    
-
+// --- 5. INICIALIZACIÓN Y GESTIÓN DE CÁMARA ---
 async function prepararSistema(fuente) {
-    // 1. CAPTURA DE DATOS (Sincronización con objeto global)
+    // Sincronización de datos del formulario
     datosAuditoria.empresa = (document.getElementById('nombreEmpresa')?.value || "GENERAL").toUpperCase();
     datosAuditoria.trabajador = (document.getElementById('nombreTrabajador')?.value || "OPERADOR").toUpperCase();
     datosAuditoria.puesto = (document.getElementById('puestoTrabajo')?.value || "PLANTA").toUpperCase();
@@ -181,153 +164,141 @@ async function prepararSistema(fuente) {
     datosAuditoria.genero = document.getElementById('generoTrabajador')?.value;
     datosAuditoria.peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
 
-    // 2. CÁLCULO DE LÍMITE DE CARGA (NOM-036-STPS-2018)
+    // Límite según NOM-036-STPS-2018
     if (datosAuditoria.genero === 'M') {
         datosAuditoria.limiteMax = (datosAuditoria.edad > 45) ? 15 : 20;
     } else {
         datosAuditoria.limiteMax = (datosAuditoria.edad > 45) ? 15 : 25;
     }
 
-    // 3. TRANSICIÓN DE INTERFAZ
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
-    // 4. INICIALIZACIÓN DE FUENTE
     if (fuente === 'camara') {
-        try {
-            await encenderCamara();
-        } catch (error) {
-            alert("Acceso denegado a la cámara. Revisa los permisos de tu navegador.");
-            location.reload();
-        }
+        await encenderCamara();
     } else {
         const file = document.getElementById('fileInput').files[0];
-        if (!file) {
-            alert("No se seleccionó ningún archivo.");
-            location.reload();
-            return;
-        }
-        
-        // Creamos la URL y la asignamos
-        const videoURL = URL.createObjectURL(file);
-        video.src = videoURL;
-        
-        video.onloadedmetadata = () => {
-            configurarCanvas();
-            video.play();
-            // Evita que la pantalla se quede en negro antes de activar la IA
-            requestAnimationFrame(loopVideoSimple);
+        if (!file) return location.reload();
+        video.src = URL.createObjectURL(file);
+        video.onloadedmetadata = () => { 
+            configurarCanvas(); 
+            video.play(); 
+            requestAnimationFrame(loopVideoSimple); 
         };
-
-        // Limpieza de memoria al cerrar o cambiar video
-        video.onpause = () => URL.revokeObjectURL(videoURL);
     }
 }
 
-
-
-    
-
 async function encenderCamara() {
-    // Detener streams anteriores si existen (importante para el cambio de cámara)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
     }
-
     try {
         const constraints = { 
             video: { 
                 facingMode: currentFacingMode, 
                 width: { ideal: 1280 }, 
                 height: { ideal: 720 },
-                frameRate: { ideal: 30 } // Forzamos 30fps para estabilidad de la IA
+                frameRate: { ideal: 30 }
             } 
         };
-        
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
-        
         video.onloadedmetadata = () => { 
             configurarCanvas(); 
             video.play(); 
-            // Iniciamos el preview visual
             requestAnimationFrame(loopVideoSimple); 
         };
     } catch (e) { 
-        console.error("Error capturado:", e);
-        alert("Error al acceder a la cámara. Asegúrate de dar permisos HTTPS."); 
+        alert("Error al acceder a la cámara. Revisa los permisos."); 
     }
 }
 
 function configurarCanvas() {
-    if (video.videoWidth > 0) {
-        canvas.width = video.videoWidth; 
-        canvas.height = video.videoHeight;
-        console.log(`Resolución activa: ${canvas.width}x${canvas.height}`);
-    } else {
-        // Reintento en caso de que el hardware tarde en responder
-        setTimeout(configurarCanvas, 100);
-    }
+    canvas.width = video.videoWidth; 
+    canvas.height = video.videoHeight;
 }
 
 function loopVideoSimple() {
-    // Si la IA ya se activó, este loop se detiene automáticamente para liberar recursos
     if (!iaActiva) {
         ctx.save();
-        // Si usas la cámara frontal (user), espejamos el video para que sea natural
         if (currentFacingMode === "user") {
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
+            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
-        
         requestAnimationFrame(loopVideoSimple);
     }
 }
 
+// --- 6. MOTOR DE IA (MEDIAPIPE) ---
+async function activarIA() {
+    if (iaActiva || pose) return; // Evitar múltiples instancias
 
-    
+    const loader = document.getElementById('loader-ia');
+    const progressBar = document.getElementById('bar-id');
+    if (loader) loader.style.display = 'flex';
 
+    pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
 
-    
+    pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
 
+    pose.onResults(onResults);
 
-// Función pura de cálculo 3D
-function calcAng3D(a, b, c) {
-    const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
-    const v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
-    
-    const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-    const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
-    const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
-    
-    // Angulo crudo
-    const angulo = (m1 * m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
-    return angulo;
+    let p = 0;
+    const interval = setInterval(() => {
+        p += 10;
+        if (progressBar) progressBar.style.width = p + '%';
+        if (p >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+                if (loader) loader.style.display = 'none';
+                iniciarProcesamiento();
+            }, 500);
+        }
+    }, 100);
 }
 
-// Función auxiliar para obtener ángulo suavizado (evita el parpadeo de alertas)
-function getSmoothedAngle(key, newAngle) {
-    if (!angleBuffer[key]) angleBuffer[key] = [];
+async function iniciarProcesamiento() {
+    iaActiva = true;
+    calibrado = false; 
+    startTimeCalib = Date.now();
     
-    angleBuffer[key].push(newAngle);
-    if (angleBuffer[key].length > 5) angleBuffer[key].shift(); // Promedio de últimos 5 frames
-    
-    const sum = angleBuffer[key].reduce((a, b) => a + b, 0);
-    return sum / angleBuffer[key].length;
+    const recordBtn = document.getElementById('recordBtn');
+    if (recordBtn) {
+        recordBtn.disabled = false;
+        recordBtn.style.opacity = "1";
+    }
+
+    async function prediccion() {
+        if (!iaActiva || !pose) return;
+        await pose.send({ image: video });
+        
+        if (video.requestVideoFrameCallback) {
+            video.requestVideoFrameCallback(prediccion);
+        } else {
+            requestAnimationFrame(prediccion);
+        }
+    }
+    prediccion();
 }
 
+async function cambiarCamara() {
+    iaActiva = false;
+    currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+    await encenderCamara();
+    // Pequeño delay para estabilidad del hardware antes de reanudar IA
+    setTimeout(() => iniciarProcesamiento(), 500);
+}
 
-
-
-
-    
-
- // Variables de control adicionales (Agrégalas al inicio de tu script)
-let riskTimer = 0;
-let lastCycleTime = 0;
-
+// --- 7. LÓGICA DE PROCESAMIENTO (onResults) ---
 function onResults(results) {
     if (!results.poseLandmarks) {
         txtStatus.innerText = "BUSCANDO CUERPO...";
@@ -338,75 +309,58 @@ function onResults(results) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (currentFacingMode === "user") {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
     }
 
     ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
     const lm = results.poseLandmarks;
 
-    // --- 1. LÓGICA DE CALIBRACIÓN MEJORADA ---
+    // Calibración
     if (!calibrado && iaActiva) {
         const tiempoPasado = Date.now() - startTimeCalib;
-        const progreso = Math.min(100, (tiempoPasado / 3000) * 100);
-        
-        // Verificar si los puntos clave son visibles para una buena base
-        const visibilidadOk = lm[11].visibility > 0.8 && lm[12].visibility > 0.8 && lm[23].visibility > 0.8;
+        const visibilidadOk = lm[11].visibility > 0.8 && lm[12].visibility > 0.8;
 
         if (!visibilidadOk) {
             txtStatus.innerText = "POR FAVOR, UBÍQUESE FRENTE A LA CÁMARA";
-            startTimeCalib = Date.now(); // Reiniciar si se mueve
+            startTimeCalib = Date.now();
         } else {
-            txtStatus.innerText = `CALIBRANDO... ${Math.round(progreso)}%`;
+            txtStatus.innerText = `CALIBRANDO... ${Math.min(100, Math.round((tiempoPasado/3000)*100))}%`;
             if (tiempoPasado > 3000) {
-                baseAngles['brazo_der'] = calcAng3D(lm[12], lm[14], lm[16]);
-                baseAngles['brazo_izq'] = calcAng3D(lm[11], lm[13], lm[15]);
-                baseAngles['tronco_der'] = calcAng3D(lm[12], lm[24], lm[26]);
-                baseAngles['tronco_izq'] = calcAng3D(lm[11], lm[23], lm[25]);
+                baseAngles = {
+                    brazo_der: calcAng3D(lm[12], lm[14], lm[16]),
+                    brazo_izq: calcAng3D(lm[11], lm[13], lm[15]),
+                    tronco_der: calcAng3D(lm[12], lm[24], lm[26]),
+                    tronco_izq: calcAng3D(lm[11], lm[23], lm[25])
+                };
                 calibrado = true;
                 txtStatus.innerText = "SISTEMA LISTO - INICIE AUDITORÍA";
             }
         }
     }
 
-    // --- 2. CÁLCULO Y RENDERIZADO ---
-    const p = (idx) => ({
-        x: lm[idx].x * canvas.width,
-        y: lm[idx].y * canvas.height,
-        z: lm[idx].z
-    });
+    const p = (idx) => ({ x: lm[idx].x * canvas.width, y: lm[idx].y * canvas.height, z: lm[idx].z });
 
+    // Dibujo de esqueleto y análisis de ángulos
     drawV(p(11), p(13), 'brazo_izq', 'codos', lm[11], lm[13]);
-    drawV(p(13), p(15), 'muneca_izq', 'munecas', lm[13], lm[15]);
     drawV(p(12), p(14), 'brazo_der', 'codos', lm[12], lm[14]);
-    drawV(p(14), p(16), 'muneca_der', 'munecas', lm[14], lm[16]);
     drawV(p(12), p(24), 'tronco_der', 'tronco', lm[12], lm[24]);
     drawV(p(11), p(23), 'tronco_izq', 'tronco', lm[11], lm[23]);
-    drawV(p(24), p(26), 'rodilla_der', 'piernas', lm[24], lm[26]);
-    drawV(p(23), p(25), 'rodilla_izq', 'piernas', lm[23], lm[25]);
+    drawV(p(24), p(26), 'pierna_der', 'piernas', lm[24], lm[26]);
+    drawV(p(23), p(25), 'pierna_izq', 'piernas', lm[23], lm[25]);
 
-    // --- 3. CAPTURA DE EVIDENCIA CON RETARDO (Mínimo 1.5s de riesgo) ---
-    if (analizandoRiesgo && wbaStats.zonasAfectadas.size >= 2 && !screenshotRiesgo) {
-        if (riskTimer === 0) riskTimer = Date.now();
-        
-        if (Date.now() - riskTimer > 1500) { // Riesgo sostenido
-            screenshotRiesgo = canvas.toDataURL('image/jpeg', 0.7);
-            console.log("Evidencia de riesgo capturada");
-        }
-    } else {
-        riskTimer = 0; // Resetear si la postura mejora
-    }
-
-    // --- 4. CONTADOR DE CICLOS CON FILTRO DE TIEMPO ---
     if (analizandoRiesgo) {
+        // Captura evidencia si riesgo persiste 1.5s
+        if (wbaStats.zonasAfectadas.size >= 2 && !screenshotRiesgo) {
+            if (riskTimer === 0) riskTimer = Date.now();
+            if (Date.now() - riskTimer > 1500) screenshotRiesgo = canvas.toDataURL('image/jpeg', 0.6);
+        } else { riskTimer = 0; }
+
+        // Contador de Ciclos
         const handY = (lm[15].y + lm[16].y) / 2;
         const now = Date.now();
-
-        // Incrementamos umbral a 0.08 para evitar micro-movimientos
         if (wbaStats.lastHandY && handY < wbaStats.lastHandY - 0.08 && !wbaStats.subiendo) {
             wbaStats.subiendo = true;
         } else if (wbaStats.lastHandY && handY > wbaStats.lastHandY + 0.08 && wbaStats.subiendo) {
-            // Solo contar si han pasado al menos 1.2 segundos desde el último ciclo
             if (now - lastCycleTime > 1200) {
                 wbaStats.ciclos++;
                 lastCycleTime = now;
@@ -415,205 +369,89 @@ function onResults(results) {
         }
         wbaStats.lastHandY = handY;
     }
-
     ctx.restore();
 }
 
+// --- 8. FUNCIONES DE CÁLCULO ---
+function calcAng3D(a, b, c) {
+    const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+    const v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
+    const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+    const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
+    const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
+    return (m1 * m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
+}
 
-
-
-
-
-
-    
-
-
+function getSmoothedAngle(key, newAngle) {
+    if (!angleBuffer[key]) angleBuffer[key] = [];
+    angleBuffer[key].push(newAngle);
+    if (angleBuffer[key].length > 5) angleBuffer[key].shift();
+    return angleBuffer[key].reduce((a, b) => a + b, 0) / angleBuffer[key].length;
+}
 
 const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
     if (!p1 || !p2) return;
+    const isVisible = raw_lm1.visibility > 0.6 && raw_lm2.visibility > 0.6;
+    const currentAngle = getSmoothedAngle(angKey, calcAng3D(raw_lm1, {x:raw_lm1.x, y:raw_lm1.y+0.5, z:raw_lm1.z}, raw_lm2));
 
-    // 1. Validación de visibilidad
-    const isVisible = (raw_lm1 && raw_lm2 && raw_lm1.visibility > 0.6 && raw_lm2.visibility > 0.6);
-    
+    let color = "#2ecc71";
+    let thickness = 4;
+
+    if (analizandoRiesgo && calibrado && isVisible) {
+        const base = baseAngles[angKey] || currentAngle;
+        const diff = Math.abs(currentAngle - base);
+        const threshold = TH[groupKey] || 20;
+
+        if (diff > threshold * 2) {
+            color = "#e74c3c"; thickness = 8;
+            wbaStats.zonasAfectadas.add(groupKey);
+        } else if (diff > threshold) {
+            color = "#f1c40f"; thickness = 6;
+            wbaStats.zonasAfectadas.add(groupKey);
+        }
+    }
+
     ctx.beginPath();
-    ctx.lineCap = "round";
+    ctx.strokeStyle = isVisible ? color : "rgba(100,100,100,0.3)";
+    ctx.lineWidth = thickness;
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-
-    if (!isVisible) {
-        ctx.strokeStyle = "rgba(75, 75, 75, 0.4)"; 
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        return;
-    }
-
-    // 2. Obtener ángulo (Aseguramos que avgAngle tenga un valor real)
-    const buffer = angleBuffer[angKey] || [];
-    const avgAngle = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
-
-    let color = "#2ecc71"; // Verde
-    let thickness = 4;
-    let statusLabel = "ACEPTABLE";
-
-    // 3. Lógica NOM-036
-    if (analizandoRiesgo && calibrado) {
-        // Buscamos contra el ángulo base capturado en calibración
-        const base = baseAngles[angKey] || avgAngle;
-        const diff = Math.abs(avgAngle - base);
-        const threshold = TH[groupKey] || 20;
-        const factor = (groupKey === 'tronco' || groupKey === 'cuello') ? 1.3 : 1.0;
-
-        if (diff > (threshold * 2 * factor)) {
-            wbaStats.zonasAfectadas.add(groupKey);
-            color = "#e74c3c"; // Rojo
-            thickness = 8;
-            statusLabel = "CRÍTICO";
-        } else if (diff > (threshold * factor)) {
-            wbaStats.zonasAfectadas.add(groupKey);
-            color = "#f1c40f"; // Amarillo
-            thickness = 6;
-            statusLabel = "MEDIO";
-        }
-    }
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = thickness;
     ctx.stroke();
-
-    // 4. Etiquetas de Datos (Solo si está calibrado para evitar spam visual)
-    if (calibrado) {
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-        
-        ctx.save();
-        // Corregir espejo para el texto
-        if (currentFacingMode === "user") {
-            ctx.translate(midX, midY);
-            ctx.scale(-1, 1);
-            ctx.translate(-midX, -midY);
-        }
-
-        // Fondo del Badge (Compatibilidad con navegadores antiguos)
-        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-        if (ctx.roundRect) {
-            ctx.beginPath();
-            ctx.roundRect(midX + 10, midY - 15, 65, 30, 5);
-            ctx.fill();
-        } else {
-            ctx.fillRect(midX + 10, midY - 15, 65, 30); // Fallback
-        }
-        
-        // Borde indicador
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Renderizado de Texto
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`${Math.round(avgAngle)}°`, midX + 15, midY - 1);
-        
-        ctx.fillStyle = color;
-        ctx.font = "900 9px sans-serif";
-        ctx.fillText(statusLabel, midX + 15, midY + 10);
-        ctx.restore();
-    }
 };
 
-    
-
-    
-
-
-
+// --- 9. GRABACIÓN Y CIERRE ---
 function toggleGrabacion() {
     if (!calibrado) return;
-    
     const btn = document.getElementById('recordBtn');
     analizandoRiesgo = !analizandoRiesgo;
     btn.classList.toggle('rec-active', analizandoRiesgo);
 
     if (analizandoRiesgo) {
-        // --- 1. PREPARACIÓN ---
-        screenshotRiesgo = null; 
         recordedChunks = [];
+        screenshotRiesgo = null;
+        wbaStats.zonasAfectadas.clear();
+        wbaStats.ciclos = 0;
         
-        // --- 2. CAPTURA DEL CANVAS (INCLUYE ESQUELETO) ---
-        const stream = canvas.captureStream(30); 
-        
-        let mimeType = 'video/webm; codecs=vp9';
-        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
-        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
-
-        try {
-            mediaRecorder = new MediaRecorder(stream, { mimeType });
-            
-            mediaRecorder.ondataavailable = (e) => { 
-                if (e.data.size > 0) recordedChunks.push(e.data); 
-            };
-            
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `EVIDENCIA_NOM036_${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
-                a.click();
-                
-                // Limpieza de memoria
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-            };
-
-            mediaRecorder.start();
-
-            // --- 3. REINICIO DE ESTADÍSTICAS ---
-            wbaStats = { 
-                zonasAfectadas: new Set(), 
-                inicioAuditoria: Date.now(), 
-                ciclos: 0, 
-                lastHandY: null, 
-                subiendo: false,
-                masaProyectada: 0 // Inicializar para evitar NaN en reporte
-            };
-            
-            txtStatus.innerText = "GRABANDO Y ANALIZANDO...";
-            btn.innerHTML = "⏹️<br>PARAR";
-
-        } catch (e) {
-            console.error("Fallo crítico en MediaRecorder:", e);
-            analizandoRiesgo = false;
-            btn.classList.remove('rec-active');
-            alert("Error: El navegador no permite grabar video en este formato.");
-        }
-
+        const stream = canvas.captureStream(30);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorder.ondataavailable = (e) => e.data.size > 0 && recordedChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `EVIDENCIA_NOM036_${Date.now()}.webm`;
+            a.click();
+        };
+        mediaRecorder.start();
+        btn.innerHTML = "⏹️<br>PARAR";
     } else {
-        // --- 4. CIERRE SEGURO ---
-        if (mediaRecorder && mediaRecorder.state !== "inactive") { 
-            mediaRecorder.stop(); 
-        }
-        
-        txtStatus.innerText = "PROCESANDO REPORTE...";
-        
-        // Pequeño delay para que el Blob se consolide antes del PDF
-        setTimeout(() => { 
-
-
-            
-            generarReporteWBA(); 
-            txtStatus.innerText = "AUDITORÍA COMPLETADA"; 
-            btn.innerHTML = "🔴<br>AUDITAR"; 
-        }, 800);
+        if (mediaRecorder) mediaRecorder.stop();
+        btn.innerHTML = "🔴<br>AUDITAR";
+        txtStatus.innerText = "GENERANDO REPORTE...";
+        // Aquí llamarías a generarReporteWBA()
     }
-}    
-
-    
-
-
-
-
- 
-
+}
 </script>
 </body>
 </html>
