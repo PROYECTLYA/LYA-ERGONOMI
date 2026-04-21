@@ -39,7 +39,7 @@
 
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
-    <p class="sub-text">Auditoría de Procesos NOM-036 (Vectorización Jerárquica)</p>
+    <p class="sub-text">Auditoría de Procesos NOM-036</p>
     
     <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
         <div class="row">
@@ -305,22 +305,51 @@
     }
 
 /**
- * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (MEDIAPIPE)
- * Carga de modelos de redes neuronales y bucle de inferencia.
+ * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (REVISADO)
+ * Activa los modelos y habilita la interfaz de usuario al detectar señal.
  */
-    function activarIA() {
-        document.getElementById('loader-ia').style.display = 'flex';
-        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-        pose.onResults((res) => {
-            if (!iaActiva) { document.getElementById('loader-ia').style.display = 'none'; iaActiva = true; startTimeCalib = Date.now(); loopIA(); }
-            onResults(res);
-        });
-        pose.send({image: video});
-    }
+function activarIA() {
+    const loader = document.getElementById('loader-ia');
+    if (loader) loader.style.display = 'flex';
 
-    async function loopIA() { if (iaActiva) { await pose.send({image: video}); requestAnimationFrame(loopIA); } }
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
 
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.6, 
+        minTrackingConfidence: 0.6 
+    });
+
+    pose.onResults((res) => {
+        if (!iaActiva) { 
+            if (loader) loader.style.display = 'none';
+            iaActiva = true; 
+            startTimeCalib = Date.now(); 
+            
+            const btn = document.getElementById('recordBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
+            loopIA(); // Inicia el bucle
+        }
+        onResults(res);
+    });
+    // Iniciar el envío de frames
+    pose.send({image: video});
+}
+
+// ESTA FUNCIÓN DEBE ESTAR AFUERA, NO ANIDADA
+async function loopIA() { 
+    if (iaActiva) { 
+        await pose.send({image: video}); 
+        requestAnimationFrame(loopIA); 
+    } 
+}
 /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
  * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
