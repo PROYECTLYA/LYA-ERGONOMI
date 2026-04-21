@@ -39,7 +39,7 @@
 
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
-    <p class="sub-text">Auditoría de Procesos NOM-036</p>
+    <p class="sub-text">Auditoría de Procesos NOM-036-STPS</p>
     
     <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
         <div class="row">
@@ -133,6 +133,8 @@
     let iaActiva = false, calibrado = false, analizandoRiesgo = false;
     let currentFacingMode = "environment", startTimeCalib = 0;
     let pose;
+    let mediaRecorder;
+let recordedChunks = [];
 
 /**
  * 🏷️ BLOQUE 3: GESTIÓN DE FUENTES DE VIDEO
@@ -388,26 +390,63 @@ async function loopIA() {
         doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
     }
 
+
+    function descargarVideo() {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    
+    a.href = url;
+    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Limpieza
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
 /**
  * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
  * Funciones de usuario para iniciar auditoría o alternar cámara frontal/trasera.
  */
     function toggleGrabacion() {
-        if (!calibrado) return;
-        analizandoRiesgo = !analizandoRiesgo;
-        const btn = document.getElementById('recordBtn');
-        btn.classList.toggle('rec-active', analizandoRiesgo);
+    if (!calibrado) return;
+    analizandoRiesgo = !analizandoRiesgo;
+    const btn = document.getElementById('recordBtn');
+    btn.classList.toggle('rec-active', analizandoRiesgo);
 
-        if (analizandoRiesgo) {
-            wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
-            txtStatus.innerText = "ANALIZANDO...";
-            btn.innerHTML = "⏹️<br>DETENER";
-        } else {
-            txtStatus.innerText = "GENERANDO REPORTE...";
-            btn.innerHTML = "🔴<br>AUDITAR";
-            setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "FIN AUDITORÍA"; }, 300);
+    if (analizandoRiesgo) {
+        // --- INICIO DE GRABACIÓN DE VIDEO ---
+        recordedChunks = [];
+        const stream = canvas.captureStream(30); // Captura a 30 FPS
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+        
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = descargarVideo; // Se ejecuta al detener
+        mediaRecorder.start();
+        // ------------------------------------
+
+        wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
+        txtStatus.innerText = "ANALIZANDO...";
+        btn.innerHTML = "⏹️<br>DETENER";
+    } else {
+        txtStatus.innerText = "GENERANDO ARCHIVOS...";
+        btn.innerHTML = "🔴<br>AUDITAR";
+        
+        // Detenemos la grabación de video
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
         }
+
+        setTimeout(() => { 
+            generarReporteWBA(); 
+            txtStatus.innerText = "FIN AUDITORÍA"; 
+        }, 500);
     }
+}
 
     async function cambiarCamara() {
         currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
@@ -415,6 +454,23 @@ async function loopIA() {
         if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         await encenderCamara();
     }
+    function descargarVideo() {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    
+    a.href = url;
+    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Limpieza
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
 </script>
 
 
