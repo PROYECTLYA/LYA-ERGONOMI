@@ -1,226 +1,716 @@
-NUEVO AJUSTE
+
+Estos son los resultados en tablet y celular del código:
+
+V4.JUEV adaptacion a pantalla 
 <!DOCTYPE html> 
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYA-ERGO v20.2 | AUDITORÍA ERGONÓMICA</title>
+    <title>LYA-ERGO v20.2 | AUDITORÍA CERVECERA HIERÁRQUICA</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
-<style>
-    /* Ajuste para Tablets */
+    <style>
+    /* 1. Cambio a height: 100svh para evitar que el contenido se desplace bajo las barras del navegador */
+    body { 
+        background-color: #0d1117; 
+        color: white; 
+        margin: 0; 
+        overflow: hidden; 
+        font-family: 'Segoe UI', sans-serif; 
+        height: 100vh;
+        height: 100svh; 
+    }
+
     #menu-inicial { 
         display: flex; 
         width: 100%; 
-        height: 100svh; 
+        height: 100vh; 
+        height: 100svh;
         flex-direction: column; 
         align-items: center; 
         justify-content: center; 
         background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
         position: fixed; 
+        z-index: 5000; 
+    }
+
+    .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 0; }
+    .sub-text { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; }
+    
+    .btn-inicio { 
+        width: 85%; 
+        max-width: 320px; 
+        padding: 18px; 
+        margin: 10px; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        border: none; 
+        font-size: 1.1rem; 
+        transition: all 0.3s ease; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+    }
+
+    #loader-ia { 
+        display: none; 
+        position: fixed; 
+        top:0; 
+        left:0; 
+        width:100%; 
+        height:100%; 
+        height: 100svh;
+        background: rgba(13, 17, 23, 0.98); 
+        z-index: 6000; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+    }
+
+    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
+
+    /* 2. El contenedor ahora ocupa el alto dinámico exacto */
+    #contenedor-analisis { 
+        display: none; 
+        width: 100vw; 
+        height: 100vh; 
+        height: 100svh;
+        position: relative; 
+        background: #000; 
+    }
+
+    canvas { width: 100%; height: 100%; object-fit: contain; }
+    video { display: none; }
+
+    .status-badge { 
+        position: absolute; 
+
+      <style>
+    /* 1. Ajuste del contenedor principal para que use todo el alto disponible */
+    #menu-inicial { 
+        display: flex; 
+        width: 100%; 
+        height: 100svh; /* Alto dinámico */
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; /* Centra el bloque de contenido */
+        background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
+        position: fixed; 
         z-index: 5000;
         padding: 20px;
         box-sizing: border-box;
-        overflow-y: auto;
+        overflow-y: auto; /* Permite scroll si la pantalla es muy pequeña */
     }
 
+    /* 2. Logo y Texto Fluido */
     .logo-text { 
         color: #00ff00; 
         font-weight: 800; 
-        font-size: clamp(2rem, 8vw, 3.5rem); 
+        letter-spacing: 3px; 
+        margin-bottom: 5px; 
+        font-size: clamp(2rem, 8vw, 3.5rem); /* Se ajusta solo según el ancho */
         text-align: center;
     }
 
+    .sub-text { 
+        color: #8b949e; 
+        font-size: clamp(0.7rem, 2vw, 0.9rem); 
+        text-transform: uppercase; 
+        letter-spacing: 2px; 
+        margin-bottom: 30px; 
+        text-align: center;
+    }
+    
+    /* 3. El Formulario: Ahora es elástico */
     .container-form {
         width: 100%;
-        max-width: 550px;
+        max-width: 550px; /* Ancho máximo para tablets */
         background: rgba(255,255,255,0.05); 
-        padding: 25px; 
+        padding: clamp(15px, 4vw, 30px); 
         border-radius: 20px; 
         border: 1px solid rgba(255,255,255,0.1);
+        margin-bottom: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
 
-    #contenedor-analisis {
-        display: none;
-        width: 100vw;
-        height: 100vh;
-        background: #000;
-        position: relative;
+    /* Ajuste de los inputs para que se vean grandes y fáciles de tocar */
+    .container-form input, .container-form select {
+        font-size: 1rem !important; /* Evita zoom automático en iPhone */
+        padding: 12px !important;
+        margin-top: 5px;
     }
 
-    canvas {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-    }
-
-    .barra-controles {
-        position: absolute;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 15px;
-        z-index: 100;
-    }
-
-    .btn-circular {
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
+    /* 4. Botones de Acción */
+    .btn-inicio { 
+        flex: 1; 
+        padding: 20px !important; 
+        border-radius: 15px; 
+        font-weight: 900; 
+        font-size: 1.1rem; 
         border: none;
-        font-size: 0.7rem;
-        font-weight: bold;
+        transition: transform 0.2s;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
 
-    #loader-ia {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: #0d1117;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 6000;
+    .btn-inicio:active {
+        transform: scale(0.95);
+    }
+
+    /* Contenedor de botones para que siempre estén alineados */
+    .d-flex.gap-2 {
+        width: 100%;
+        max-width: 550px;
     }
 </style>
+  
+
+    
 </head>
 <body>
 
 <div id="loader-ia">
-    <h3 style="color:#00ff00;">LYA-AUDITOR ENGINE</h3>
-    <p style="color: white;">Cargando Redes Neuronales...</p>
-</div>
-
-<div id="menu-inicial">
-    <h1 class="logo-text">LYA-ERGO</h1>
-    <p class="text-secondary mb-4">AUDITORÍA NOM-036-STPS</p>
-    
-    <div class="container-form">
-        <div class="row g-3">
-            <div class="col-12">
-                <label class="text-secondary small">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" class="form-control bg-dark text-white border-secondary">
-            </div>
-            <div class="col-6">
-                <label class="text-secondary small">PUESTO:</label>
-                <input type="text" id="puestoTrabajo" class="form-control bg-dark text-white border-secondary">
-            </div>
-            <div class="col-6">
-                <label class="text-secondary small">PESO (KG):</label>
-                <input type="number" id="pesoCarga" class="form-control bg-dark text-white border-success">
-            </div>
-        </div>
-        
-        <div class="d-flex gap-2 mt-4">
-            <button class="btn btn-success w-100 py-3 fw-bold" onclick="prepararSistema('camara')">🎥 EN VIVO</button>
-            <button class="btn btn-primary w-100 py-3 fw-bold" onclick="document.getElementById('fileInput').click()">📁 ARCHIVO</button>
-        </div>
-        <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">LYA-AUDITOR ENGINE</h3>
+    <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
+        <div id="bar-id" class="progress-bar"></div>
     </div>
 </div>
 
+
+<div id="menu-inicial">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Auditoría de Procesos NOM-036-STPS</p>
+    
+    <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+        <div class="row">
+            <div class="col-12 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
+                <input type="text" id="nombreEmpresa" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
+                <input type="text" id="puestoTrabajo" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
+                <input type="text" id="nombreTrabajador" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">GÉNERO:</label>
+                <select id="generoTrabajador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                    <option value="H">Hombre</option>
+                    <option value="M">Mujer</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">EDAD:</label>
+                <input type="number" id="edadTrabajador" min="15" max="80" placeholder="Años" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+            </div>
+
+            <div class="col-12">
+                <label style="color: #27ae60; font-size: 0.7rem; display: block; font-weight: bold;">PESO DE LA CARGA (KG):</label>
+                <input type="number" id="pesoCarga" min="1" max="50" placeholder="Ej: 10" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #27ae60; background: #0d1117; color: white;">
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
+        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()">📁 ARCHIVO</button>
+    </div>
+    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+</div>
+    
 <div id="contenedor-analisis">
-    <div id="txt-status" class="position-absolute top-0 start-50 translate-middle-x mt-3 badge bg-dark border border-success">SISTEMA READY</div>
+    <div class="status-badge" id="txt-status">SISTEMA READY</div>
+    
     <canvas id="output_canvas"></canvas>
+    
     <video id="input_video" playsinline muted style="display:none;"></video>
     
     <div class="barra-controles">
-        <button class="btn-circular bg-danger text-white" onclick="location.reload()">✖<br>SALIR</button>
-        <button class="btn-circular bg-info" onclick="cambiarCamara()">🔄<br>GIRAR</button>
-        <button class="btn-circular bg-warning" onclick="activarIA()">⚖️<br>CALIBRAR</button>
-        <button id="recordBtn" class="btn-circular bg-success text-white" onclick="toggleGrabacion()" disabled>🔴<br>AUDITAR</button>
+        <button class="btn-circular btn-dark" onclick="location.reload()" title="Cerrar auditoría">
+            <span>✖</span><br>SALIR
+        </button>
+        
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">
+            <span>🔄</span><br>GIRAR
+        </button>
+        
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">
+            <span>⚖️</span><br>CALIBRAR
+        </button>
+        
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled>
+            <span>🔴</span><br>AUDITAR
+        </button>
     </div>
 </div>
 
 <script>
+/**
+ * 🏷️ BLOQUE 1: REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
+ * Selección de elementos de interfaz y definición de umbrales NOM-036.
+ */
     const video = document.getElementById('input_video');
     const canvas = document.getElementById('output_canvas');
     const ctx = canvas.getContext('2d');
-    let pose, iaActiva = false, calibrado = false, analizandoRiesgo = false;
-    let currentFacingMode = "environment";
-    let posBuffer = {};
+    const txtStatus = document.getElementById('txt-status');
 
+    // Umbrales de desviación permitidos (Grados)
+    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
+
+/**
+ * 🏷️ BLOQUE 2: ESTADO GLOBAL Y VARIABLES DE CONTROL
+ * Gestión de banderas de IA, calibración y almacenamiento temporal de ángulos.
+ */
+    let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
+    
+    let baseAngles = {}, angleBuffer = {};
+    const HISTORIAL_MAX = 20; // Para suavizado de movimiento
+    let iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0;
+    let pose;
+    let mediaRecorder;
+let recordedChunks = [];
+    // Añade esto en el Bloque 2
+let posBuffer = {}; // Historial de coordenadas X, Y para suavizado
+const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
+
+/**
+ * 🏷️ BLOQUE 3: GESTIÓN DE FUENTES DE VIDEO
+ * Configuración de cámara del dispositivo o carga de archivos locales.
+ */
     async function prepararSistema(fuente) {
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('contenedor-analisis').style.display = 'block';
         if (fuente === 'camara') await encenderCamara();
+        else {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+            if (video.src) URL.revokeObjectURL(video.src); 
+            video.src = URL.createObjectURL(file);
+            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
+        }
     }
 
+    function setupCanvas() {
+    // Forzamos al canvas a tener la resolución nativa del video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // El CSS se encarga de que se vea bien (object-fit: contain)
+    console.log("Resolución de análisis: " + canvas.width + "x" + canvas.height);
+    }
+    
     async function encenderCamara() {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
-        });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            video.play();
-            requestAnimationFrame(renderLoop);
-        };
+        try {
+            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
+        } catch (e) { alert("Error al acceder a la cámara"); }
     }
 
-    function renderLoop() {
+    function loopVideoSimple() {
         if (!iaActiva) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            requestAnimationFrame(renderLoop);
+            requestAnimationFrame(loopVideoSimple);
         }
     }
 
-    function activarIA() {
-        document.getElementById('loader-ia').style.display = 'flex';
-        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6 });
-        
-        pose.onResults((res) => {
-            document.getElementById('loader-ia').style.display = 'none';
-            iaActiva = true;
-            document.getElementById('recordBtn').disabled = false;
-            drawResults(res);
+/**
+ * 🏷️ BLOQUE 4: MOTOR MATEMÁTICO Y RENDERIZADO VISUAL
+ * Cálculo de ángulos en 3D y dibujo de indicadores (semáforo) sobre el cuerpo.
+ */
+    function calcAng3D(a,b,c) {
+        const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
+        const dot = v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+        const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2), m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
+        return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
+    }
+const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+    // Si cualquiera de los dos puntos que forman el vector tiene baja visibilidad, 
+    // NO dibujamos el vector ni procesamos el riesgo.
+    if (raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) {
+        return; 
+    }
+
+    const buffer = angleBuffer[angKey] || [0];
+    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+    let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
+
+    if (analizandoRiesgo && calibrado) {
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+        const t = TH[groupKey];
+        wbaStats.framesAnalizados++;
+        if (diff > (t * 2)) { 
+            wbaStats.riesgoAltoTotal++; wbaStats.zonasAfectadas.add(groupKey);
+            color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
+        } else if (diff > t) {
+            color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
+        }
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = color; ctx.lineWidth = thickness;
+    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    if (calibrado) {
+        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+        let offsetX = (groupKey === "munecas") ? 45 : 15;
+        let offsetY = (groupKey === "munecas") ? 20 : -15;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+        ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
+        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
+        ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
+        ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
+        ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
+    }
+};
+
+
+
+function onResults(res) {
+    if (!res.poseLandmarks) return;
+    
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Espejo para cámara frontal
+    if (currentFacingMode === "user") { 
+        ctx.translate(canvas.width, 0); 
+        ctx.scale(-1, 1); 
+    }
+    
+    ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+
+    const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
+const pt = (i) => {
+    const lmPoint = lm[i];
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // 1. Umbral de visibilidad: Si es menor a 0.5, el punto es poco confiable
+    const esInestable = lmPoint.visibility < 0.5;
+
+    if (!posBuffer[i]) {
+        posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
+    }
+
+    // 2. Si es inestable, no añadimos el punto nuevo al historial, 
+    // mantenemos el promedio anterior para evitar el "salto".
+    if (!esInestable) {
+        posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
+        if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
+    }
+
+    const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
+    const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
+
+    posBuffer[i].x = avgX;
+    posBuffer[i].y = avgY;
+
+    return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
+};
+    // Mapeo de anatomía con puntos suavizados
+    const p = {
+        cab: pt(0), 
+        cue: { 
+            x: (lm[11].x + lm[12].x) / 2 * w, 
+            y: (lm[11].y + lm[12].y) / 2 * h, 
+            z: (lm[11].z + lm[12].z) / 2 
+        },
+        tor: { 
+            x: (lm[11].x + lm[12].x) / 2 * w, 
+            y: (lm[11].y + lm[12].y) / 2 * h + 40, 
+            z: (lm[11].z + lm[12].z) / 2 
+        },
+        abd: { 
+            x: (lm[23].x + lm[24].x) / 2 * w, 
+            y: (lm[23].y + lm[24].y) / 2 * h - 30, 
+            z: (lm[23].z + lm[24].z) / 2 
+        },
+        esp_baja: { 
+            x: (lm[23].x + lm[24].x) / 2 * w, 
+            y: (lm[23].y + lm[24].y) / 2 * h, 
+            z: (lm[23].z + lm[24].z) / 2 
+        },
+        h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
+        h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
+        p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
+        p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
+    };
+
+    // Lógica de conteo de ciclos (Levantamientos)
+    if (analizandoRiesgo) {
+        const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
+        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
+        const umbralMovimiento = alturaTorso * 0.3; 
+
+        if (wbaStats.lastHandY !== null) {
+            const desplazamiento = wbaStats.lastHandY - currentHandY;
+            if (desplazamiento > umbralMovimiento && !wbaStats.subiendo) {
+                wbaStats.ciclos++; 
+                wbaStats.subiendo = true;
+            } else if (desplazamiento < -umbralMovimiento) {
+                wbaStats.subiendo = false;
+            }
+        }
+        wbaStats.lastHandY = currentHandY;
+    }
+
+    // Cálculo de ángulos actuales
+    const currentAngles = {
+        cue: calcAng3D(p.cab, p.cue, p.tor), 
+        abd: calcAng3D(p.tor, p.abd, p.esp_baja),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), 
+        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), 
+        m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
+        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), 
+        h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
+        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), 
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
+        t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+    };
+
+    // Llenar buffer de ángulos para el suavizado del Bloque 4
+    Object.keys(currentAngles).forEach(k => {
+        if (!angleBuffer[k]) angleBuffer[k] = [];
+        angleBuffer[k].push(currentAngles[k]);
+        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+    });
+
+    // Calibración automática tras 3 segundos
+    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
+        Object.keys(angleBuffer).forEach(k => { 
+            baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
         });
-
-        const sendFrames = async () => {
-            if (video.readyState >= 2) await pose.send({image: video});
-            requestAnimationFrame(sendFrames);
-        };
-        sendFrames();
+        wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
+        calibrado = true; 
+        document.getElementById('recordBtn').style.opacity = "1";
+        txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    function drawResults(res) {
-        ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
-        
-        if (res.poseLandmarks) {
-            // Lógica de dibujo de esqueleto aquí...
-            ctx.fillStyle = "#00ff00";
-            res.poseLandmarks.forEach(pt => {
-                if(pt.visibility > 0.5) ctx.fillRect(pt.x * canvas.width, pt.y * canvas.height, 5, 5);
-            });
+    // Renderizado del Esqueleto (Solo líneas base)
+    ctx.strokeStyle = "#00ff00"; 
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
+
+    // Dibujo de Vectores con Semáforo (Usando la visibilidad real de MediaPipe)
+    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
+    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
+    drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
+    drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+    
+    ctx.restore();
+}
+
+/**
+ * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (CORREGIDO)
+ */
+function activarIA() {
+    const loader = document.getElementById('loader-ia');
+    if (loader) loader.style.display = 'flex';
+
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
+
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.6, 
+        minTrackingConfidence: 0.6 
+    });
+
+    pose.onResults((res) => {
+        if (!iaActiva) { 
+            if (loader) loader.style.display = 'none';
+            iaActiva = true; 
+            startTimeCalib = Date.now(); 
+            
+            const btn = document.getElementById('recordBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
         }
-        ctx.restore();
+        onResults(res);
+    });
+
+    // Iniciar el bucle de procesamiento
+    loopIA();
+}
+
+async function loopIA() { 
+    if (iaActiva && video.readyState >= 2) { 
+        await pose.send({image: video}); 
+    } 
+    requestAnimationFrame(loopIA); 
+}
+    /**
+ * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
+ * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
+ */
+function generarReporteWBA() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
+    const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
+    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const duracionMinutos = msTranscurridos / 60000;
+    const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
+
+    let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
+    if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { 
+        colorHex = "#c0392b"; 
+        conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA"; 
+    } else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { 
+        colorHex = "#f1c40f"; 
+        conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS"; 
     }
 
-    function toggleGrabacion() {
-        analizandoRiesgo = !analizandoRiesgo;
-        const btn = document.getElementById('recordBtn');
-        btn.innerHTML = analizandoRiesgo ? "⏹️<br>PARAR" : "🔴<br>AUDITAR";
-        btn.classList.toggle('bg-success');
-        btn.classList.toggle('bg-danger');
-        if(!analizandoRiesgo) alert("Auditoría Finalizada. Generando PDF...");
-    }
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
 
-    async function cambiarCamara() {
-        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        await encenderCamara();
+    doc.autoTable({
+        startY: 75,
+        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS']],
+        body: [
+            ['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],
+            ['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],
+            ['Postura Crítica', `${porcentajeRiesgo}%`, zonas]
+        ],
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setDrawColor(colorHex); doc.rect(15, finalY, 180, 40);
+    doc.setTextColor(colorHex); doc.text("CONCLUSIÓN Y RECOMENDACIÓN:", 20, finalY + 10);
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+    doc.text(`${conclusion}. Se detectó estrés en: ${zonas}. Ciclos totales: ${wbaStats.ciclos}.`, 20, finalY + 20, { maxWidth: 170 });
+    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+}
+
+/**
+ * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
+ */
+function toggleGrabacion() {
+    if (!calibrado) return;
+    analizandoRiesgo = !analizandoRiesgo;
+    const btn = document.getElementById('recordBtn');
+
+    if (analizandoRiesgo) {
+        // --- INICIO DE AUDITORÍA Y VIDEO ---
+        recordedChunks = [];
+        const stream = canvas.captureStream(30); 
+        
+        const tipos = ['video/webm; codecs=vp9', 'video/webm', 'video/mp4'];
+        const mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || '';
+        
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = descargarVideo; 
+        
+        mediaRecorder.start();
+
+        wbaStats = { 
+            riesgoAltoTotal: 0, 
+            framesAnalizados: 0, 
+            zonasAfectadas: new Set(), 
+            inicioAuditoria: Date.now(), 
+            ciclos: 0, 
+            lastHandY: null, 
+            subiendo: false 
+        };
+
+        txtStatus.innerText = "ANALIZANDO...";
+        btn.innerHTML = "⏹️<br>DETENER";
+        btn.classList.add('rec-active');
+    } else {
+        // --- FIN DE AUDITORÍA ---
+        txtStatus.innerText = "PROCESANDO...";
+        btn.innerHTML = "🔴<br>AUDITAR";
+        btn.classList.remove('rec-active');
+        
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop(); 
+        }
+
+        setTimeout(() => { 
+            generarReporteWBA(); 
+            txtStatus.innerText = "FIN AUDITORÍA"; 
+        }, 600);
     }
+}
+
+async function cambiarCamara() {
+    currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+    iaActiva = false;
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    await encenderCamara();
+}
+
+function descargarVideo() {
+    if (recordedChunks.length === 0) return;
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    
+    a.href = url;
+    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
+// Forzar ajuste de dimensiones en cambios de orientación (Tablets)
+window.addEventListener('resize', () => {
+    if (iaActiva) {
+        setupCanvas();
+    }
+});let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        if (video.readyState >= 2) {
+            setupCanvas();
+            // Si la IA está corriendo, MediaPipe se ajustará al nuevo canvas en el siguiente frame
+        }
+    }, 300); // 300ms permite que el navegador termine de acomodar los elementos
+});
+    
 </script>
+
+
 </body>
 </html>
