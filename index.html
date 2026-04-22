@@ -11,22 +11,128 @@ V2.JUEV
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <style>
-        body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        #menu-inicial { display: flex; width: 100%; height: 100vh; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: fixed; z-index: 5000; }
-        .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 0; }
-        .sub-text { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; }
-        .btn-inicio { width: 85%; max-width: 320px; padding: 18px; margin: 10px; border-radius: 12px; font-weight: bold; border: none; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        #loader-ia { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(13, 17, 23, 0.98); z-index: 6000; flex-direction: column; align-items: center; justify-content: center; }
-        .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
-        #contenedor-analisis { display: none; width: 100vw; height: 100vh; position: relative; background: #000; }
-        canvas { width: 100%; height: 100%; object-fit: contain; }
-        video { display: none; }
-        .status-badge { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 12px 20px; border-radius: 8px; border-left: 4px solid #00ff00; font-size: 10px; z-index: 3000; font-weight: bold; }
-        .barra-controles { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 4000; width: 95%; justify-content: center; }
-        .btn-circular { width: 68px; height: 68px; border-radius: 50%; border: none; font-size: 9px; font-weight: 900; color: white; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .rec-active { background: #fff !important; color: #f00 !important; border: 3px solid #f00 !important; animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } }
-    </style>
+    /* 1. Cambio a height: 100svh para evitar que el contenido se desplace bajo las barras del navegador */
+    body { 
+        background-color: #0d1117; 
+        color: white; 
+        margin: 0; 
+        overflow: hidden; 
+        font-family: 'Segoe UI', sans-serif; 
+        height: 100vh;
+        height: 100svh; 
+    }
+
+    #menu-inicial { 
+        display: flex; 
+        width: 100%; 
+        height: 100vh; 
+        height: 100svh;
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
+        position: fixed; 
+        z-index: 5000; 
+    }
+
+    .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 0; }
+    .sub-text { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px; }
+    
+    .btn-inicio { 
+        width: 85%; 
+        max-width: 320px; 
+        padding: 18px; 
+        margin: 10px; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        border: none; 
+        font-size: 1.1rem; 
+        transition: all 0.3s ease; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+    }
+
+    #loader-ia { 
+        display: none; 
+        position: fixed; 
+        top:0; 
+        left:0; 
+        width:100%; 
+        height:100%; 
+        height: 100svh;
+        background: rgba(13, 17, 23, 0.98); 
+        z-index: 6000; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+    }
+
+    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
+
+    /* 2. El contenedor ahora ocupa el alto dinámico exacto */
+    #contenedor-analisis { 
+        display: none; 
+        width: 100vw; 
+        height: 100vh; 
+        height: 100svh;
+        position: relative; 
+        background: #000; 
+    }
+
+    canvas { width: 100%; height: 100%; object-fit: contain; }
+    video { display: none; }
+
+    .status-badge { 
+        position: absolute; 
+        top: calc(20px + env(safe-area-inset-top)); /* Ajuste para notch/cámara superior */
+        left: 20px; 
+        background: rgba(0,0,0,0.8); 
+        padding: 12px 20px; 
+        border-radius: 8px; 
+        border-left: 4px solid #00ff00; 
+        font-size: 10px; 
+        z-index: 3000; 
+        font-weight: bold; 
+    }
+
+    /* 3. CORRECCIÓN PRINCIPAL: Posicionamiento basado en el área segura inferior */
+    .barra-controles { 
+        position: absolute; 
+        bottom: calc(25px + env(safe-area-inset-bottom)); 
+        left: 50%; 
+        transform: translateX(-50%); 
+        display: flex; 
+        gap: 15px; 
+        z-index: 4000; 
+        width: 95%; 
+        justify-content: center; 
+        padding-bottom: 5px;
+    }
+
+    /* 4. flex-shrink: 0 evita que los botones se deformen si el espacio es poco */
+    .btn-circular { 
+        width: 68px; 
+        height: 68px; 
+        border-radius: 50%; 
+        border: none; 
+        font-size: 9px; 
+        font-weight: 900; 
+        color: white; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        flex-direction: column;
+        flex-shrink: 0;
+    }
+
+    .rec-active { background: #fff !important; color: #f00 !important; border: 3px solid #f00 !important; animation: pulse-red 1.5s infinite; }
+    
+    @keyframes pulse-red { 
+        0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 
+        70% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); } 
+        100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } 
+    }
+</style>
+
 </head>
 <body>
 
@@ -158,10 +264,15 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
     }
 
     function setupCanvas() {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-    }
-
+    // Usamos el offsetHeight del contenedor que ya tiene 100svh
+    const contenedor = document.getElementById('contenedor-analisis');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Ajustar visualmente el canvas sin romper la resolución de la IA
+    canvas.style.maxHeight = "100%";
+    canvas.style.maxWidth = "100%";
+}
     async function encenderCamara() {
         try {
             if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
@@ -545,7 +656,12 @@ function descargarVideo() {
         window.URL.revokeObjectURL(url);
     }, 100);
 }
-
+// Forzar ajuste de dimensiones en cambios de orientación (Tablets)
+window.addEventListener('resize', () => {
+    if (iaActiva) {
+        setupCanvas();
+    }
+});
 </script>
 
 
