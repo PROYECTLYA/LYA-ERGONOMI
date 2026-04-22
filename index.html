@@ -83,161 +83,90 @@ V4.JUEV adaptacion a pantalla
 
     .status-badge { 
         position: absolute; 
-<style>
-    :root {
-        --primary-green: #00ff00;
-        /* Variable para facilitar el mantenimiento del color principal */
-    }
 
-    /* 1. Cambio a height: 100svh para evitar que el contenido se desplace bajo las barras del navegador */
-    body { 
-        background-color: #0d1117; 
-        color: white; 
-        margin: 0; 
-        overflow: hidden; 
-        font-family: 'Segoe UI', sans-serif; 
-        height: 100vh;
-        height: 100svh; 
-    }
-
+      <style>
+    /* 1. Ajuste del contenedor principal para que use todo el alto disponible */
     #menu-inicial { 
         display: flex; 
         width: 100%; 
-        height: 100svh;
+        height: 100svh; /* Alto dinámico */
         flex-direction: column; 
         align-items: center; 
-        justify-content: center; 
+        justify-content: center; /* Centra el bloque de contenido */
         background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
         position: fixed; 
         z-index: 5000;
         padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto; /* Permite scroll si la pantalla es muy pequeña */
     }
 
-    /* Adecuación: Tamaño de logo fluido según pantalla */
+    /* 2. Logo y Texto Fluido */
     .logo-text { 
-        color: var(--primary-green); 
+        color: #00ff00; 
         font-weight: 800; 
         letter-spacing: 3px; 
-        margin-bottom: 0; 
-        font-size: clamp(1.8rem, 5vw, 3rem); 
+        margin-bottom: 5px; 
+        font-size: clamp(2rem, 8vw, 3.5rem); /* Se ajusta solo según el ancho */
+        text-align: center;
     }
 
     .sub-text { 
         color: #8b949e; 
-        font-size: 0.7rem; 
+        font-size: clamp(0.7rem, 2vw, 0.9rem); 
         text-transform: uppercase; 
         letter-spacing: 2px; 
-        margin-bottom: clamp(20px, 5vh, 40px); 
+        margin-bottom: 30px; 
+        text-align: center;
     }
     
-    /* Adecuación: Contenedor de formulario con ancho máximo inteligente para tablets */
+    /* 3. El Formulario: Ahora es elástico */
     .container-form {
         width: 100%;
-        max-width: 600px; 
+        max-width: 550px; /* Ancho máximo para tablets */
         background: rgba(255,255,255,0.05); 
-        padding: clamp(15px, 3vw, 30px); 
+        padding: clamp(15px, 4vw, 30px); 
         border-radius: 20px; 
         border: 1px solid rgba(255,255,255,0.1);
-        margin-bottom: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
 
+    /* Ajuste de los inputs para que se vean grandes y fáciles de tocar */
+    .container-form input, .container-form select {
+        font-size: 1rem !important; /* Evita zoom automático en iPhone */
+        padding: 12px !important;
+        margin-top: 5px;
+    }
+
+    /* 4. Botones de Acción */
     .btn-inicio { 
-        width: 100%;
-        max-width: 280px;
-        padding: 18px; 
-        margin: 10px; 
-        border-radius: 12px; 
-        font-weight: bold; 
-        border: none; 
-        font-size: clamp(0.9rem, 2vw, 1.1rem); 
-        transition: all 0.3s ease; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
-    }
-
-    #loader-ia { 
-        display: none; 
-        position: fixed; 
-        top:0; 
-        left:0; 
-        width:100%; 
-        height: 100svh;
-        background: rgba(13, 17, 23, 0.98); 
-        z-index: 6000; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-    }
-
-    .progress-bar { width: 0%; height: 6px; background: var(--primary-green); transition: 0.4s; box-shadow: 0 0 20px var(--primary-green); margin-top: 25px; border-radius: 10px; }
-
-    /* 2. El contenedor ahora ocupa el alto dinámico exacto */
-    #contenedor-analisis { 
-        display: none; 
-        width: 100vw; 
-        height: 100svh;
-        position: relative; 
-        background: #000; 
-    }
-
-    canvas { width: 100%; height: 100%; object-fit: contain; }
-    video { display: none; }
-
-    .status-badge { 
-        position: absolute; 
-        top: calc(15px + env(safe-area-inset-top)); 
-        left: 15px; 
-        background: rgba(0,0,0,0.8); 
-        padding: 10px 18px; 
-        border-radius: 8px; 
-        border-left: 4px solid var(--primary-green); 
-        font-size: clamp(9px, 1.5vw, 11px); 
-        z-index: 3000; 
-        font-weight: bold; 
-    }
-
-    /* 3. CORRECCIÓN PRINCIPAL: Barra adaptativa con desenfoque y espaciado dinámico */
-    .barra-controles { 
-        position: absolute; 
-        bottom: calc(20px + env(safe-area-inset-bottom)); 
-        left: 50%; 
-        transform: translateX(-50%); 
-        display: flex; 
-        gap: clamp(10px, 3vw, 25px); 
-        z-index: 4000; 
-        width: auto;
-        padding: 12px 25px;
-        background: rgba(0,0,0,0.4);
-        border-radius: 50px;
-        backdrop-filter: blur(10px);
-    }
-
-    /* 4. Adecuación: Tamaño de botones circulares proporcional al ancho de pantalla */
-    .btn-circular { 
-        width: clamp(62px, 12vw, 82px); 
-        height: clamp(62px, 12vw, 82px); 
-        border-radius: 50%; 
-        border: none; 
-        font-size: clamp(8px, 1.5vw, 10px);
+        flex: 1; 
+        padding: 20px !important; 
+        border-radius: 15px; 
         font-weight: 900; 
-        color: white; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        flex-direction: column;
-        flex-shrink: 0;
+        font-size: 1.1rem; 
+        border: none;
         transition: transform 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
 
-    .btn-circular:active { transform: scale(0.9); }
+    .btn-inicio:active {
+        transform: scale(0.95);
+    }
 
-    .rec-active { background: #fff !important; color: #f00 !important; border: 3px solid #f00 !important; animation: pulse-red 1.5s infinite; }
-    
-    @keyframes pulse-red { 
-        0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 
-        70% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); } 
-        100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } 
+    /* Contenedor de botones para que siempre estén alineados */
+    .d-flex.gap-2 {
+        width: 100%;
+        max-width: 550px;
     }
 </style>
+  
+
     
 </head>
 <body>
