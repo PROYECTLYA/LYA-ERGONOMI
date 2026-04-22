@@ -1,4 +1,4 @@
-V1.JUEV
+V2.JUEV
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -378,10 +378,8 @@ const pt = (i) => {
     ctx.restore();
 }
 
-
-    
 /**
- * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (OPTIMIZADO)
+ * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (CORREGIDO)
  */
 function activarIA() {
     const loader = document.getElementById('loader-ia');
@@ -398,7 +396,6 @@ function activarIA() {
         minTrackingConfidence: 0.6 
     });
 
-    // Solo definimos qué hacer cuando lleguen resultados
     pose.onResults((res) => {
         if (!iaActiva) { 
             if (loader) loader.style.display = 'none';
@@ -414,91 +411,65 @@ function activarIA() {
         onResults(res);
     });
 
-    // Iniciamos el bucle de envío de frames UNA SOLA VEZ
-    iaActiva = true;
+    // Iniciar el bucle de procesamiento
     loopIA();
 }
 
 async function loopIA() { 
-    if (iaActiva && video.readyState >= 2) { // Verificamos que el video tenga datos
+    if (iaActiva && video.readyState >= 2) { 
         await pose.send({image: video}); 
-    }
+    } 
     requestAnimationFrame(loopIA); 
 }
-        onResults(res);
-    });
-    // Iniciar el envío de frames
-    pose.send({image: video});
-}
-
-// ESTA FUNCIÓN DEBE ESTAR AFUERA, NO ANIDADA
-async function loopIA() { 
-    if (iaActiva) { 
-        await pose.send({image: video}); 
-        requestAnimationFrame(loopIA); 
-    } 
-}
-/**
+    /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
  * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
  */
-    function generarReporteWBA() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
-        const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
-        const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
-        const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
-        const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
-        const duracionMinutos = msTranscurridos / 60000;
-        const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
+function generarReporteWBA() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
+    const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
+    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const duracionMinutos = msTranscurridos / 60000;
+    const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
 
-        let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
-        if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { colorHex = "#c0392b"; conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA"; }
-        else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { colorHex = "#f1c40f"; conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS"; }
-
-        doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
-        doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
-
-        doc.autoTable({
-            startY: 75,
-            head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS']],
-            body: [['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],['Postura Crítica', `${porcentajeRiesgo}%`, zonas]],
-            headStyles: { fillColor: [41, 128, 185] }
-        });
-
-        const finalY = doc.lastAutoTable.finalY + 15;
-        doc.setDrawColor(colorHex); doc.rect(15, finalY, 180, 40);
-        doc.setTextColor(colorHex); doc.text("CONCLUSIÓN Y RECOMENDACIÓN:", 20, finalY + 10);
-        doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-        doc.text(`${conclusion}. Se detectó estrés en: ${zonas}. Ciclos totales: ${wbaStats.ciclos}.`, 20, finalY + 20, { maxWidth: 170 });
-        doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+    let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
+    if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { 
+        colorHex = "#c0392b"; 
+        conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA"; 
+    } else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { 
+        colorHex = "#f1c40f"; 
+        conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS"; 
     }
 
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
 
-    function descargarVideo() {
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
-    
-    a.href = url;
-    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Limpieza
-    setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }, 100);
+    doc.autoTable({
+        startY: 75,
+        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS']],
+        body: [
+            ['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],
+            ['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],
+            ['Postura Crítica', `${porcentajeRiesgo}%`, zonas]
+        ],
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setDrawColor(colorHex); doc.rect(15, finalY, 180, 40);
+    doc.setTextColor(colorHex); doc.text("CONCLUSIÓN Y RECOMENDACIÓN:", 20, finalY + 10);
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+    doc.text(`${conclusion}. Se detectó estrés en: ${zonas}. Ciclos totales: ${wbaStats.ciclos}.`, 20, finalY + 20, { maxWidth: 170 });
+    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
 }
-
 
 /**
  * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
- * Este bloque gestiona el inicio/fin del análisis y la captura de video.
  */
 function toggleGrabacion() {
     if (!calibrado) return;
@@ -515,8 +486,6 @@ function toggleGrabacion() {
         
         mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        
-        // Se asigna la referencia. Al ejecutar .stop(), se llamará a la función externa.
         mediaRecorder.onstop = descargarVideo; 
         
         mediaRecorder.start();
@@ -550,15 +519,17 @@ function toggleGrabacion() {
         }, 600);
     }
 }
-    
 
-    async function cambiarCamara() {
-        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        iaActiva = false;
-        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-        await encenderCamara();
-    }
-    function descargarVideo() {
+async function cambiarCamara() {
+    currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+    iaActiva = false;
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    await encenderCamara();
+}
+
+function descargarVideo() {
+    if (recordedChunks.length === 0) return;
+
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -569,12 +540,12 @@ function toggleGrabacion() {
     document.body.appendChild(a);
     a.click();
     
-    // Limpieza
     setTimeout(() => {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }, 100);
 }
+
 </script>
 
 
