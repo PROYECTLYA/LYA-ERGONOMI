@@ -1,3 +1,4 @@
+V1.JUEV
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -190,14 +191,9 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-    // Filtro de visibilidad: si es baja, dibujamos esqueleto "fantasma" sin procesar riesgo
-    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.6 || raw_lm2.visibility < 0.6) {
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(75, 75, 75, 0.3)";
-        ctx.lineWidth = 2;
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
+    // Si cualquiera de los dos puntos que forman el vector tiene baja visibilidad, 
+    // NO dibujamos el vector ni procesamos el riesgo.
+    if (raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) {
         return; 
     }
 
@@ -253,39 +249,33 @@ function onResults(res) {
     ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
 
     const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
+const pt = (i) => {
+    const lmPoint = lm[i];
+    const w = canvas.width;
+    const h = canvas.height;
 
-    /**
-     * 🛠️ SUB-FUNCIÓN INTERNA: pt(i) 
-     * Estabiliza el punto 'i' usando un promedio móvil y memoria de posición.
-     */
-    const pt = (i) => {
-        let rawX = lm[i].x * w;
-        let rawY = lm[i].y * h;
+    // 1. Umbral de visibilidad: Si es menor a 0.5, el punto es poco confiable
+    const esInestable = lmPoint.visibility < 0.5;
 
-        // 1. Si la visibilidad es nula o muy baja, recuperamos el último punto estable
-        if (lm[i].visibility < 0.5 && posBuffer[i]) {
-            return { x: posBuffer[i].x, y: posBuffer[i].y, z: lm[i].z };
-        }
+    if (!posBuffer[i]) {
+        posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
+    }
 
-        // 2. Inicializar buffer si es un punto nuevo
-        if (!posBuffer[i]) {
-            posBuffer[i] = { x: rawX, y: rawY, history: [] };
-        }
-
-        // 3. Suavizado: Añadir al historial y promediar últimos frames
-        posBuffer[i].history.push({ x: rawX, y: rawY });
+    // 2. Si es inestable, no añadimos el punto nuevo al historial, 
+    // mantenemos el promedio anterior para evitar el "salto".
+    if (!esInestable) {
+        posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
         if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
+    }
 
-        const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
-        const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
+    const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
+    const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
 
-        // Guardar para la próxima referencia
-        posBuffer[i].x = avgX;
-        posBuffer[i].y = avgY;
+    posBuffer[i].x = avgX;
+    posBuffer[i].y = avgY;
 
-        return { x: avgX, y: avgY, z: lm[i].z };
-    };
-
+    return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
+};
     // Mapeo de anatomía con puntos suavizados
     const p = {
         cab: pt(0), 
@@ -391,8 +381,7 @@ function onResults(res) {
 
     
 /**
- * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (REVISADO)
- * Activa los modelos y habilita la interfaz de usuario al detectar señal.
+ * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (OPTIMIZADO)
  */
 function activarIA() {
     const loader = document.getElementById('loader-ia');
@@ -409,6 +398,7 @@ function activarIA() {
         minTrackingConfidence: 0.6 
     });
 
+    // Solo definimos qué hacer cuando lleguen resultados
     pose.onResults((res) => {
         if (!iaActiva) { 
             if (loader) loader.style.display = 'none';
@@ -419,10 +409,22 @@ function activarIA() {
             if (btn) {
                 btn.disabled = false;
                 btn.style.opacity = "1";
-                btn.style.cursor = "pointer";
             }
-            loopIA(); // Inicia el bucle
         }
+        onResults(res);
+    });
+
+    // Iniciamos el bucle de envío de frames UNA SOLA VEZ
+    iaActiva = true;
+    loopIA();
+}
+
+async function loopIA() { 
+    if (iaActiva && video.readyState >= 2) { // Verificamos que el video tenga datos
+        await pose.send({image: video}); 
+    }
+    requestAnimationFrame(loopIA); 
+}
         onResults(res);
     });
     // Iniciar el envío de frames
