@@ -1,4 +1,4 @@
-V2 JUE
+V3 JUE
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -390,18 +390,29 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
 
 
 function onResults(res) {
-    if (!res.poseLandmarks) return;
+    if (!res.poseLandmarks) {
+        txtStatus.innerText = "SUJETO PERDIDO";
+        return;
+    }
     
+    // Si llegamos aquí, hay detección exitosa
+    if (!calibrado) {
+        let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
+        txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
+    }
+
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Espejo para cámara frontal
     if (currentFacingMode === "user") { 
         ctx.translate(canvas.width, 0); 
         ctx.scale(-1, 1); 
     }
     
     ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+    
+    // ... (El resto de tu lógica de dibujo drawV y puntos pt se mantiene igual)
+}
 
     const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
 const pt = (i) => {
@@ -533,13 +544,33 @@ const pt = (i) => {
     ctx.restore();
 }
 
-    /** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (OPTIMIZADO)
+
+/** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA CON CONTROL DE DETECCIÓN
+ * Se agrega alerta por falta de sujeto y manejo de estatus.
  */
+let timeoutDeteccion; // Variable global para controlar el tiempo de espera
+
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
+    
+    // Reset de estados para nueva calibración
+    calibrado = false;
+    iaActiva = false;
+    txtStatus.innerText = "BUSCANDO SUJETO...";
 
-    // 1. Inicializar Pose solo si no existe
+    // 1. TEMPORIZADOR DE SEGURIDAD:
+    // Si en 5 segundos no se ha activado la IA (porque no detecta a nadie), avisamos.
+    clearTimeout(timeoutDeteccion);
+    timeoutDeteccion = setTimeout(() => {
+        if (!iaActiva) {
+            if (loader) loader.style.display = 'none';
+            alert("⚠️ NO SE HA DETECTADO EL SUJETO.\n\nPor favor, asegúrese de que la persona sea visible de cuerpo completo y que haya suficiente iluminación.");
+            txtStatus.innerText = "SISTEMA READY (FALLÓ DETECCIÓN)";
+        }
+    }, 5000);
+
+    // 2. Inicializar Pose solo si no existe
     if (!pose) {
         pose = new Pose({ 
             locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
@@ -548,43 +579,50 @@ async function activarIA() {
         pose.setOptions({ 
             modelComplexity: 1, 
             smoothLandmarks: true, 
-            minDetectionConfidence: 0.5, // Bajamos un poco para ganar velocidad
+            minDetectionConfidence: 0.5, 
             minTrackingConfidence: 0.5 
         });
 
         pose.onResults((res) => {
-            if (!iaActiva) { 
-                if (loader) loader.style.display = 'none';
-                iaActiva = true; 
-                startTimeCalib = Date.now(); 
-                
-                const btn = document.getElementById('recordBtn');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.style.opacity = "1";
+            // Validamos si MediaPipe encontró una persona
+            if (res.poseLandmarks) {
+                if (!iaActiva) {
+                    if (loader) loader.style.display = 'none';
+                    iaActiva = true; 
+                    startTimeCalib = Date.now(); 
+                    
+                    const btn = document.getElementById('recordBtn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                    }
+                }
+                // Si ya está activa la IA, ejecutamos el análisis
+                onResults(res);
+            } else {
+                // Si la IA está corriendo pero el sujeto salió de cuadro
+                if (iaActiva) {
+                    txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
                 }
             }
-            onResults(res);
             
-            // 2. IMPORTANTE: Pedimos el siguiente frame SOLO cuando el actual terminó
-            if (iaActiva) {
+            // Pedimos el siguiente frame solo si el actual terminó
+            if (video.readyState >= 2) {
                 requestAnimationFrame(() => {
-                    if (video.readyState >= 2) pose.send({image: video});
+                    pose.send({image: video});
                 });
             }
         });
     }
 
-    // Iniciar el primer frame
+    // Iniciar el proceso de envío de frames
     if (video.readyState >= 2) {
         await pose.send({image: video});
     } else {
-        // Si el video no está listo, reintentar en 100ms
         setTimeout(activarIA, 100);
     }
 }
 
-// ELIMINA COMPLETAMENTE LA FUNCIÓN loopIA() ANTERIOR PARA EVITAR CONFLICTOS
     /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
  * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
