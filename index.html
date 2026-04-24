@@ -1,4 +1,4 @@
-V3 JUE
+V3 VIVO JUE
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -296,18 +296,28 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
  * 🏷️ BLOQUE 3: GESTIÓN DE FUENTES DE VIDEO
  * Configuración de cámara del dispositivo o carga de archivos locales.
  */
-    async function prepararSistema(fuente) {
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('contenedor-analisis').style.display = 'block';
-        if (fuente === 'camara') await encenderCamara();
-        else {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return;
-            if (video.src) URL.revokeObjectURL(video.src); 
-            video.src = URL.createObjectURL(file);
-            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
+  async function prepararSistema(fuente) {
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+    
+    if (fuente === 'camara') {
+        await encenderCamara();
+    } else {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) {
+            location.reload(); // Volver al inicio si no hay archivo
+            return;
         }
+        if (video.src) URL.revokeObjectURL(video.src); 
+        video.src = URL.createObjectURL(file);
+        video.onloadedmetadata = () => { 
+            setupCanvas(); 
+            video.play(); 
+            // En archivos, es mejor activar la IA automáticamente tras cargar
+            activarIA(); 
+        };
     }
+}
 
     function setupCanvas() {
     // Forzamos al canvas a tener la resolución nativa del video
@@ -329,12 +339,14 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
         } catch (e) { alert("Error al acceder a la cámara"); }
     }
 
-    function loopVideoSimple() {
-        if (!iaActiva) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            requestAnimationFrame(loopVideoSimple);
-        }
+  function loopVideoSimple() {
+    // Solo dibujamos manualmente si la IA NO está activa
+    if (!iaActiva) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(loopVideoSimple);
     }
+    // Si la IA se activa, ella misma toma el control del dibujo en onResults
+}
 
 /**
  * 🏷️ BLOQUE 4: MOTOR MATEMÁTICO Y RENDERIZADO VISUAL
@@ -606,15 +618,17 @@ async function activarIA() {
                 }
             }
             
-            // Pedimos el siguiente frame solo si el actual terminó
-            if (video.readyState >= 2) {
-                requestAnimationFrame(() => {
-                    pose.send({image: video});
-                });
-            }
-        });
+          // ... dentro de activarIA, al final:
+    
+    // Iniciar el proceso de envío de frames
+    if (video.readyState >= 2) {
+        await pose.send({image: video});
+    } else {
+        video.onloadeddata = async () => {
+            await pose.send({image: video});
+        };
     }
-
+}
     // Iniciar el proceso de envío de frames
     if (video.readyState >= 2) {
         await pose.send({image: video});
