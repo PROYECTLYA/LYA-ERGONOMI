@@ -623,53 +623,99 @@ async function activarIA() {
     }
 }
 
-    /**
- * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
- * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
+  /**
+ * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF (FORMATO INFOGRAFÍA NOM-036)
  */
 function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+    
+    // --- DATOS DE ENTRADA ---
+    const empresa = document.getElementById('nombreEmpresa')?.value || "CERVECERÍA MODELO";
     const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    const trabajador = document.getElementById('nombreTrabajador')?.value || "N/A";
     const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
     const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
-    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
     const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
-    const duracionMinutos = msTranscurridos / 60000;
+    const duracionMinutos = (msTranscurridos / 60000).toFixed(2);
     const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
 
-    let colorHex = "#27ae60", conclusion = "OPERACIÓN ESTABLE / RIESGO BAJO";
-    if (peso > 25 || frecuencia > 4 || porcentajeRiesgo > 60) { 
-        colorHex = "#c0392b"; 
-        conclusion = "NO APTO: REQUIERE REDISEÑO O AYUDA MECÁNICA INMEDIATA"; 
-    } else if (peso > 15 || frecuencia > 1 || porcentajeRiesgo > 25) { 
-        colorHex = "#f1c40f"; 
-        conclusion = "RIESGO MODERADO: REQUIERE AJUSTES ERGONÓMICOS"; 
-    }
+    // --- 1. ENCABEZADO (ESTILO LYA-ERGO) ---
+    doc.setFillColor(13, 17, 23); 
+    doc.rect(0, 0, 210, 25, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(20);
+    doc.text("LYA – ERGONOMI", 105, 12, { align: "center" });
+    doc.setTextColor(255, 255, 255); doc.setFontSize(10);
+    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 18, { align: "center" });
 
-    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("LYA – ERGONOMI", 105, 20, { align: "center" });
-    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 32, { align: "center" });
+    // --- 2. APARTADO DE RESULTADOS (CUADRO AZUL OSCURO) ---
+    doc.setFillColor(5, 30, 85); // Azul Marino Profundo
+    doc.rect(10, 30, 190, 45, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text("RESULTADOS DE LA EVALUACIÓN Y RECOMENDACIONES", 105, 40, { align: "center" });
+    
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text(`TRABAJADOR: ${trabajador}`, 20, 52);
+    doc.text(`PUESTO: ${puesto}`, 20, 58);
+    doc.text(`PLANTA: ${empresa}`, 20, 64);
+    
+    // Recomendación dinámica basada en riesgo
+    let recText = porcentajeRiesgo > 40 ? "⚠️ ALERTA: Rediseñar puesto o rotar personal." : "✅ ESTATUS: Postura dentro de límites permitidos.";
+    doc.setTextColor(0, 255, 0);
+    doc.text(`RECOMENDACIÓN: ${recText}`, 20, 70);
 
+    // --- 3. TABLA 1: CRITERIOS POR EDAD/GÉNERO (SEGÚN TU IMAGEN) ---
     doc.autoTable({
-        startY: 75,
-        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS']],
+        startY: 80,
+        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS NOM-036', 'CRITERIO']],
         body: [
-            ['Peso de Carga', `${peso} kg`, peso > 25 ? 'RIESGO' : 'ACEPTABLE'],
-            ['Frecuencia', `${frecuencia} lev/min`, frecuencia > 4 ? 'RIESGO ALTO' : 'ESTABLE'],
-            ['Postura Crítica', `${porcentajeRiesgo}%`, zonas]
+            ['Peso de Carga Real', `${peso} kg`, peso > 25 ? 'EXCEDE' : 'ACEPTABLE', 'Límite Máximo NOM'],
+            ['Hombres 18-45 años', '≤ 25 kg', 'ACEPTABLE', 'Límite Inicial'],
+            ['Mujeres 18-45 años', '≤ 15 kg', 'ACEPTABLE', 'Capacidad Media'],
+            ['Menores de edad', '≤ 7 kg', 'RESTRINGIDA', 'No permitido >7kg'],
+            ['Embarazo / Postparto', '≤ 5 kg', 'CRÍTICO', 'Protección Especial']
         ],
-        headStyles: { fillColor: [41, 128, 185] }
+        headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
+        styles: { fontSize: 8 }
     });
 
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setDrawColor(colorHex); doc.rect(15, finalY, 180, 40);
-    doc.setTextColor(colorHex); doc.text("CONCLUSIÓN Y RECOMENDACIÓN:", 20, finalY + 10);
-    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-    doc.text(`${conclusion}. Se detectó estrés en: ${zonas}. Ciclos totales: ${wbaStats.ciclos}.`, 20, finalY + 20, { maxWidth: 170 });
+    // --- 4. TABLA 2: FACTORES ERGONÓMICOS INTEGRADOS ---
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [['FACTOR', 'BAJO RIESGO', 'RIESGO MEDIO', 'ALTO RIESGO']],
+        body: [
+            ['Peso Levantado', `${peso} kg`, 'Cercano al máximo', 'Excede Límite'],
+            ['Frecuencia', `${frecuencia} lev/min`, '2-5 veces/min', '> 5 veces/min'],
+            ['Flexión Espalda', `${porcentajeRiesgo}% tiempo`, '21° - 45°', '> 45°'],
+            ['Zonas Críticas', zonas, 'Giro < 30°', 'Giro Crítico']
+        ],
+        headStyles: { fillColor: [44, 62, 80], fontSize: 9 },
+        styles: { fontSize: 8 },
+        columnStyles: { 0: { fontStyle: 'bold' } }
+    });
+
+    // --- 5. CUADROS DE ADVERTENCIA (PIE DE PÁGINA) ---
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setDrawColor(241, 196, 15); doc.setLineWidth(1);
+    doc.rect(10, finalY, 90, 25); // Cuadro Mayores 45
+    doc.setTextColor(0); doc.setFontSize(9);
+    doc.text("MAYORES DE 45 AÑOS", 15, finalY + 7);
+    doc.setFontSize(7);
+    doc.text("• Disminuir peso un 10-20%\n• Reducir frecuencia\n• Ajuste médico periódico", 15, finalY + 13);
+
+    doc.rect(110, finalY, 90, 25); // Cuadro Mujeres
+    doc.text("MUJERES", 115, finalY + 7);
+    doc.text("• Priorizar cargas cercanas al cuerpo\n• Evitar posturas en grandes alcances\n• Considerar capacidad menor", 115, finalY + 13);
+
+    // --- FINALIZACIÓN ---
+    doc.setFontSize(8); doc.setTextColor(100);
+    doc.text("GRACIAS Y ATENCIÓN A LA NOM-036 PARA PREVENIR TME", 105, 290, { align: "center" });
+    
     doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
 }
-
 /**
  * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
  */
