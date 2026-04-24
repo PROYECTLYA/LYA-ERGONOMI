@@ -296,24 +296,25 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
  * 🏷️ BLOQUE 3: GESTIÓN DE FUENTES DE VIDEO
  * Configuración de cámara del dispositivo o carga de archivos locales.
  */
-  async function prepararSistema(fuente) {
+async function prepararSistema(fuente) {
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
     
     if (fuente === 'camara') {
         await encenderCamara();
+        // Agregamos el llamado automático a activarIA para que no se quede estático
+        setTimeout(() => {
+            activarIA();
+        }, 500); 
     } else {
         const file = document.getElementById('fileInput').files[0];
-        if (!file) {
-            location.reload(); // Volver al inicio si no hay archivo
-            return;
-        }
+        if (!file) return;
         if (video.src) URL.revokeObjectURL(video.src); 
         video.src = URL.createObjectURL(file);
         video.onloadedmetadata = () => { 
             setupCanvas(); 
             video.play(); 
-            // En archivos, es mejor activar la IA automáticamente tras cargar
+            // Para archivos, también podrías querer activar la IA automáticamente:
             activarIA(); 
         };
     }
@@ -400,61 +401,56 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
 };
 
 
-
 function onResults(res) {
-    if (!res.poseLandmarks) {
+    // 1. Validar detección de landmarks
+    if (!res || !res.poseLandmarks) {
         txtStatus.innerText = "SUJETO PERDIDO";
         return;
     }
     
-    // Si llegamos aquí, hay detección exitosa
+    const lm = res.poseLandmarks;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // 2. Feedback de Calibración
     if (!calibrado) {
         let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
         txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
     }
 
+    // 3. Preparar Lienzo (Canvas)
     ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, w, h);
     
+    // Efecto espejo si se usa cámara frontal
     if (currentFacingMode === "user") { 
-        ctx.translate(canvas.width, 0); 
+        ctx.translate(w, 0); 
         ctx.scale(-1, 1); 
     }
     
-    ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
-    
-    // ... (El resto de tu lógica de dibujo drawV y puntos pt se mantiene igual)
-}
+    ctx.drawImage(res.image, 0, 0, w, h);
 
-    const lm = res.poseLandmarks, w = canvas.width, h = canvas.height;
-const pt = (i) => {
-    const lmPoint = lm[i];
-    const w = canvas.width;
-    const h = canvas.height;
+    // 4. Función de suavizado de puntos (pt) - Dentro del scope
+    const pt = (i) => {
+        const lmPoint = lm[i];
+        const esInestable = lmPoint.visibility < 0.5;
 
-    // 1. Umbral de visibilidad: Si es menor a 0.5, el punto es poco confiable
-    const esInestable = lmPoint.visibility < 0.5;
+        if (!posBuffer[i]) {
+            posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
+        }
 
-    if (!posBuffer[i]) {
-        posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
-    }
+        if (!esInestable) {
+            posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
+            if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
+        }
 
-    // 2. Si es inestable, no añadimos el punto nuevo al historial, 
-    // mantenemos el promedio anterior para evitar el "salto".
-    if (!esInestable) {
-        posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
-        if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
-    }
+        const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
+        const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
 
-    const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
-    const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
+        return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
+    };
 
-    posBuffer[i].x = avgX;
-    posBuffer[i].y = avgY;
-
-    return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
-};
-    // Mapeo de anatomía con puntos suavizados
+    // 5. Mapeo de Anatomía
     const p = {
         cab: pt(0), 
         cue: { 
@@ -483,7 +479,7 @@ const pt = (i) => {
         p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
     };
 
-    // Lógica de conteo de ciclos (Levantamientos)
+    // 6. Conteo de Levantamientos (NOM-036)
     if (analizandoRiesgo) {
         const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
         const currentHandY = (p.m_d.y + p.m_i.y) / 2;
@@ -501,7 +497,7 @@ const pt = (i) => {
         wbaStats.lastHandY = currentHandY;
     }
 
-    // Cálculo de ángulos actuales
+    // 7. Cálculo de Ángulos y Buffering
     const currentAngles = {
         cue: calcAng3D(p.cab, p.cue, p.tor), 
         abd: calcAng3D(p.tor, p.abd, p.esp_baja),
@@ -517,14 +513,13 @@ const pt = (i) => {
         t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
     };
 
-    // Llenar buffer de ángulos para el suavizado del Bloque 4
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // Calibración automática tras 3 segundos
+    // 8. Calibración Automática
     if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
         Object.keys(angleBuffer).forEach(k => { 
             baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
@@ -535,13 +530,12 @@ const pt = (i) => {
         txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    // Renderizado del Esqueleto (Solo líneas base)
+    // 9. Dibujo del Esqueleto y Vectores
     ctx.strokeStyle = "#00ff00"; 
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
 
-    // Dibujo de Vectores con Semáforo (Usando la visibilidad real de MediaPipe)
     drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
     drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
     drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
@@ -557,8 +551,9 @@ const pt = (i) => {
 }
 
 
+    
 /** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA CON CONTROL DE DETECCIÓN
- * Se agrega alerta por falta de sujeto y manejo de estatus.
+ * Manejo de motor MediaPipe Pose y bucle de análisis en tiempo real.
  */
 let timeoutDeteccion; // Variable global para controlar el tiempo de espera
 
@@ -566,23 +561,22 @@ async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
-    // Reset de estados para nueva calibración
+    // 1. Reset de estados para nueva calibración
     calibrado = false;
-    iaActiva = false;
+    iaActiva = false; 
     txtStatus.innerText = "BUSCANDO SUJETO...";
 
-    // 1. TEMPORIZADOR DE SEGURIDAD:
-    // Si en 5 segundos no se ha activado la IA (porque no detecta a nadie), avisamos.
+    // 2. Temporizador de seguridad (5 segundos)
     clearTimeout(timeoutDeteccion);
     timeoutDeteccion = setTimeout(() => {
         if (!iaActiva) {
             if (loader) loader.style.display = 'none';
-            alert("⚠️ NO SE HA DETECTADO EL SUJETO.\n\nPor favor, asegúrese de que la persona sea visible de cuerpo completo y que haya suficiente iluminación.");
+            alert("⚠️ NO SE HA DETECTADO EL SUJETO.\n\nAsegúrate de que la persona sea visible de cuerpo completo.");
             txtStatus.innerText = "SISTEMA READY (FALLÓ DETECCIÓN)";
         }
     }, 5000);
 
-    // 2. Inicializar Pose solo si no existe
+    // 3. Inicialización del motor Pose (Singleton)
     if (!pose) {
         pose = new Pose({ 
             locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
@@ -596,8 +590,8 @@ async function activarIA() {
         });
 
         pose.onResults((res) => {
-            // Validamos si MediaPipe encontró una persona
             if (res.poseLandmarks) {
+                // Primera detección exitosa
                 if (!iaActiva) {
                     if (loader) loader.style.display = 'none';
                     iaActiva = true; 
@@ -609,33 +603,37 @@ async function activarIA() {
                         btn.style.opacity = "1";
                     }
                 }
-                // Si ya está activa la IA, ejecutamos el análisis
+                // Enviar resultados al renderizador (Bloque 5)
                 onResults(res);
             } else {
-                // Si la IA está corriendo pero el sujeto salió de cuadro
+                // Sujeto fuera de cuadro durante el análisis
                 if (iaActiva) {
                     txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
                 }
             }
-            
-          // ... dentro de activarIA, al final:
-    
-    // Iniciar el proceso de envío de frames
-    if (video.readyState >= 2) {
-        await pose.send({image: video});
-    } else {
-        video.onloadeddata = async () => {
-            await pose.send({image: video});
-        };
+        });
     }
-}
-    // Iniciar el proceso de envío de frames
-    if (video.readyState >= 2) {
-        await pose.send({image: video});
-    } else {
-        setTimeout(activarIA, 100);
+
+    // 4. Bucle de procesamiento de frames (Recursivo)
+    async function procesarFrame() {
+        // Solo procesamos si el contenedor es visible (evita gasto de recursos en menú)
+        if (document.getElementById('contenedor-analisis').style.display === 'block') {
+            if (video.readyState >= 2) {
+                await pose.send({ image: video });
+            }
+            // Solicita el siguiente frame inmediatamente después de procesar el actual
+            requestAnimationFrame(procesarFrame);
+        }
     }
+
+    // 5. Arranque del bucle con delay para estabilización de hardware
+    setTimeout(() => {
+        procesarFrame();
+    }, 800);
 }
+
+
+
 
   /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF (FORMATO INFOGRAFÍA NOM-036)
