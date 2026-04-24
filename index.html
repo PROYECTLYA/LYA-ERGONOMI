@@ -164,6 +164,19 @@ V1 JUE
         70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
         100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
     }
+       
+        input[type="text"], input[type="number"], select {
+            background: #161b22 !important;
+            border: 1px solid #30363d !important;
+            color: #e6edf3 !important;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: #00ff00 !important;
+            outline: none;
+        }
+   
 </style> 
     
 </head>
@@ -334,14 +347,13 @@ const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-    // Si cualquiera de los dos puntos que forman el vector tiene baja visibilidad, 
-    // NO dibujamos el vector ni procesamos el riesgo.
-    if (raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) {
-        return; 
-    }
+    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) return; 
 
-    const buffer = angleBuffer[angKey] || [0];
+    const buffer = angleBuffer[angKey] || [];
+    if (buffer.length === 0) return; // Si no hay datos, no dibujamos para no trabar
+
     const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+    
     let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
 
     if (analizandoRiesgo && calibrado) {
@@ -521,49 +533,58 @@ const pt = (i) => {
     ctx.restore();
 }
 
-/**
- * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (CORREGIDO)
+    /** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA (OPTIMIZADO)
  */
-function activarIA() {
+async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
 
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
+    // 1. Inicializar Pose solo si no existe
+    if (!pose) {
+        pose = new Pose({ 
+            locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+        });
 
-    pose.setOptions({ 
-        modelComplexity: 1, 
-        smoothLandmarks: true, 
-        minDetectionConfidence: 0.6, 
-        minTrackingConfidence: 0.6 
-    });
+        pose.setOptions({ 
+            modelComplexity: 1, 
+            smoothLandmarks: true, 
+            minDetectionConfidence: 0.5, // Bajamos un poco para ganar velocidad
+            minTrackingConfidence: 0.5 
+        });
 
-    pose.onResults((res) => {
-        if (!iaActiva) { 
-            if (loader) loader.style.display = 'none';
-            iaActiva = true; 
-            startTimeCalib = Date.now(); 
-            
-            const btn = document.getElementById('recordBtn');
-            if (btn) {
-                btn.disabled = false;
-                btn.style.opacity = "1";
+        pose.onResults((res) => {
+            if (!iaActiva) { 
+                if (loader) loader.style.display = 'none';
+                iaActiva = true; 
+                startTimeCalib = Date.now(); 
+                
+                const btn = document.getElementById('recordBtn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                }
             }
-        }
-        onResults(res);
-    });
+            onResults(res);
+            
+            // 2. IMPORTANTE: Pedimos el siguiente frame SOLO cuando el actual terminó
+            if (iaActiva) {
+                requestAnimationFrame(() => {
+                    if (video.readyState >= 2) pose.send({image: video});
+                });
+            }
+        });
+    }
 
-    // Iniciar el bucle de procesamiento
-    loopIA();
+    // Iniciar el primer frame
+    if (video.readyState >= 2) {
+        await pose.send({image: video});
+    } else {
+        // Si el video no está listo, reintentar en 100ms
+        setTimeout(activarIA, 100);
+    }
 }
 
-async function loopIA() { 
-    if (iaActiva && video.readyState >= 2) { 
-        await pose.send({image: video}); 
-    } 
-    requestAnimationFrame(loopIA); 
-}
+// ELIMINA COMPLETAMENTE LA FUNCIÓN loopIA() ANTERIOR PARA EVITAR CONFLICTOS
     /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF
  * Cruce de datos de auditoría con normatividad NOM-036 y exportación con jsPDF.
