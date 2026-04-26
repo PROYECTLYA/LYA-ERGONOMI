@@ -1,4 +1,4 @@
-V1 DOM
+V1 DOM BLOQUEO DE BOTONES DE INICIO
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -188,8 +188,6 @@ V1 DOM
         <div id="bar-id" class="progress-bar"></div>
     </div>
 </div>
-
-
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría de Procesos NOM-036-STPS</p>
@@ -231,31 +229,28 @@ V1 DOM
 
     <div class="d-flex gap-2">
         <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()">📁 ARCHIVO</button>
+        
+        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
     </div>
+    
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
-    
+
 <div id="contenedor-analisis">
     <div class="status-badge" id="txt-status">SISTEMA READY</div>
-    
     <canvas id="output_canvas"></canvas>
-    
     <video id="input_video" playsinline muted style="display:none;"></video>
     
     <div class="barra-controles">
         <button class="btn-circular btn-dark" onclick="location.reload()" title="Cerrar auditoría">
             <span>✖</span><br>SALIR
         </button>
-        
         <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">
             <span>🔄</span><br>GIRAR
         </button>
-        
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">
             <span>⚖️</span><br>CALIBRAR
         </button>
-        
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled>
             <span>🔴</span><br>AUDITAR
         </button>
@@ -273,8 +268,7 @@ V1 DOM
     const txtStatus = document.getElementById('txt-status');
 
     // Umbrales de desviación permitidos (Grados)
-    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
-
+    const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25, pies: 18 };
 /**
  * 🏷️ BLOQUE 2: ESTADO GLOBAL Y VARIABLES DE CONTROL
  * Gestión de banderas de IA, calibración, suavizado y almacenamiento de métricas.
@@ -317,24 +311,51 @@ let recordedChunks = [];     // Fragmentos de video para descarga final
  * Configuración de cámara del dispositivo o carga de archivos locales.
  */
 async function prepararSistema(fuente) {
+    // 1. Definición de campos críticos para la NOM-036
+    const campos = [
+        { id: 'nombreEmpresa', label: 'EMPRESA' },
+        { id: 'puestoTrabajo', label: 'PUESTO' },
+        { id: 'nombreTrabajador', label: 'NOMBRE TRABAJADOR' },
+        { id: 'edadTrabajador', label: 'EDAD' },
+        { id: 'pesoCarga', label: 'PESO DE CARGA' }
+    ];
+
+    // 2. Verificación de campos vacíos
+    let faltantes = [];
+    campos.forEach(campo => {
+        const val = document.getElementById(campo.id).value.trim();
+        if (!val) {
+            faltantes.push(campo.label);
+            document.getElementById(campo.id).style.border = "2px solid #ff4d4d"; // Resalte visual
+        } else {
+            document.getElementById(campo.id).style.border = "1px solid #30363d"; // Reset
+        }
+    });
+
+    if (faltantes.length > 0) {
+        alert("⛔ BLOQUEO DE SEGURIDAD:\n\nDebe completar los siguientes campos antes de iniciar la auditoría:\n" + faltantes.map(f => "- " + f).join("\n"));
+        return; // Detiene el ingreso a VIVO o ARCHIVO
+    }
+
+    // 3. Si el formulario está lleno, procedemos al cambio de pantalla
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
     
     if (fuente === 'camara') {
         await encenderCamara();
-        // Agregamos el llamado automático a activarIA para que no se quede estático
-        setTimeout(() => {
-            activarIA();
-        }, 500); 
+        setTimeout(() => { activarIA(); }, 500); 
     } else {
         const file = document.getElementById('fileInput').files[0];
-        if (!file) return;
+        if (!file) {
+            // Si el usuario cerró el explorador de archivos sin elegir nada, volvemos al menú
+            location.reload();
+            return;
+        }
         if (video.src) URL.revokeObjectURL(video.src); 
         video.src = URL.createObjectURL(file);
         video.onloadedmetadata = () => { 
             setupCanvas(); 
             video.play(); 
-            // Para archivos, también podrías querer activar la IA automáticamente:
             activarIA(); 
         };
     }
@@ -451,6 +472,7 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
     }
 };
 
+
 function onResults(res) {
     // 1. Validar detección de landmarks
     if (!res || !res.poseLandmarks) {
@@ -480,7 +502,7 @@ function onResults(res) {
     
     ctx.drawImage(res.image, 0, 0, w, h);
 
-    // 4. Función de suavizado de puntos (pt) - Dentro del scope
+    // 4. Función de suavizado de puntos (pt)
     const pt = (i) => {
         const lmPoint = lm[i];
         const esInestable = lmPoint.visibility < 0.5;
@@ -529,8 +551,9 @@ function onResults(res) {
         p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
     };
 
-    // 6. Conteo de Levantamientos (NOM-036)
+    // 6. Análisis NOM-036 (Ciclos y Altura)
     if (analizandoRiesgo) {
+        // A. Conteo de Levantamientos
         const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
         const currentHandY = (p.m_d.y + p.m_i.y) / 2;
         const umbralMovimiento = alturaTorso * 0.3; 
@@ -545,6 +568,18 @@ function onResults(res) {
             }
         }
         wbaStats.lastHandY = currentHandY;
+
+        // B. DETECCIÓN DE AGARRE ALTO (Muñecas sobre Hombros)
+        // Nota: En Canvas Y disminuye hacia arriba.
+        if (p.m_d.y < p.h_d.y || p.m_i.y < p.h_i.y) {
+            wbaStats.agarreSobreHombros = true;
+            wbaStats.zonasAfectadas.add("AGARRE ALTO");
+            
+            // Alerta visual rápida en pantalla
+            ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
+            ctx.font = "bold 20px Segoe UI";
+            ctx.fillText("⚠️ AGARRE SOBRE HOMBROS", 30, 100);
+        }
     }
 
     // 7. Cálculo de Ángulos y Buffering
@@ -577,21 +612,32 @@ function onResults(res) {
         wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
         calibrado = true; 
         document.getElementById('recordBtn').style.opacity = "1";
+        document.getElementById('recordBtn').disabled = false;
         txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    // 9. Dibujo del Esqueleto y Vectores
-    ctx.strokeStyle = "#00ff00"; 
-    ctx.lineWidth = 4;
+    // 9. Dibujo del Esqueleto y Vectores (Semáforo Dinámico)
+    ctx.strokeStyle = "rgba(0, 255, 0, 0.5)"; 
+    ctx.lineWidth = 2;
+    // Líneas Conectoras Base
     ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
 
+    // Vectores con Evaluación de Riesgo (NOM-036)
     drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
     drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
+    
+    // Hombros (NUEVO: Evaluación de elevación de brazos)
+    drawV(p.p_d, p.h_d, 'h_d', 'hombros', lm[24], lm[12]);
+    drawV(p.p_i, p.h_i, 'h_i', 'hombros', lm[23], lm[11]);
+
+    // Brazos
     drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
     drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
     drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
     drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+
+    // Piernas
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
@@ -599,8 +645,6 @@ function onResults(res) {
     
     ctx.restore();
 }
-
-
     
 
 /** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA CON CONTROL DE DETECCIÓN
@@ -883,6 +927,23 @@ window.addEventListener('resize', () => {
         }
     }, 300); // 300ms permite que el navegador termine de acomodar los elementos
 });
+function validarYAbrirArchivo() {
+    // Esta función solo sirve para disparar el input file si la validación pasa
+    const campos = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    let error = false;
+
+    campos.forEach(id => {
+        if (!document.getElementById(id).value.trim()) error = true;
+    });
+
+    if (error) {
+        // Ejecutamos prepararSistema solo para que dispare las alertas de error
+        prepararSistema('archivo'); 
+    } else {
+        // Si todo está bien, abrimos el selector de archivos
+        document.getElementById('fileInput').click();
+    }
+}
     
 </script>
 
