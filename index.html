@@ -1,4 +1,4 @@
-V1 DOM BLOQUEO DE BOTONES DE INICIO
+V1 DOM ERROR DE CALCULO
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -248,9 +248,9 @@ V1 DOM BLOQUEO DE BOTONES DE INICIO
         <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">
             <span>🔄</span><br>GIRAR
         </button>
-        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">
-            <span>⚖️</span><br>CALIBRAR
-        </button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracionManual()">
+    <span>⚖️</span><br>CALIBRAR
+</button>
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled>
             <span>🔴</span><br>AUDITAR
         </button>
@@ -472,11 +472,10 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
     }
 };
 
-
 function onResults(res) {
     // 1. Validar detección de landmarks
     if (!res || !res.poseLandmarks) {
-        txtStatus.innerText = "SUJETO PERDIDO";
+        txtStatus.innerText = "BUSCANDO SUJETO...";
         return;
     }
     
@@ -484,10 +483,12 @@ function onResults(res) {
     const w = canvas.width;
     const h = canvas.height;
 
-    // 2. Feedback de Calibración
-    if (!calibrado) {
+    // 2. Feedback de Calibración (Solo si el timer está activo)
+    if (!calibrado && startTimeCalib > 0) {
         let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
-        txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
+        txtStatus.innerText = `MANTENGA POSTURA: ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
+    } else if (!calibrado && startTimeCalib === 0) {
+        txtStatus.innerText = "IA LISTA - PRESIONE CALIBRAR";
     }
 
     // 3. Preparar Lienzo (Canvas)
@@ -553,7 +554,6 @@ function onResults(res) {
 
     // 6. Análisis NOM-036 (Ciclos y Altura)
     if (analizandoRiesgo) {
-        // A. Conteo de Levantamientos
         const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
         const currentHandY = (p.m_d.y + p.m_i.y) / 2;
         const umbralMovimiento = alturaTorso * 0.3; 
@@ -569,13 +569,9 @@ function onResults(res) {
         }
         wbaStats.lastHandY = currentHandY;
 
-        // B. DETECCIÓN DE AGARRE ALTO (Muñecas sobre Hombros)
-        // Nota: En Canvas Y disminuye hacia arriba.
         if (p.m_d.y < p.h_d.y || p.m_i.y < p.h_i.y) {
             wbaStats.agarreSobreHombros = true;
             wbaStats.zonasAfectadas.add("AGARRE ALTO");
-            
-            // Alerta visual rápida en pantalla
             ctx.fillStyle = "rgba(255, 0, 0, 0.7)";
             ctx.font = "bold 20px Segoe UI";
             ctx.fillText("⚠️ AGARRE SOBRE HOMBROS", 30, 100);
@@ -604,40 +600,46 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // 8. Calibración Automática
-    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
+    // 8. Calibración CONTROLADA y SIMÉTRICA
+    if (iaActiva && !calibrado && startTimeCalib > 0 && (Date.now() - startTimeCalib > 3000)) {
         Object.keys(angleBuffer).forEach(k => { 
             baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
         });
+
+        // --- CORRECCIÓN DE ASIMETRÍA (Brazo Izq vs Der) ---
+        const promCodos = (baseAngles['c_d'] + baseAngles['c_i']) / 2;
+        baseAngles['c_d'] = baseAngles['c_i'] = promCodos;
+
+        const promHombros = (baseAngles['h_d'] + baseAngles['h_i']) / 2;
+        baseAngles['h_d'] = baseAngles['h_i'] = promHombros;
+
         wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
         calibrado = true; 
-        document.getElementById('recordBtn').style.opacity = "1";
-        document.getElementById('recordBtn').disabled = false;
+        startTimeCalib = 0; // Reset del timer
+
+        const recordBtn = document.getElementById('recordBtn');
+        recordBtn.style.opacity = "1";
+        recordBtn.disabled = false;
         txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    // 9. Dibujo del Esqueleto y Vectores (Semáforo Dinámico)
+    // 9. Dibujo del Esqueleto y Vectores
     ctx.strokeStyle = "rgba(0, 255, 0, 0.5)"; 
     ctx.lineWidth = 2;
-    // Líneas Conectoras Base
     ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
 
-    // Vectores con Evaluación de Riesgo (NOM-036)
     drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
     drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
     
-    // Hombros (NUEVO: Evaluación de elevación de brazos)
     drawV(p.p_d, p.h_d, 'h_d', 'hombros', lm[24], lm[12]);
     drawV(p.p_i, p.h_i, 'h_i', 'hombros', lm[23], lm[11]);
 
-    // Brazos
     drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
     drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
     drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
     drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
 
-    // Piernas
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
@@ -645,7 +647,7 @@ function onResults(res) {
     
     ctx.restore();
 }
-    
+
 
 /** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA CON CONTROL DE DETECCIÓN
  * Manejo de motor MediaPipe Pose y bucle de análisis en tiempo real.
@@ -656,22 +658,11 @@ async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
-    // 1. Reset de estados para nueva calibración
-    calibrado = false;
+    // reset de estados
     iaActiva = false; 
-    txtStatus.innerText = "BUSCANDO SUJETO...";
+    // IMPORTANTE: No reseteamos 'calibrado' aquí para permitir re-calibración manual
+    txtStatus.innerText = "INICIALIZANDO MOTOR...";
 
-    // 2. Temporizador de seguridad (5 segundos)
-    clearTimeout(timeoutDeteccion);
-    timeoutDeteccion = setTimeout(() => {
-        if (!iaActiva) {
-            if (loader) loader.style.display = 'none';
-            alert("⚠️ NO SE HA DETECTADO EL SUJETO.\n\nAsegúrate de que la persona sea visible de cuerpo completo.");
-            txtStatus.innerText = "SISTEMA READY (FALLÓ DETECCIÓN)";
-        }
-    }, 5000);
-
-    // 3. Inicialización del motor Pose (Singleton)
     if (!pose) {
         pose = new Pose({ 
             locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
@@ -686,47 +677,50 @@ async function activarIA() {
 
         pose.onResults((res) => {
             if (res.poseLandmarks) {
-                // Primera detección exitosa
                 if (!iaActiva) {
                     if (loader) loader.style.display = 'none';
-                    iaActiva = true; 
-                    startTimeCalib = Date.now(); 
-                    
-                    const btn = document.getElementById('recordBtn');
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.style.opacity = "1";
-                    }
+                    iaActiva = true;
+                    // Ya no disparamos startTimeCalib aquí automáticamente
+                    txtStatus.innerText = "IA ACTIVA - LISTO PARA CALIBRAR";
                 }
-                // Enviar resultados al renderizador (Bloque 5)
                 onResults(res);
-            } else {
-                // Sujeto fuera de cuadro durante el análisis
-                if (iaActiva) {
-                    txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
-                }
             }
         });
     }
 
     // 4. Bucle de procesamiento de frames (Recursivo)
-    async function procesarFrame() {
-        // Solo procesamos si el contenedor es visible (evita gasto de recursos en menú)
+   async function procesarFrame() {
         if (document.getElementById('contenedor-analisis').style.display === 'block') {
             if (video.readyState >= 2) {
                 await pose.send({ image: video });
             }
-            // Solicita el siguiente frame inmediatamente después de procesar el actual
             requestAnimationFrame(procesarFrame);
         }
     }
+
+    setTimeout(() => { procesarFrame(); }, 800);
+}
 
     // 5. Arranque del bucle con delay para estabilización de hardware
     setTimeout(() => {
         procesarFrame();
     }, 800);
 }
-
+/**
+ * NUEVA FUNCIÓN: Disparada por el botón ⚖️ CALIBRAR
+ */
+function iniciarCalibracionManual() {
+    if (!iaActiva) {
+        alert("Espere a que la IA detecte al sujeto primero.");
+        return;
+    }
+    calibrado = false; // Forzamos nueva calibración
+    startTimeCalib = Date.now(); // Iniciamos el conteo de 3 segundos DESDE AHORA
+    txtStatus.innerText = "MANTENGA POSTURA NEUTRA...";
+    
+    // Limpiamos buffers previos para una calibración limpia
+    angleBuffer = {}; 
+}
 /**
  * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF (FORMATO INFOGRAFÍA NOM-036)
  * Integración de métricas de IA, Agarre Alto y Frecuencia de Ciclos.
@@ -836,10 +830,15 @@ function generarReporteWBA() {
 }
 
 /**
- * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
+ * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y AUDITORÍA
+ * Gestiona el inicio/fin de la captura de video y la inicialización de métricas.
  */
 function toggleGrabacion() {
-    if (!calibrado) return;
+    if (!calibrado) {
+        alert("⚠️ Primero debe realizar la calibración de postura.");
+        return;
+    }
+    
     analizandoRiesgo = !analizandoRiesgo;
     const btn = document.getElementById('recordBtn');
 
@@ -857,6 +856,7 @@ function toggleGrabacion() {
         
         mediaRecorder.start();
 
+        // Reinicio de estadísticas de auditoría
         wbaStats = { 
             riesgoAltoTotal: 0, 
             framesAnalizados: 0, 
@@ -880,30 +880,47 @@ function toggleGrabacion() {
             mediaRecorder.stop(); 
         }
 
+        // Delay para asegurar que el MediaRecorder cierre el archivo antes de generar PDF
         setTimeout(() => { 
             generarReporteWBA(); 
             txtStatus.innerText = "FIN AUDITORÍA"; 
-        }, 600);
+        }, 800);
     }
 }
 
+/**
+ * 🏷️ BLOQUE 9: GESTIÓN DE CÁMARA Y DISPOSITIVOS
+ * Permite alternar entre cámara frontal y trasera (útil en dispositivos móviles).
+ */
 async function cambiarCamara() {
     currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
     iaActiva = false;
-    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    
+    // Detener tracks actuales para liberar el hardware de la cámara
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+    }
+    
     await encenderCamara();
 }
 
+/**
+ * 🏷️ BLOQUE 10: EXPORTACIÓN DE EVIDENCIA DIGITAL
+ * Procesa los fragmentos de video y dispara la descarga automática.
+ */
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
 
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    
+    // Limpieza de nombre de archivo para evitar errores de sistema
+    const trabajador = document.getElementById('nombreTrabajador')?.value || "EVIDENCIA";
+    const safeName = trabajador.replace(/[^a-z0-9]/gi, '_').toUpperCase();
     
     a.href = url;
-    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
+    a.download = `EVIDENCIA_LYA_${safeName}.webm`;
     document.body.appendChild(a);
     a.click();
     
@@ -912,35 +929,41 @@ function descargarVideo() {
         window.URL.revokeObjectURL(url);
     }, 100);
 }
-// Forzar ajuste de dimensiones en cambios de orientación (Tablets)
-window.addEventListener('resize', () => {
-    if (iaActiva) {
-        setupCanvas();
-    }
-});let resizeTimer;
+
+/**
+ * 🏷️ BLOQUE 11: OPTIMIZACIÓN DE RESPONSIVE Y RE-ESCALADO
+ * Asegura que el canvas de detección se ajuste si el usuario rota la tablet o celular.
+ */
+let resizeTimer;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
         if (video.readyState >= 2) {
             setupCanvas();
-            // Si la IA está corriendo, MediaPipe se ajustará al nuevo canvas en el siguiente frame
+            console.log("📏 Re-ajuste de dimensiones completado.");
         }
-    }, 300); // 300ms permite que el navegador termine de acomodar los elementos
+    }, 300); 
 });
+
+/**
+ * 🏷️ BLOQUE 12: VALIDACIÓN DE FORMULARIO PRE-ANÁLISIS
+ * Verifica que los datos obligatorios de la NOM-036 estén presentes.
+ */
 function validarYAbrirArchivo() {
-    // Esta función solo sirve para disparar el input file si la validación pasa
     const campos = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    let error = false;
+    let faltantes = [];
 
     campos.forEach(id => {
-        if (!document.getElementById(id).value.trim()) error = true;
+        const el = document.getElementById(id);
+        if (!el || !el.value.trim()) {
+            faltantes.push(id.replace(/[A-Z]/g, ' $&').toUpperCase());
+        }
     });
 
-    if (error) {
-        // Ejecutamos prepararSistema solo para que dispare las alertas de error
-        prepararSistema('archivo'); 
+    if (faltantes.length > 0) {
+        alert("⚠️ Faltan datos obligatorios:\n" + faltantes.join("\n"));
     } else {
-        // Si todo está bien, abrimos el selector de archivos
+        // Si todo está correcto, abre el selector de archivos para análisis offline
         document.getElementById('fileInput').click();
     }
 }
