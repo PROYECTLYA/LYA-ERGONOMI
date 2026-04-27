@@ -1,4 +1,4 @@
-V2 lUN PANEL 2D IA 5
+V2 lUN PANEL 2D IA 7
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -241,12 +241,12 @@ V2 lUN PANEL 2D IA 5
     
     <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
         <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
-        <div id="canvas-container" style="position: relative; width: 100%; height: 100%;">
+        <div id="lya-main-container" style="position: relative; width: 100%; height: 100vh; background: #000;">
     <canvas id="output_canvas"></canvas>
     <canvas id="vector_plane" width="250" height="180" 
         style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
-        background: rgba(0, 0, 0, 0.8); border: 2px solid #00FF00; border-radius: 8px; 
-        z-index: 1000; pointer-events: none; will-change: transform;"></canvas>
+        background: rgba(0, 0, 0, 0.85); border: 2px solid #00FF00; border-radius: 12px; 
+        z-index: 9999; pointer-events: none; will-change: transform; box-shadow: 0 0 20px rgba(0,255,0,0.2);"></canvas>
 </div>
         <canvas id="vector_plane" width="250" height="180" 
             style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
@@ -331,21 +331,25 @@ const SUAVIZADO_POS = 5;     // Frames para promediar posición y evitar "jitter
 
 // ⚙️ Control de Estado de IA y Hardware
 
-// --- GESTIÓN DE ESTADOS LYA-ERGO (SECCIONAMIENTO DE LÓGICA) ---
-let estadoSistema = "REPOSO"; // Estados: REPOSO, VIVO, CALIBRANDO, AUDITANDO
+// --- NÚCLEO DE CONTROL DE ESTADOS LYA-ERGO ---
+// PASIVO: Solo dibujo de vectores
+// CALIBRANDO: Validación de postura (etiquetas activas)
+// AUDITANDO: Cálculos matemáticos y semáforos (grabación activa)
+let estadoActual = "PASIVO"; 
+
 let vCanvas = null;
 let vCtx = null;
 
-// Inicialización del plano 2D optimizado
 function initPlanoVectorial() {
     vCanvas = document.getElementById('vector_plane');
     if (vCanvas) vCtx = vCanvas.getContext('2d', { alpha: true });
 }
 
-function dibujarPlanoPasivo(results) {
+function renderPlanoPasivo(results) {
     if (!vCtx) initPlanoVectorial();
     if (!vCtx || !results.poseLandmarks) return;
     vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+    // Dibujo del esqueleto 2D (Interpretación completa)
     drawConnectors(vCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
     drawLandmarks(vCtx, results.poseLandmarks, {color: '#FFFFFF', lineWidth: 1, radius: 1});
 }
