@@ -1,4 +1,4 @@
-V2 lUN PANEL 2D
+V2 lUN PANEL 2D IA
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -239,7 +239,14 @@ V2 lUN PANEL 2D
 <div id="contenedor-analisis" style="position: relative; width: 100%; height: 100vh;">
     <div class="status-badge" id="txt-status">SISTEMA READY</div>
     
-    <canvas id="output_canvas"></canvas>
+    <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
+        <canvas id="output_canvas"></canvas>
+        <!-- Plano Vectorial 2D Optimizado -->
+        <canvas id="vector_plane" width="250" height="180" 
+            style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
+            background: rgba(0, 0, 0, 0.6); border: 1px solid #00FF00; border-radius: 10px; 
+            z-index: 999; pointer-events: none; will-change: transform;"></canvas>
+    </div>
     
     <canvas id="vector_plane" 
         style="position: absolute; 
