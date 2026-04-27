@@ -1,4 +1,4 @@
-V2 lUN PANEL 2D IA 3
+V2 lUN PANEL 2D IA 4
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -241,7 +241,13 @@ V2 lUN PANEL 2D IA 3
     
     <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
         <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
-        <canvas id="output_canvas"></canvas>
+        <div id="contenedor-relativo" style="position: relative; width: 100%; height: 100vh; overflow: hidden;">
+    <canvas id="output_canvas"></canvas>
+    <canvas id="vector_plane" width="250" height="180" 
+        style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
+        background: rgba(0, 0, 0, 0.7); border: 2px solid #00FF00; border-radius: 10px; 
+        z-index: 999; pointer-events: none; will-change: transform;"></canvas>
+</div>
         <canvas id="vector_plane" width="250" height="180" 
             style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
             background: rgba(0, 0, 0, 0.7); border: 2px solid #00FF00; border-radius: 10px; 
