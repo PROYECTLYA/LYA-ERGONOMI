@@ -1,4 +1,4 @@
-V2 lUN PANEL 2D IA 4
+V2 lUN PANEL 2D IA 5
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -241,12 +241,12 @@ V2 lUN PANEL 2D IA 4
     
     <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
         <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
-        <div id="contenedor-relativo" style="position: relative; width: 100%; height: 100vh; overflow: hidden;">
+        <div id="canvas-container" style="position: relative; width: 100%; height: 100%;">
     <canvas id="output_canvas"></canvas>
     <canvas id="vector_plane" width="250" height="180" 
         style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
-        background: rgba(0, 0, 0, 0.7); border: 2px solid #00FF00; border-radius: 10px; 
-        z-index: 999; pointer-events: none; will-change: transform;"></canvas>
+        background: rgba(0, 0, 0, 0.8); border: 2px solid #00FF00; border-radius: 8px; 
+        z-index: 1000; pointer-events: none; will-change: transform;"></canvas>
 </div>
         <canvas id="vector_plane" width="250" height="180" 
             style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
@@ -330,6 +330,26 @@ let posBuffer = {};          // Historial de coordenadas X, Y, Z
 const SUAVIZADO_POS = 5;     // Frames para promediar posición y evitar "jitter"
 
 // ⚙️ Control de Estado de IA y Hardware
+
+// --- GESTIÓN DE ESTADOS LYA-ERGO (SECCIONAMIENTO DE LÓGICA) ---
+let estadoSistema = "REPOSO"; // Estados: REPOSO, VIVO, CALIBRANDO, AUDITANDO
+let vCanvas = null;
+let vCtx = null;
+
+// Inicialización del plano 2D optimizado
+function initPlanoVectorial() {
+    vCanvas = document.getElementById('vector_plane');
+    if (vCanvas) vCtx = vCanvas.getContext('2d', { alpha: true });
+}
+
+function dibujarPlanoPasivo(results) {
+    if (!vCtx) initPlanoVectorial();
+    if (!vCtx || !results.poseLandmarks) return;
+    vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+    drawConnectors(vCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+    drawLandmarks(vCtx, results.poseLandmarks, {color: '#FFFFFF', lineWidth: 1, radius: 1});
+}
+
 let iaActiva = false;        // Indica si el modelo MediaPipe está cargado
 let calibrado = false; let ejecutandoCalibracion = false;       // Indica si ya se tomaron los ángulos base
 let analizandoRiesgo = false;// Activo solo durante la grabación (Auditar)
