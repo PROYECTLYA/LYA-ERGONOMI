@@ -1,4 +1,4 @@
-V2 lUN PANEL 2D IA 7
+V2 lUN PANEL 2D IA 8
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -241,12 +241,12 @@ V2 lUN PANEL 2D IA 7
     
     <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
         <div id="wrapper-canvas" style="position: relative; width: 100%; height: 100%;">
-        <div id="lya-main-container" style="position: relative; width: 100%; height: 100vh; background: #000;">
+        <div id="lya-main-wrapper" style="position: relative; width: 100%; height: 100vh; background: #000; overflow: hidden;">
     <canvas id="output_canvas"></canvas>
     <canvas id="vector_plane" width="250" height="180" 
         style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
-        background: rgba(0, 0, 0, 0.85); border: 2px solid #00FF00; border-radius: 12px; 
-        z-index: 9999; pointer-events: none; will-change: transform; box-shadow: 0 0 20px rgba(0,255,0,0.2);"></canvas>
+        background: rgba(0, 0, 0, 0.9); border: 2px solid #00FF00; border-radius: 12px; 
+        z-index: 10000; pointer-events: none; will-change: transform; box-shadow: 0 0 25px rgba(0,255,0,0.3);"></canvas>
 </div>
         <canvas id="vector_plane" width="250" height="180" 
             style="position: absolute; top: 20px; right: 20px; width: 250px; height: 180px; 
@@ -331,10 +331,10 @@ const SUAVIZADO_POS = 5;     // Frames para promediar posición y evitar "jitter
 
 // ⚙️ Control de Estado de IA y Hardware
 
-// --- NÚCLEO DE CONTROL DE ESTADOS LYA-ERGO ---
-// PASIVO: Solo dibujo de vectores
-// CALIBRANDO: Validación de postura (etiquetas activas)
-// AUDITANDO: Cálculos matemáticos y semáforos (grabación activa)
+// --- GESTIÓN DE SEGURIDAD LYA-ERGO (FLUX CONTROL) ---
+// PASIVO: Cámara encendida, MediaPipe detectando, solo dibujo de vectores.
+// CALIBRANDO: Validación de postura inicial activa (Manual).
+// AUDITANDO: Cálculos de ángulos y semáforos de riesgo activos (Manual).
 let estadoActual = "PASIVO"; 
 
 let vCanvas = null;
@@ -349,7 +349,8 @@ function renderPlanoPasivo(results) {
     if (!vCtx) initPlanoVectorial();
     if (!vCtx || !results.poseLandmarks) return;
     vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
-    // Dibujo del esqueleto 2D (Interpretación completa)
+    
+    // El plano 2D siempre dibuja el esqueleto como referencia visual fluida
     drawConnectors(vCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
     drawLandmarks(vCtx, results.poseLandmarks, {color: '#FFFFFF', lineWidth: 1, radius: 1});
 }
