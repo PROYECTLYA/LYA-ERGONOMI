@@ -1,4 +1,4 @@
-V5 MIER
+V6 MIER
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -200,16 +200,16 @@ V5 MIER
         <div class="row">
             <div class="col-12 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" class="form-val" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreEmpresa" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
-                <input type="text" id="puestoTrabajo" class="form-val" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="puestoTrabajo" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" class="form-val" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreTrabajador" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
 
             <div class="col-md-6 mb-3">
@@ -267,20 +267,51 @@ const inputs = document.querySelectorAll('.form-val');
 const btnVivo = document.getElementById('btn-vivo');
 const btnArchivo = document.getElementById('btn-archivo');
 
+
 function validarFormulario() {
     let completo = true;
-    inputs.forEach(input => {
-        if (input.value.trim() === "") completo = false;
+    const inputsVal = document.querySelectorAll('.form-val');
+    
+    inputsVal.forEach(input => {
+        const val = input.value.trim();
+        if (val === "") {
+            completo = false;
+        }
+        
+        // Validación extra por tipo
+        if (input.type === "number") {
+            const num = parseFloat(val);
+            if (isNaN(num) || num <= 0) completo = false;
+        }
+        
+        // Validación de texto (pattern)
+        if (input.hasAttribute('pattern')) {
+            const reg = new RegExp("^" + input.getAttribute('pattern') + "$");
+            if (!reg.test(val)) completo = false;
+        }
     });
     
+    const selectGen = document.getElementById('generoTrabajador');
+    if(!selectGen.value) completo = false;
+
     btnVivo.disabled = !completo;
     btnArchivo.disabled = !completo;
+    
+    // Feedback visual de los botones
+    btnVivo.style.opacity = completo ? "1" : "0.5";
+    btnArchivo.style.opacity = completo ? "1" : "0.5";
 }
 
-// Escuchar cambios en cada input
+// Escuchar todos los eventos relevantes
 inputs.forEach(input => {
     input.addEventListener('input', validarFormulario);
+    input.addEventListener('change', validarFormulario);
 });
+document.getElementById('generoTrabajador').addEventListener('change', validarFormulario);
+
+// Ejecutar una vez al cargar por si hay autocompletado
+validarFormulario();
+
 
 /**
  * 🏷️ REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
