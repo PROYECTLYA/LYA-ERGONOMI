@@ -1,4 +1,4 @@
-V9 MIER
+V10 MIER
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -200,16 +200,16 @@ V9 MIER
         <div class="row">
             <div class="col-12 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreEmpresa" class="form-val" pattern="^[A-Za-z0-9ñÑáéíóúÁÉÍÓÚ\s.#-]+$" title="Solo texto" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
-                <input type="text" id="puestoTrabajo" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="puestoTrabajo" class="form-val" pattern="^[A-Za-z0-9ñÑáéíóúÁÉÍÓÚ\s.#-]+$" title="Solo texto" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreTrabajador" class="form-val" pattern="^[A-Za-z0-9ñÑáéíóúÁÉÍÓÚ\s.#-]+$" title="Solo texto" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
 
             <div class="col-md-6 mb-3">
@@ -267,96 +267,119 @@ V9 MIER
 const inputs = document.querySelectorAll('.form-val');
 const btnVivo = document.getElementById('btn-vivo');
 const btnArchivo = document.getElementById('btn-archivo');
+const selectGen = document.getElementById('generoTrabajador');
 
 function validarFormulario() {
     let completo = true;
-    const inputsVal = document.querySelectorAll('.form-val');
-    
-    inputsVal.forEach(input => {
-        const val = input.value.trim();
 
-        // 🔴 VACÍO
+    inputs.forEach(input => {
+        const val = input.value.trim();
+        let valido = true;
+
+        // 🔴 VALIDAR VACÍO
         if (val === "") {
-            completo = false;
-            return;
+            valido = false;
         }
-        
-        // 🔢 VALIDACIÓN NUMÉRICA ESPECÍFICA
+
+        // 🔢 VALIDACIÓN NUMÉRICA
         if (input.type === "number") {
             const num = parseFloat(val);
 
-           if (isNaN(num)) {
-    completo = false;
-    input.style.borderColor = "red";
-    return;
-} else {
-    input.style.borderColor = "#30363d";
-}
+            if (val === "" || isNaN(num)) {
+                valido = false;
+            } else {
+                if (input.id === "edadTrabajador" && (num < 15 || num > 80)) {
+                    valido = false;
+                }
 
-            // Validar rangos específicos por ID
-            if (input.id === "edadTrabajador") {
-                if (num < 15 || num > 80) completo = false;
-            }
-
-            if (input.id === "pesoCarga") {
-                if (num <= 0 || num > 50) completo = false;
+                if (input.id === "pesoCarga" && (num <= 0 || num > 50)) {
+                    valido = false;
+                }
             }
         }
-        if (val === "") {
-    completo = false;
-    return;
-}
-        if (!val || val.trim().length === 0) {
-    completo = false;
-    return;
-}
-      // 🔤 VALIDACIÓN DE TEXTO CON PATTERN
-if (input.hasAttribute('pattern')) {
-    const reg = new RegExp("^" + input.getAttribute('pattern') + "$");
 
-    if (!reg.test(val)) {
-        completo = false;
-        input.style.borderColor = "red";
-    } else {
-        input.style.borderColor = "#30363d";
-    }
-}
+        // 🔤 VALIDACIÓN DE TEXTO CON PATTERN
+        if (input.hasAttribute('pattern') && val !== "") {
+            const reg = new RegExp(`^${input.getAttribute('pattern')}$`);
+            if (!reg.test(val)) {
+                valido = false;
+            }
+        }
+
+        // 🎯 ESTILO FINAL POR CAMPO
+        if (!valido) {
+            input.style.borderColor = "red";
+            completo = false;
+        } else {
+            input.style.borderColor = "#30363d";
+        }
     });
-    
-    // 🚫 GÉNERO OBLIGATORIO (SIN VALOR POR DEFECTO)
-    const selectGen = document.getElementById('generoTrabajador');
-    if (!selectGen.value) completo = false;
 
-    // 🔒 BLOQUEO DE BOTONES
+    // 🚫 VALIDAR SELECT (GÉNERO)
+    if (!selectGen.value) {
+        completo = false;
+        selectGen.style.borderColor = "red";
+    } else {
+        selectGen.style.borderColor = "#30363d";
+    }
+
+    // 🔒 ACTIVAR / DESACTIVAR BOTONES
     btnVivo.disabled = !completo;
     btnArchivo.disabled = !completo;
-    
-    // 🎯 FEEDBACK VISUAL
+
     btnVivo.style.opacity = completo ? "1" : "0.5";
     btnArchivo.style.opacity = completo ? "1" : "0.5";
+
+    console.log("Formulario válido:", completo);
 }
+
+// 🎧 EVENTOS (UNA SOLA VEZ)
+inputs.forEach(input => {
+    input.addEventListener('input', validarFormulario);
+    input.addEventListener('change', validarFormulario);
+});
+
+selectGen.addEventListener('change', validarFormulario);
+
+// 🚀 VALIDACIÓN INICIAL
+validarFormulario();
 
 
 /**
  * 🏷️ REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
  */
-    const video = document.getElementById('input_video');
-    const canvas = document.getElementById('output_canvas');
-    const ctx = canvas.getContext('2d');
-    const txtStatus = document.getElementById('txt-status');
+const video = document.getElementById('input_video');
+const canvas = document.getElementById('output_canvas');
+const ctx = canvas.getContext('2d');
+const txtStatus = document.getElementById('txt-status');
 
-    const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
+const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
 
-    let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
-    let baseAngles = {}, angleBuffer = {};
-    const HISTORIAL_MAX = 20; 
-    let iaActiva = false, calibrado = false, analizandoRiesgo = false;
-    let currentFacingMode = "environment", startTimeCalib = 0;
-    let pose;
-    let mediaRecorder;
-    let recordedChunks = [];
-    let posBuffer = {};
-    const SUAVIZADO_POS = 5;
+let wbaStats = { 
+    riesgoAltoTotal: 0, 
+    framesAnalizados: 0, 
+    zonasAfectadas: new Set(), 
+    inicioAuditoria: null, 
+    ciclos: 0, 
+    lastHandY: null, 
+    subiendo: false 
+};
+
+let baseAngles = {}, angleBuffer = {};
+const HISTORIAL_MAX = 20;
+
+let iaActiva = false, 
+    calibrado = false, 
+    analizandoRiesgo = false;
+
+let currentFacingMode = "environment", 
+    startTimeCalib = 0;
+
+let pose;
+let mediaRecorder;
+let recordedChunks = [];
+let posBuffer = {};
+const SUAVIZADO_POS = 5;
 
 /**
  * 🏷️ GESTIÓN DE FUENTES DE VIDEO
@@ -415,196 +438,65 @@ if (loader) loader.style.display = "none";
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 
-
 const drawV = (p1, p2, angKey, groupKey, raw1, raw2) => {
     if (!raw1 || !raw2 || raw1.visibility < 0.5 || raw2.visibility < 0.5) return;
-    
+
+    const buffer = angleBuffer[angKey] || [];
+    if (buffer.length === 0) return;
+
+    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+
     let color = "#00ff00";
-    let thickness = 3;
+    let thickness = 4;
+    let statusLabel = "SEGURO";
 
-    // Solo semaforizar e interpretar si ya está calibrado
+    // 🔥 Evaluación de riesgo
     if (calibrado) {
-        const buffer = angleBuffer[angKey] || [];
-        const avg = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
-        const diff = Math.abs(avg - (baseAngles[angKey] || avg));
-        
-        // Umbrales independientes por jerarquía muscular
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
         const t = TH[groupKey] || 20;
-        if (diff > t * 2) { color = "#ff3838"; thickness = 7; }
-        else if (diff > t) { color = "#f1c40f"; thickness = 5; }
 
-        // Etiquetas: Solo visibles tras calibrar
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(p1.x + 10, p1.y - 15, 48, 18);
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 11px Arial";
-        ctx.fillText(Math.round(avg) + "°", p1.x + 15, p1.y - 2);
+        if (diff > t * 2) {
+            color = "#ff3838";
+            thickness = 8;
+            statusLabel = "CRÍTICO";
+
+            if (analizandoRiesgo) {
+                wbaStats.riesgoAltoTotal++;
+                wbaStats.zonasAfectadas.add(groupKey);
+            }
+
+        } else if (diff > t) {
+            color = "#f1c40f";
+            thickness = 6;
+            statusLabel = "ADVERTENCIA";
+        }
     }
 
+    // 📏 Línea
     ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
-};
 
-    const buffer = angleBuffer[angKey] || [];
-    if (buffer.length === 0) return;
-
-    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
-    let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
-    if (analizandoRiesgo && calibrado) {
-        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const t = TH[groupKey];
-        wbaStats.framesAnalizados++;
-        if (diff > (t * 2)) { 
-            wbaStats.riesgoAltoTotal++;
-            wbaStats.zonasAfectadas.add(groupKey);
-            color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
-        } else if (diff > t) {
-            color = "#f1c40f";
-            thickness = 7; statusLabel = "ADVERTENCIA";
-        }
-    }
-
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = thickness;
-    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-
+    // 🧠 Etiqueta
     if (calibrado) {
-        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
-        let offsetX = (groupKey === "munecas") ? 45 : 15;
-        let offsetY = (groupKey === "munecas") ? 20 : -15;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-        ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
-        ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
-        ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
-        ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(midX + 10, midY - 20, 90, 30);
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 10px Arial";
+        ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + 15, midY - 5);
+
+        ctx.fillStyle = color;
+        ctx.font = "bold 9px Arial";
+        ctx.fillText(statusLabel, midX + 15, midY + 8);
     }
 };
-
-function onResults(res) {
-    if (!res || !res.poseLandmarks) {
-        txtStatus.innerText = "SUJETO PERDIDO";
-        return;
-    }
-    
-    const lm = res.poseLandmarks;
-    const w = canvas.width;
-    const h = canvas.height;
-
-    if (!calibrado) {
-        let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
-        txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
-    }
-
-    ctx.save();
-    ctx.clearRect(0, 0, w, h);
-    if (currentFacingMode === "user") { 
-        ctx.translate(w, 0);
-        ctx.scale(-1, 1); 
-    }
-    
-    ctx.drawImage(res.image, 0, 0, w, h);
-
-    const pt = (i) => {
-        const lmPoint = lm[i];
-        if (!posBuffer[i]) {
-            posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
-        }
-        if (lmPoint.visibility >= 0.5) {
-            posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
-            if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
-        }
-        const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
-        const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
-        return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
-    };
-
-    
-    
-        // JERARQUÍA MUSCULAR SEGÚN DIAGRAMA
-        const p = {
-            cab: pt(0),
-            cue: { x: (lm[11].x + lm[12].x) / 2 * canvas.width, y: (lm[11].y + lm[12].y) / 2 * canvas.height },
-            tor: { x: (lm[11].x + lm[12].x) / 2 * canvas.width, y: ((lm[11].y + lm[12].y) / 2 * canvas.height) + 35 },
-            abd: { x: (lm[23].x + lm[24].x) / 2 * canvas.width, y: ((lm[23].y + lm[24].y) / 2 * canvas.height) - 30 },
-            esp: { x: (lm[23].x + lm[24].x) / 2 * canvas.width, y: (lm[23].y + lm[24].y) / 2 * canvas.height },
-            hd: pt(12), hi: pt(11), cd: pt(14), ci: pt(13), md: pt(16), mi: pt(15), 
-            pd: pt(24), pi: pt(23), rd: pt(26), ri: pt(25), td: pt(28), ti: pt(27)
-        };
-
-
-    if (analizandoRiesgo) {
-        const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
-        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-        const umbralMovimiento = alturaTorso * 0.3;
-        if (wbaStats.lastHandY !== null) {
-            const desplazamiento = wbaStats.lastHandY - currentHandY;
-            if (desplazamiento > umbralMovimiento && !wbaStats.subiendo) {
-                wbaStats.ciclos++;
-                wbaStats.subiendo = true;
-            } else if (desplazamiento < -umbralMovimiento) {
-                wbaStats.subiendo = false;
-            }
-        }
-        wbaStats.lastHandY = currentHandY;
-    }
-
-    const currentAngles = {
-        cue: calcAng3D(p.cab, p.cue, p.tor), 
-        abd: calcAng3D(p.tor, p.abd, p.esp_baja),
-        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), 
-        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), 
-        m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
-        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), 
-        h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
-        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), 
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
-        t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
-    };
-    Object.keys(currentAngles).forEach(k => {
-        if (!angleBuffer[k]) angleBuffer[k] = [];
-        angleBuffer[k].push(currentAngles[k]);
-        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-    });
-
-    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
-        Object.keys(angleBuffer).forEach(k => { 
-            baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
-        });
-        wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
-        calibrado = true; 
-        document.getElementById('recordBtn').style.opacity = "1";
-        txtStatus.innerText = "CALIBRADO - LISTO";
-    }
-
-    ctx.strokeStyle = "#00ff00"; 
-    ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
-
-    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
-    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
-    drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
-    drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
-    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
-    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]);
-    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
-    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
-    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
-    
-    ctx.restore();
-}
 
 /** * 🏷️ INICIALIZACIÓN DE IA
  */
@@ -766,18 +658,21 @@ window.addEventListener('resize', () => {
 document.getElementById('generoTrabajador')
     .addEventListener('change', validarFormulario);
 
-// Ejecutar al cargar
-validarFormulario();
-    inputs.forEach(input => {
+const inputs = document.querySelectorAll('.form-val');
+
+// Eventos en inputs
+inputs.forEach(input => {
     input.addEventListener('input', validarFormulario);
     input.addEventListener('change', validarFormulario);
 });
 
+// Evento en select
 document.getElementById('generoTrabajador')
     .addEventListener('change', validarFormulario);
 
-// Ejecutar al cargar
+// Ejecutar validación inicial
 validarFormulario();
+    
 </script>
 </body>
 </html>
