@@ -1,4 +1,4 @@
-V3 MIER
+V5 MIER
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -11,28 +11,182 @@ V3 MIER
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
    <style>
-    body { background-color: #0d1117; color: white; margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; height: 100svh; }
-    #menu-inicial { display: flex; width: 100%; height: 100svh; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #161b22 0%, #0d1117 100%); position: fixed; z-index: 5000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
-    .logo-text { color: #00ff00; font-weight: 800; letter-spacing: 3px; margin-bottom: 5px; font-size: clamp(2rem, 8vw, 3.5rem); text-align: center; }
-    .sub-text { color: #8b949e; font-size: clamp(0.7rem, 2vw, 0.9rem); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; text-align: center; }
-    .btn-inicio { flex: 1; padding: 20px !important; border-radius: 15px; font-weight: 900; font-size: 1.1rem; border: none; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-    .btn-inicio:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
-    #loader-ia { display: none; position: fixed; top:0; left:0; width:100%; height:100svh; background: rgba(13, 17, 23, 0.98); z-index: 6000; flex-direction: column; align-items: center; justify-content: center; }
-    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
-    #contenedor-analisis { display: none; width: 100vw; height: 100svh; position: relative; background: #000; }
+    /* --- CONFIGURACIÓN BASE --- */
+    body { 
+        background-color: #0d1117;
+        color: white; 
+        margin: 0; 
+        overflow: hidden; 
+        font-family: 'Segoe UI', sans-serif; 
+        height: 100vh;
+        height: 100svh;
+    }
+
+    /* --- MENÚ INICIAL (RESPONSIVO) --- */
+    #menu-inicial { 
+        display: flex;
+        width: 100%; 
+        height: 100svh;
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
+        position: fixed; 
+        z-index: 5000;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+    }
+
+    .logo-text { 
+        color: #00ff00;
+        font-weight: 800; 
+        letter-spacing: 3px; 
+        margin-bottom: 5px; 
+        font-size: clamp(2rem, 8vw, 3.5rem);
+        text-align: center;
+    }
+
+    .sub-text { 
+        color: #8b949e; 
+        font-size: clamp(0.7rem, 2vw, 0.9rem);
+        text-transform: uppercase; 
+        letter-spacing: 2px; 
+        margin-bottom: 30px; 
+        text-align: center;
+    }
+
+    /* --- BOTONES DE INICIO --- */
+    .btn-inicio { 
+        flex: 1;
+        padding: 20px !important; 
+        border-radius: 15px; 
+        font-weight: 900; 
+        font-size: 1.1rem; 
+        border: none;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+
+    .btn-inicio:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
+    }
+
+    .btn-inicio:active:not(:disabled) { transform: scale(0.95); }
+
+    .d-flex.gap-2 { width: 100%; max-width: 550px; }
+
+    /* --- PANTALLA DE CARGA --- */
+    #loader-ia { 
+        display: none;
+        position: fixed; 
+        top:0; left:0; width:100%; height:100svh;
+        background: rgba(13, 17, 23, 0.98); 
+        z-index: 6000; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center;
+    }
+
+    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00;
+        margin-top: 25px; border-radius: 10px; }
+
+    /* --- CONTENEDOR DE ANÁLISIS --- */
+    #contenedor-analisis { 
+        display: none;
+        width: 100vw; 
+        height: 100svh;
+        position: relative; 
+        background: #000; 
+    }
+
     canvas { width: 100%; height: 100%; object-fit: contain; }
-    .status-badge { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 255, 0, 0.2); color: #00ff00; padding: 5px 15px; border-radius: 20px; font-weight: bold; border: 1px solid #00ff00; z-index: 7000; }
-    .barra-controles { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 7000; background: rgba(0, 0, 0, 0.6); padding: 15px 25px; border-radius: 50px; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); }
-    .btn-circular { width: 65px; height: 65px; border-radius: 50%; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 800; cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
-    .rec-active { background: #ff4d4d !important; color: white !important; animation: pulse-red 1.5s infinite; }
-    @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); } }
-    input.form-val, select { background: #161b22 !important; border: 1px solid #30363d !important; color: #e6edf3 !important; }
+    video { display: none; }
+
+    .status-badge { 
+        position: absolute;
+        top: 20px; 
+        left: 50%; 
+        transform: translateX(-50%);
+        background: rgba(0, 255, 0, 0.2);
+        color: #00ff00;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        border: 1px solid #00ff00;
+        z-index: 7000;
+    }
+
+    .barra-controles {
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 15px;
+        z-index: 7000;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 15px 25px;
+        border-radius: 50px;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-circular {
+        width: 65px;
+        height: 65px;
+        border-radius: 50%;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    .btn-circular span { font-size: 1.4rem; margin-bottom: 2px; }
+    .btn-circular:hover { transform: scale(1.1); }
+    .btn-circular:active { transform: scale(0.9); }
+
+    .rec-active {
+        background: #ff4d4d !important;
+        color: white !important;
+        animation: pulse-red 1.5s infinite;
+    }
+
+    @keyframes pulse-red {
+        0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+        70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+    }
+       
+    input[type="text"], input[type="number"], select {
+        background: #161b22 !important;
+        border: 1px solid #30363d !important;
+        color: #e6edf3 !important;
+        transition: border-color 0.3s;
+    }
+
+    input:focus {
+        border-color: #00ff00 !important;
+        outline: none;
+    }
 </style> 
 </head>
 <body>
 
 <div id="loader-ia">
-    <h3 id="loader-msg" style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">BUSCANDO SUJETO</h3>
+    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">LYA-AUDITOR ENGINE</h3>
     <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
         <div id="bar-id" class="progress-bar"></div>
     </div>
@@ -41,33 +195,45 @@ V3 MIER
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría de Procesos NOM-036-STPS</p>
+    
     <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
         <div class="row">
             <div class="col-12 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem; display: block;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" class="form-val" style="width: 100%; padding: 8px; border-radius: 6px;">
+                <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
+                <input type="text" id="nombreEmpresa" class="form-val" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
+                <input type="text" id="puestoTrabajo" class="form-val" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO:</label>
-                <input type="text" id="puestoTrabajo" class="form-val" style="width: 100%; padding: 8px; border-radius: 6px;">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
+                <input type="text" id="nombreTrabajador" class="form-val" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
+
             <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem; display: block;">TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" class="form-val" style="width: 100%; padding: 8px; border-radius: 6px;">
+                <label style="color: #8b949e; font-size: 0.7rem; display: block;">GÉNERO:</label>
+                <select id="generoTrabajador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                    <option value="H">Hombre</option>
+                    <option value="M">Mujer</option>
+                </select>
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">EDAD:</label>
-                <input type="number" id="edadTrabajador" class="form-val" style="width: 100%; padding: 8px; border-radius: 6px;">
+                <input type="number" id="edadTrabajador" class="form-val" min="15" max="80" placeholder="Años" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #27ae60; font-size: 0.7rem; display: block;">PESO CARGA (KG):</label>
-                <input type="number" id="pesoCarga" class="form-val" style="width: 100%; padding: 8px; border-radius: 6px;">
+
+            <div class="col-12">
+                <label style="color: #27ae60; font-size: 0.7rem; display: block; font-weight: bold;">PESO DE LA CARGA (KG):</label>
+                <input type="number" id="pesoCarga" class="form-val" min="1" max="50" placeholder="Ej: 10" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #27ae60; background: #0d1117; color: white;">
             </div>
         </div>
     </div>
+
     <div class="d-flex gap-2">
-        <button id="btn-vivo" class="btn-inicio" style="background:#27ae60; color:white;" onclick="prepararSistema('camara')" disabled>🎥 VIVO</button>
-        <button id="btn-archivo" class="btn-inicio" style="background:#2980b9; color:white;" onclick="document.getElementById('fileInput').click()" disabled>📁 ARCHIVO</button>
+        <button id="btn-vivo" class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')" disabled>🎥 VIVO</button>
+        <button id="btn-archivo" class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()" disabled>📁 ARCHIVO</button>
     </div>
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
@@ -76,66 +242,116 @@ V3 MIER
     <div class="status-badge" id="txt-status">SISTEMA READY</div>
     <canvas id="output_canvas"></canvas>
     <video id="input_video" playsinline muted style="display:none;"></video>
+    
     <div class="barra-controles">
-        <button class="btn-circular btn-dark" onclick="location.reload()"><span>✖</span><br>SALIR</button>
-        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span><br>GIRAR</button>
-        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span><br>CALIBRAR</button>
-        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled><span>🔴</span><br>AUDITAR</button>
+        <button class="btn-circular btn-dark" onclick="location.reload()" title="Cerrar auditoría">
+            <span>✖</span><br>SALIR
+        </button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">
+            <span>🔄</span><br>GIRAR
+        </button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">
+            <span>⚖️</span><br>CALIBRAR
+        </button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled>
+            <span>🔴</span><br>AUDITAR
+        </button>
     </div>
 </div>
 
 <script>
-    const inputs = document.querySelectorAll('.form-val');
-    const btnVivo = document.getElementById('btn-vivo');
-    const btnArchivo = document.getElementById('btn-archivo');
+/**
+ * 🏷️ VALIDACIÓN DE FORMULARIO
+ */
+const inputs = document.querySelectorAll('.form-val');
+const btnVivo = document.getElementById('btn-vivo');
+const btnArchivo = document.getElementById('btn-archivo');
+
+function validarFormulario() {
+    let completo = true;
+    inputs.forEach(input => {
+        if (input.value.trim() === "") completo = false;
+    });
+    
+    btnVivo.disabled = !completo;
+    btnArchivo.disabled = !completo;
+}
+
+// Escuchar cambios en cada input
+inputs.forEach(input => {
+    input.addEventListener('input', validarFormulario);
+});
+
+/**
+ * 🏷️ REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
+ */
     const video = document.getElementById('input_video');
     const canvas = document.getElementById('output_canvas');
     const ctx = canvas.getContext('2d');
     const txtStatus = document.getElementById('txt-status');
-    const loader = document.getElementById('loader-ia');
-    const loaderMsg = document.getElementById('loader-msg');
+
     const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
+
+    let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
+    let baseAngles = {}, angleBuffer = {};
+    const HISTORIAL_MAX = 20; 
+    let iaActiva = false, calibrado = false, analizandoRiesgo = false;
+    let currentFacingMode = "environment", startTimeCalib = 0;
+    let pose;
+    let mediaRecorder;
+    let recordedChunks = [];
+    let posBuffer = {};
+    const SUAVIZADO_POS = 5;
+
+/**
+ * 🏷️ GESTIÓN DE FUENTES DE VIDEO
+ */
+async function prepararSistema(fuente) {
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+    if (fuente === 'camara') {
+        await encenderCamara();
+        setTimeout(() => { activarIA(); }, 500);
+    } else {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return;
+        if (video.src) URL.revokeObjectURL(video.src);
+        video.src = URL.createObjectURL(file);
+        video.onloadedmetadata = () => { 
+            setupCanvas();
+            video.play(); 
+            activarIA();
+        };
+    }
+}
+
+    function setupCanvas() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+    }
     
-    let iaActiva = false, calibrado = false, analizandoRiesgo = false, procesandoCalib = false;
-    let currentFacingMode = "environment", startTimeCalib = 0, pose;
-    let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null };
-    let baseAngles = {}, angleBuffer = {}, posBuffer = {};
-
-    function validarFormulario() {
-        let completo = Array.from(inputs).every(i => i.value.trim() !== "");
-        btnVivo.disabled = btnArchivo.disabled = !completo;
-    }
-    inputs.forEach(i => i.addEventListener('input', validarFormulario));
-
-    async function prepararSistema(fuente) {
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('contenedor-analisis').style.display = 'block';
-        if (fuente === 'camara') { await encenderCamara(); activarIA(false); }
-        else { /* Lógica Archivo */ }
-    }
-
     async function encenderCamara() {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: 1280, height: 720 } });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => { canvas.width = video.videoWidth; canvas.height = video.videoHeight; video.play(); };
+    loader.style.display = "none"; // Asegurar que el loader no se vea al inicio
+        try {
+            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => { setupCanvas(); video.play(); requestAnimationFrame(loopVideoSimple); };
+        } catch (e) { alert("Error al acceder a la cámara"); }
     }
 
-    function iniciarCalibracion() {
-        procesandoCalib = true;
-        calibrado = false;
-        startTimeCalib = Date.now();
-        loader.style.display = 'flex';
-        loaderMsg.innerText = "BUSCANDO SUJETO...";
-        
-        setTimeout(() => {
-            if (!iaActiva) {
-                loader.style.display = 'none';
-                procesandoCalib = false;
-                alert("❌ FALLO DE RECONOCIMIENTO:\n1. Asegúrese de que el cuerpo completo sea visible.\n2. Mejore la iluminación frontal.\n3. Evite fondos con colores similares a la ropa.");
-            }
-        }, 5000);
+  function loopVideoSimple() {
+    if (!iaActiva) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(loopVideoSimple);
     }
+}
 
+/**
+ * 🏷️ MOTOR MATEMÁTICO Y RENDERIZADO VISUAL
+ */
     function calcAng3D(a,b,c) {
         const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
         const dot = v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
@@ -143,80 +359,350 @@ V3 MIER
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
 
-    const drawV = (p1, p2, angKey, groupKey, lm1, lm2) => {
-        if (!lm1 || !lm2 || lm1.visibility < 0.5 || lm2.visibility < 0.5) return;
-        let color = "#00ff00", thickness = 3;
+
+const drawV = (p1, p2, angKey, groupKey, raw1, raw2) => {
+    if (!raw1 || !raw2 || raw1.visibility < 0.5 || raw2.visibility < 0.5) return;
+    
+    let color = "#00ff00";
+    let thickness = 3;
+
+    // Solo semaforizar e interpretar si ya está calibrado
+    if (calibrado) {
+        const buffer = angleBuffer[angKey] || [];
+        const avg = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
+        const diff = Math.abs(avg - (baseAngles[angKey] || avg));
         
-        if (calibrado && analizandoRiesgo) {
-            const avgAngle = angleBuffer[angKey].reduce((a,b)=>a+b,0)/angleBuffer[angKey].length;
-            const diff = Math.abs(avgAngle - baseAngles[angKey]);
-            if (diff > TH[groupKey]*2) { color = "#ff3838"; thickness = 8; }
-            else if (diff > TH[groupKey]) { color = "#f1c40f"; thickness = 5; }
-        }
+        // Umbrales independientes por jerarquía muscular
+        const t = TH[groupKey] || 20;
+        if (diff > t * 2) { color = "#ff3838"; thickness = 7; }
+        else if (diff > t) { color = "#f1c40f"; thickness = 5; }
 
-        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = thickness;
-        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-
-        if (calibrado) {
-            ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(p1.x+10, p1.y-10, 50, 20);
-            ctx.fillStyle = "#fff"; ctx.font = "10px Arial";
-            ctx.fillText(Math.round(angleBuffer[angKey].slice(-1))+"°", p1.x+15, p1.y+5);
-        }
-    };
-
-    function onResults(res) {
-        if (!res.poseLandmarks) { txtStatus.innerText = "BUSCANDO..."; return; }
-        iaActiva = true;
-        const lm = res.poseLandmarks;
-        const w = canvas.width, h = canvas.height;
-
-        if (procesandoCalib && !calibrado) {
-            let seg = Math.ceil((3000 - (Date.now()-startTimeCalib))/1000);
-            loaderMsg.innerText = "CALIBRANDO EN " + (seg > 0 ? seg : 0) + "s";
-            if (Date.now() - startTimeCalib > 3000) { 
-                calibrado = true; procesandoCalib = false; loader.style.display = 'none';
-                document.getElementById('recordBtn').disabled = false; document.getElementById('recordBtn').style.opacity = "1";
-                alert("✅ TODO LISTO: Sujeto identificado y base establecida.");
-            }
-        }
-
-        ctx.clearRect(0,0,w,h);
-        ctx.drawImage(res.image, 0,0,w,h);
-
-        const pt = (i) => ({ x: lm[i].x*w, y: lm[i].y*h, z: lm[i].z, visibility: lm[i].visibility });
-        const p = { 
-            h_d: pt(12), c_d: pt(14), m_d: pt(16), h_i: pt(11), c_i: pt(13), m_i: pt(15),
-            p_d: pt(24), r_d: pt(26), t_d: pt(28), p_i: pt(23), r_i: pt(25), t_i: pt(27)
-        };
-
-        const angles = { 
-            c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-            r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
-        };
-
-        Object.keys(angles).forEach(k => {
-            if (!angleBuffer[k]) angleBuffer[k] = [];
-            angleBuffer[k].push(angles[k]); if(angleBuffer[k].length>20) angleBuffer[k].shift();
-            if (calibrado && !baseAngles[k]) baseAngles[k] = angles[k];
-        });
-
-        drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]);
-        drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
-        drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]);
-        drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
+        // Etiquetas: Solo visibles tras calibrar
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(p1.x + 10, p1.y - 15, 48, 18);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px Arial";
+        ctx.fillText(Math.round(avg) + "°", p1.x + 15, p1.y - 2);
     }
 
-    async function activarIA(showLoader = true) {
-        if (showLoader) loader.style.display = 'flex';
-        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
-        pose.onResults(onResults);
-        const procesar = async () => { if (video.readyState >= 2) await pose.send({ image: video }); requestAnimationFrame(procesar); };
-        procesar();
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+};
+
+    const buffer = angleBuffer[angKey] || [];
+    if (buffer.length === 0) return;
+
+    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+    let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
+    if (analizandoRiesgo && calibrado) {
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+        const t = TH[groupKey];
+        wbaStats.framesAnalizados++;
+        if (diff > (t * 2)) { 
+            wbaStats.riesgoAltoTotal++;
+            wbaStats.zonasAfectadas.add(groupKey);
+            color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
+        } else if (diff > t) {
+            color = "#f1c40f";
+            thickness = 7; statusLabel = "ADVERTENCIA";
+        }
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    if (calibrado) {
+        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+        let offsetX = (groupKey === "munecas") ? 45 : 15;
+        let offsetY = (groupKey === "munecas") ? 20 : -15;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+        ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
+        ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
+        ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
+        ctx.fillText(statusLabel, midX + offsetX + 5, midY + offsetY + 27);
+    }
+};
+
+function onResults(res) {
+    if (!res || !res.poseLandmarks) {
+        txtStatus.innerText = "SUJETO PERDIDO";
+        return;
     }
     
-    function toggleGrabacion() { analizandoRiesgo = !analizandoRiesgo; document.getElementById('recordBtn').classList.toggle('rec-active'); }
-    function cambiarCamara() { currentFacingMode = currentFacingMode === "environment" ? "user" : "environment"; encenderCamara(); }
+    const lm = res.poseLandmarks;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    if (!calibrado) {
+        let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
+        txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
+    }
+
+    ctx.save();
+    ctx.clearRect(0, 0, w, h);
+    if (currentFacingMode === "user") { 
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1); 
+    }
+    
+    ctx.drawImage(res.image, 0, 0, w, h);
+
+    const pt = (i) => {
+        const lmPoint = lm[i];
+        if (!posBuffer[i]) {
+            posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
+        }
+        if (lmPoint.visibility >= 0.5) {
+            posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
+            if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
+        }
+        const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
+        const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
+        return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
+    };
+
+    
+        const pt = (i) => ({ x: lm[i].x * canvas.width, y: lm[i].y * canvas.height, z: lm[i].z, visibility: lm[i].visibility });
+        
+        // JERARQUÍA MUSCULAR SEGÚN DIAGRAMA
+        const p = {
+            cab: pt(0),
+            cue: { x: (lm[11].x + lm[12].x) / 2 * canvas.width, y: (lm[11].y + lm[12].y) / 2 * canvas.height },
+            tor: { x: (lm[11].x + lm[12].x) / 2 * canvas.width, y: ((lm[11].y + lm[12].y) / 2 * canvas.height) + 35 },
+            abd: { x: (lm[23].x + lm[24].x) / 2 * canvas.width, y: ((lm[23].y + lm[24].y) / 2 * canvas.height) - 30 },
+            esp: { x: (lm[23].x + lm[24].x) / 2 * canvas.width, y: (lm[23].y + lm[24].y) / 2 * canvas.height },
+            hd: pt(12), hi: pt(11), cd: pt(14), ci: pt(13), md: pt(16), mi: pt(15), 
+            pd: pt(24), pi: pt(23), rd: pt(26), ri: pt(25), td: pt(28), ti: pt(27)
+        };
+
+
+    if (analizandoRiesgo) {
+        const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
+        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
+        const umbralMovimiento = alturaTorso * 0.3;
+        if (wbaStats.lastHandY !== null) {
+            const desplazamiento = wbaStats.lastHandY - currentHandY;
+            if (desplazamiento > umbralMovimiento && !wbaStats.subiendo) {
+                wbaStats.ciclos++;
+                wbaStats.subiendo = true;
+            } else if (desplazamiento < -umbralMovimiento) {
+                wbaStats.subiendo = false;
+            }
+        }
+        wbaStats.lastHandY = currentHandY;
+    }
+
+    const currentAngles = {
+        cue: calcAng3D(p.cab, p.cue, p.tor), 
+        abd: calcAng3D(p.tor, p.abd, p.esp_baja),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), 
+        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        m_d: calcAng3D(p.c_d, p.m_d, p.mano_d), 
+        m_i: calcAng3D(p.c_i, p.m_i, p.mano_i),
+        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), 
+        h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
+        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), 
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
+        t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+    };
+    Object.keys(currentAngles).forEach(k => {
+        if (!angleBuffer[k]) angleBuffer[k] = [];
+        angleBuffer[k].push(currentAngles[k]);
+        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+    });
+
+    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
+        Object.keys(angleBuffer).forEach(k => { 
+            baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
+        });
+        wbaStats.lastHandY = (p.m_d.y + p.m_i.y) / 2;
+        calibrado = true; 
+        document.getElementById('recordBtn').style.opacity = "1";
+        txtStatus.innerText = "CALIBRADO - LISTO";
+    }
+
+    ctx.strokeStyle = "#00ff00"; 
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.p_i.x, p.p_i.y); ctx.lineTo(p.p_d.x, p.p_d.y); ctx.stroke();
+
+    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
+    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
+    drawV(p.h_d, p.c_d, 'c_d', 'codos', lm[12], lm[14]); 
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
+    drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]);
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+    
+    ctx.restore();
+}
+
+/** * 🏷️ INICIALIZACIÓN DE IA
+ */
+let timeoutDeteccion; 
+
+async function activarIA() {
+    const loader = document.getElementById('loader-ia');
+    if (loader) loader.style.display = 'flex';
+    
+    calibrado = false;
+    iaActiva = false; 
+    txtStatus.innerText = "BUSCANDO SUJETO...";
+
+    clearTimeout(timeoutDeteccion);
+    timeoutDeteccion = setTimeout(() => {
+        if (!iaActiva) {
+            if (loader) loader.style.display = 'none';
+            alert("⚠️ NO SE HA DETECTADO EL SUJETO.");
+            txtStatus.innerText = "SISTEMA READY (FALLÓ DETECCIÓN)";
+        }
+    }, 5000);
+
+    if (!pose) {
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults((res) => {
+            if (res.poseLandmarks) {
+                if (!iaActiva) {
+                    if (loader) loader.style.display = 'none';
+                    iaActiva = true; 
+                    startTimeCalib = Date.now(); 
+                    const btn = document.getElementById('recordBtn');
+                    if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
+                }
+                onResults(res);
+            } else if (iaActiva) {
+                txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
+            }
+        });
+    }
+
+    async function procesarFrame() {
+        if (document.getElementById('contenedor-analisis').style.display === 'block') {
+            if (video.readyState >= 2) { await pose.send({ image: video }); }
+            requestAnimationFrame(procesarFrame);
+        }
+    }
+    setTimeout(() => { procesarFrame(); }, 800);
+}
+
+/**
+ * 🏷️ REPORTE PDF
+ */
+function generarReporteWBA() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const empresa = document.getElementById('nombreEmpresa')?.value || "N/A";
+    const puesto = document.getElementById('puestoTrabajo')?.value || "N/A";
+    const trabajador = document.getElementById('nombreTrabajador')?.value || "N/A";
+    const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
+    const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
+    const msTranscurridos = Date.now() - wbaStats.inicioAuditoria;
+    const duracionMinutos = (msTranscurridos / 60000).toFixed(2);
+    const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
+    const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
+
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 25, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(20);
+    doc.text("LYA – ERGONOMI", 105, 12, { align: "center" });
+    doc.setTextColor(255, 255, 255); doc.setFontSize(10);
+    doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 18, { align: "center" });
+    
+    doc.setFillColor(5, 30, 85); doc.rect(10, 30, 190, 45, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text("RESULTADOS DE LA EVALUACIÓN", 105, 40, { align: "center" });
+    
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text(`TRABAJADOR: ${trabajador}`, 20, 52);
+    doc.text(`PUESTO: ${puesto}`, 20, 58);
+    doc.text(`PLANTA: ${empresa}`, 20, 64);
+    
+    let recText = porcentajeRiesgo > 40 ? "⚠️ ALERTA: Rediseñar puesto." : "✅ ESTATUS: Postura aceptable.";
+    doc.setTextColor(0, 255, 0); doc.text(`RECOMENDACIÓN: ${recText}`, 20, 70);
+
+    doc.autoTable({
+        startY: 80,
+        head: [['FACTOR', 'VALOR', 'ESTATUS', 'CRITERIO']],
+        body: [['Peso Carga', `${peso} kg`, peso > 25 ? 'EXCEDE' : 'OK', 'NOM-036']],
+        headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
+}
+
+/**
+ * 🏷️ GRABACIÓN
+ */
+function toggleGrabacion() {
+    if (!calibrado) return;
+    analizandoRiesgo = !analizandoRiesgo;
+    const btn = document.getElementById('recordBtn');
+
+    if (analizandoRiesgo) {
+        recordedChunks = [];
+        const stream = canvas.captureStream(30); 
+        const tipos = ['video/webm; codecs=vp9', 'video/webm', 'video/mp4'];
+        const mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || '';
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = descargarVideo; 
+        mediaRecorder.start();
+
+        wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
+        txtStatus.innerText = "ANALIZANDO...";
+        btn.innerHTML = "⏹️<br>DETENER";
+        btn.classList.add('rec-active');
+    } else {
+        txtStatus.innerText = "PROCESANDO...";
+        btn.innerHTML = "🔴<br>AUDITAR";
+        btn.classList.remove('rec-active');
+        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+        setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "FIN AUDITORÍA"; }, 600);
+    }
+}
+
+async function cambiarCamara() {
+    currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+    iaActiva = false;
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    await encenderCamara();
+}
+
+function descargarVideo() {
+    if (recordedChunks.length === 0) return;
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    a.href = url;
+    a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        if (video.readyState >= 2) { setupCanvas(); }
+    }, 300);
+});
 </script>
 </body>
 </html>
