@@ -1,4 +1,5 @@
-V1 mie
+V2 MIER
+
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -13,18 +14,18 @@ V1 mie
    <style>
     /* --- CONFIGURACIÓN BASE --- */
     body { 
-        background-color: #0d1117; 
+        background-color: #0d1117;
         color: white; 
         margin: 0; 
         overflow: hidden; 
         font-family: 'Segoe UI', sans-serif; 
         height: 100vh;
-        height: 100svh; 
+        height: 100svh;
     }
 
     /* --- MENÚ INICIAL (RESPONSIVO) --- */
     #menu-inicial { 
-        display: flex; 
+        display: flex;
         width: 100%; 
         height: 100svh;
         flex-direction: column; 
@@ -32,14 +33,14 @@ V1 mie
         justify-content: center; 
         background: radial-gradient(circle, #161b22 0%, #0d1117 100%); 
         position: fixed; 
-        z-index: 5000; 
+        z-index: 5000;
         padding: 20px;
         box-sizing: border-box;
         overflow-y: auto;
     }
 
     .logo-text { 
-        color: #00ff00; 
+        color: #00ff00;
         font-weight: 800; 
         letter-spacing: 3px; 
         margin-bottom: 5px; 
@@ -49,7 +50,7 @@ V1 mie
 
     .sub-text { 
         color: #8b949e; 
-        font-size: clamp(0.7rem, 2vw, 0.9rem); 
+        font-size: clamp(0.7rem, 2vw, 0.9rem);
         text-transform: uppercase; 
         letter-spacing: 2px; 
         margin-bottom: 30px; 
@@ -58,13 +59,13 @@ V1 mie
 
     /* --- BOTONES DE INICIO --- */
     .btn-inicio { 
-        flex: 1; 
+        flex: 1;
         padding: 20px !important; 
         border-radius: 15px; 
         font-weight: 900; 
         font-size: 1.1rem; 
         border: none;
-        transition: transform 0.2s, box-shadow 0.3s;
+        transition: all 0.3s ease;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -72,27 +73,34 @@ V1 mie
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
 
-    .btn-inicio:active { transform: scale(0.95); }
+    .btn-inicio:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
+    }
+
+    .btn-inicio:active:not(:disabled) { transform: scale(0.95); }
 
     .d-flex.gap-2 { width: 100%; max-width: 550px; }
 
     /* --- PANTALLA DE CARGA --- */
     #loader-ia { 
-        display: none; 
+        display: none;
         position: fixed; 
         top:0; left:0; width:100%; height:100svh;
         background: rgba(13, 17, 23, 0.98); 
         z-index: 6000; 
         flex-direction: column; 
         align-items: center; 
-        justify-content: center; 
+        justify-content: center;
     }
 
-    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00; margin-top: 25px; border-radius: 10px; }
+    .progress-bar { width: 0%; height: 6px; background: #00ff00; transition: 0.4s; box-shadow: 0 0 20px #00ff00;
+        margin-top: 25px; border-radius: 10px; }
 
     /* --- CONTENEDOR DE ANÁLISIS --- */
     #contenedor-analisis { 
-        display: none; 
+        display: none;
         width: 100vw; 
         height: 100svh;
         position: relative; 
@@ -103,7 +111,7 @@ V1 mie
     video { display: none; }
 
     .status-badge { 
-        position: absolute; 
+        position: absolute;
         top: 20px; 
         left: 50%; 
         transform: translateX(-50%);
@@ -116,7 +124,6 @@ V1 mie
         z-index: 7000;
     }
 
-    /* --- BARRA DE CONTROLES (LO QUE FALTABA) --- */
     .barra-controles {
         position: absolute;
         bottom: 30px;
@@ -124,7 +131,7 @@ V1 mie
         transform: translateX(-50%);
         display: flex;
         gap: 15px;
-        z-index: 7000; /* Asegura que esté por encima del canvas */
+        z-index: 7000;
         background: rgba(0, 0, 0, 0.6);
         padding: 15px 25px;
         border-radius: 50px;
@@ -152,7 +159,6 @@ V1 mie
     .btn-circular:hover { transform: scale(1.1); }
     .btn-circular:active { transform: scale(0.9); }
 
-    /* Estilo para botón Auditar cuando está grabando */
     .rec-active {
         background: #ff4d4d !important;
         color: white !important;
@@ -165,20 +171,18 @@ V1 mie
         100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
     }
        
-        input[type="text"], input[type="number"], select {
-            background: #161b22 !important;
-            border: 1px solid #30363d !important;
-            color: #e6edf3 !important;
-            transition: border-color 0.3s;
-        }
+    input[type="text"], input[type="number"], select {
+        background: #161b22 !important;
+        border: 1px solid #30363d !important;
+        color: #e6edf3 !important;
+        transition: border-color 0.3s;
+    }
 
-        input:focus {
-            border-color: #00ff00 !important;
-            outline: none;
-        }
-   
+    input:focus {
+        border-color: #00ff00 !important;
+        outline: none;
+    }
 </style> 
-    
 </head>
 <body>
 
@@ -189,7 +193,6 @@ V1 mie
     </div>
 </div>
 
-
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría de Procesos NOM-036-STPS</p>
@@ -198,16 +201,16 @@ V1 mie
         <div class="row">
             <div class="col-12 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreEmpresa" class="form-val" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
-                <input type="text" id="puestoTrabajo" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="puestoTrabajo" class="form-val" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreTrabajador" class="form-val" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
 
             <div class="col-md-6 mb-3">
@@ -219,43 +222,38 @@ V1 mie
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">EDAD:</label>
-                <input type="number" id="edadTrabajador" min="15" max="80" placeholder="Años" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="number" id="edadTrabajador" class="form-val" min="15" max="80" placeholder="Años" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
 
             <div class="col-12">
                 <label style="color: #27ae60; font-size: 0.7rem; display: block; font-weight: bold;">PESO DE LA CARGA (KG):</label>
-                <input type="number" id="pesoCarga" min="1" max="50" placeholder="Ej: 10" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #27ae60; background: #0d1117; color: white;">
+                <input type="number" id="pesoCarga" class="form-val" min="1" max="50" placeholder="Ej: 10" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #27ae60; background: #0d1117; color: white;">
             </div>
         </div>
     </div>
 
     <div class="d-flex gap-2">
-        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()">📁 ARCHIVO</button>
+        <button id="btn-vivo" class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')" disabled>🎥 VIVO</button>
+        <button id="btn-archivo" class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()" disabled>📁 ARCHIVO</button>
     </div>
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
     
 <div id="contenedor-analisis">
     <div class="status-badge" id="txt-status">SISTEMA READY</div>
-    
     <canvas id="output_canvas"></canvas>
-    
     <video id="input_video" playsinline muted style="display:none;"></video>
     
     <div class="barra-controles">
         <button class="btn-circular btn-dark" onclick="location.reload()" title="Cerrar auditoría">
             <span>✖</span><br>SALIR
         </button>
-        
         <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()">
             <span>🔄</span><br>GIRAR
         </button>
-        
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="activarIA()">
             <span>⚖️</span><br>CALIBRAR
         </button>
-        
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; opacity: 0.3;" onclick="toggleGrabacion()" disabled>
             <span>🔴</span><br>AUDITAR
         </button>
@@ -264,69 +262,73 @@ V1 mie
 
 <script>
 /**
- * 🏷️ BLOQUE 1: REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
- * Selección de elementos de interfaz y definición de umbrales NOM-036.
+ * 🏷️ VALIDACIÓN DE FORMULARIO
+ */
+const inputs = document.querySelectorAll('.form-val');
+const btnVivo = document.getElementById('btn-vivo');
+const btnArchivo = document.getElementById('btn-archivo');
+
+function validarFormulario() {
+    let completo = true;
+    inputs.forEach(input => {
+        if (input.value.trim() === "") completo = false;
+    });
+    
+    btnVivo.disabled = !completo;
+    btnArchivo.disabled = !completo;
+}
+
+// Escuchar cambios en cada input
+inputs.forEach(input => {
+    input.addEventListener('input', validarFormulario);
+});
+
+/**
+ * 🏷️ REFERENCIAS AL DOM Y CONFIGURACIÓN BASE
  */
     const video = document.getElementById('input_video');
     const canvas = document.getElementById('output_canvas');
     const ctx = canvas.getContext('2d');
     const txtStatus = document.getElementById('txt-status');
 
-    // Umbrales de desviación permitidos (Grados)
     const TH = { tronco: 18, cuello: 12, hombros: 28, codos: 25, munecas: 20, piernas: 25, pies: 18 };
 
-/**
- * 🏷️ BLOQUE 2: ESTADO GLOBAL Y VARIABLES DE CONTROL
- * Gestión de banderas de IA, calibración y almacenamiento temporal de ángulos.
- */
     let wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: null, ciclos: 0, lastHandY: null, subiendo: false };
-    
     let baseAngles = {}, angleBuffer = {};
-    const HISTORIAL_MAX = 20; // Para suavizado de movimiento
+    const HISTORIAL_MAX = 20; 
     let iaActiva = false, calibrado = false, analizandoRiesgo = false;
     let currentFacingMode = "environment", startTimeCalib = 0;
     let pose;
     let mediaRecorder;
-let recordedChunks = [];
-    // Añade esto en el Bloque 2
-let posBuffer = {}; // Historial de coordenadas X, Y para suavizado
-const SUAVIZADO_POS = 5; // Cantidad de frames para promediar posición
+    let recordedChunks = [];
+    let posBuffer = {};
+    const SUAVIZADO_POS = 5;
 
 /**
- * 🏷️ BLOQUE 3: GESTIÓN DE FUENTES DE VIDEO
- * Configuración de cámara del dispositivo o carga de archivos locales.
+ * 🏷️ GESTIÓN DE FUENTES DE VIDEO
  */
 async function prepararSistema(fuente) {
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
-    
     if (fuente === 'camara') {
         await encenderCamara();
-        // Agregamos el llamado automático a activarIA para que no se quede estático
-        setTimeout(() => {
-            activarIA();
-        }, 500); 
+        setTimeout(() => { activarIA(); }, 500);
     } else {
         const file = document.getElementById('fileInput').files[0];
         if (!file) return;
-        if (video.src) URL.revokeObjectURL(video.src); 
+        if (video.src) URL.revokeObjectURL(video.src);
         video.src = URL.createObjectURL(file);
         video.onloadedmetadata = () => { 
-            setupCanvas(); 
+            setupCanvas();
             video.play(); 
-            // Para archivos, también podrías querer activar la IA automáticamente:
-            activarIA(); 
+            activarIA();
         };
     }
 }
 
     function setupCanvas() {
-    // Forzamos al canvas a tener la resolución nativa del video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // El CSS se encarga de que se vea bien (object-fit: contain)
-    console.log("Resolución de análisis: " + canvas.width + "x" + canvas.height);
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
     }
     
     async function encenderCamara() {
@@ -341,17 +343,14 @@ async function prepararSistema(fuente) {
     }
 
   function loopVideoSimple() {
-    // Solo dibujamos manualmente si la IA NO está activa
     if (!iaActiva) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         requestAnimationFrame(loopVideoSimple);
     }
-    // Si la IA se activa, ella misma toma el control del dibujo en onResults
 }
 
 /**
- * 🏷️ BLOQUE 4: MOTOR MATEMÁTICO Y RENDERIZADO VISUAL
- * Cálculo de ángulos en 3D y dibujo de indicadores (semáforo) sobre el cuerpo.
+ * 🏷️ MOTOR MATEMÁTICO Y RENDERIZADO VISUAL
  */
     function calcAng3D(a,b,c) {
         const v1={x:a.x-b.x, y:a.y-b.y, z:a.z-b.z}, v2={x:c.x-b.x, y:c.y-b.y, z:c.z-b.z};
@@ -359,30 +358,31 @@ async function prepararSistema(fuente) {
         const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2), m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
         return (m1*m2 === 0) ? 0 : Math.acos(Math.max(-1, Math.min(1, dot/(m1*m2))))*(180/Math.PI);
     }
-const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
-    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) return; 
 
+const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
+    if (!raw_lm1 || !raw_lm2 || raw_lm1.visibility < 0.5 || raw_lm2.visibility < 0.5) return;
     const buffer = angleBuffer[angKey] || [];
-    if (buffer.length === 0) return; // Si no hay datos, no dibujamos para no trabar
+    if (buffer.length === 0) return;
 
     const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
-    
     let color = "#00ff00", thickness = 4, statusLabel = "SEGURO";
-
     if (analizandoRiesgo && calibrado) {
         const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
         const t = TH[groupKey];
         wbaStats.framesAnalizados++;
         if (diff > (t * 2)) { 
-            wbaStats.riesgoAltoTotal++; wbaStats.zonasAfectadas.add(groupKey);
+            wbaStats.riesgoAltoTotal++;
+            wbaStats.zonasAfectadas.add(groupKey);
             color = "#ff3838"; thickness = 10; statusLabel = "CRÍTICO";
         } else if (diff > t) {
-            color = "#f1c40f"; thickness = 7; statusLabel = "ADVERTENCIA";
+            color = "#f1c40f";
+            thickness = 7; statusLabel = "ADVERTENCIA";
         }
     }
 
     ctx.beginPath();
-    ctx.strokeStyle = color; ctx.lineWidth = thickness;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
     ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
 
@@ -392,7 +392,8 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
         let offsetY = (groupKey === "munecas") ? 20 : -15;
         ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
         ctx.beginPath(); ctx.roundRect(midX + offsetX, midY + offsetY, 90, 34, 5); ctx.fill();
-        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 10px Segoe UI";
         ctx.fillText(`${avgAngle.toFixed(1)}°`, midX + offsetX + 5, midY + offsetY + 15);
         ctx.fillStyle = color; ctx.font = "900 8px Segoe UI";
@@ -400,9 +401,7 @@ const drawV = (p1, p2, angKey, groupKey, raw_lm1, raw_lm2) => {
     }
 };
 
-
 function onResults(res) {
-    // 1. Validar detección de landmarks
     if (!res || !res.poseLandmarks) {
         txtStatus.innerText = "SUJETO PERDIDO";
         return;
@@ -412,83 +411,54 @@ function onResults(res) {
     const w = canvas.width;
     const h = canvas.height;
 
-    // 2. Feedback de Calibración
     if (!calibrado) {
         let tiempoRestante = Math.ceil((3000 - (Date.now() - startTimeCalib)) / 1000);
         txtStatus.innerText = `CALIBRANDO EN... ${tiempoRestante > 0 ? tiempoRestante : 0}s`;
     }
 
-    // 3. Preparar Lienzo (Canvas)
     ctx.save();
     ctx.clearRect(0, 0, w, h);
-    
-    // Efecto espejo si se usa cámara frontal
     if (currentFacingMode === "user") { 
-        ctx.translate(w, 0); 
+        ctx.translate(w, 0);
         ctx.scale(-1, 1); 
     }
     
     ctx.drawImage(res.image, 0, 0, w, h);
 
-    // 4. Función de suavizado de puntos (pt) - Dentro del scope
     const pt = (i) => {
         const lmPoint = lm[i];
-        const esInestable = lmPoint.visibility < 0.5;
-
         if (!posBuffer[i]) {
             posBuffer[i] = { x: lmPoint.x * w, y: lmPoint.y * h, history: [] };
         }
-
-        if (!esInestable) {
+        if (lmPoint.visibility >= 0.5) {
             posBuffer[i].history.push({ x: lmPoint.x * w, y: lmPoint.y * h });
             if (posBuffer[i].history.length > SUAVIZADO_POS) posBuffer[i].history.shift();
         }
-
         const avgX = posBuffer[i].history.reduce((a, b) => a + b.x, 0) / posBuffer[i].history.length;
         const avgY = posBuffer[i].history.reduce((a, b) => a + b.y, 0) / posBuffer[i].history.length;
-
         return { x: avgX, y: avgY, z: lmPoint.z, visibility: lmPoint.visibility };
     };
 
-    // 5. Mapeo de Anatomía
     const p = {
         cab: pt(0), 
-        cue: { 
-            x: (lm[11].x + lm[12].x) / 2 * w, 
-            y: (lm[11].y + lm[12].y) / 2 * h, 
-            z: (lm[11].z + lm[12].z) / 2 
-        },
-        tor: { 
-            x: (lm[11].x + lm[12].x) / 2 * w, 
-            y: (lm[11].y + lm[12].y) / 2 * h + 40, 
-            z: (lm[11].z + lm[12].z) / 2 
-        },
-        abd: { 
-            x: (lm[23].x + lm[24].x) / 2 * w, 
-            y: (lm[23].y + lm[24].y) / 2 * h - 30, 
-            z: (lm[23].z + lm[24].z) / 2 
-        },
-        esp_baja: { 
-            x: (lm[23].x + lm[24].x) / 2 * w, 
-            y: (lm[23].y + lm[24].y) / 2 * h, 
-            z: (lm[23].z + lm[24].z) / 2 
-        },
+        cue: { x: (lm[11].x + lm[12].x) / 2 * w, y: (lm[11].y + lm[12].y) / 2 * h, z: (lm[11].z + lm[12].z) / 2 },
+        tor: { x: (lm[11].x + lm[12].x) / 2 * w, y: (lm[11].y + lm[12].y) / 2 * h + 40, z: (lm[11].z + lm[12].z) / 2 },
+        abd: { x: (lm[23].x + lm[24].x) / 2 * w, y: (lm[23].y + lm[24].y) / 2 * h - 30, z: (lm[23].z + lm[24].z) / 2 },
+        esp_baja: { x: (lm[23].x + lm[24].x) / 2 * w, y: (lm[23].y + lm[24].y) / 2 * h, z: (lm[23].z + lm[24].z) / 2 },
         h_d: pt(12), c_d: pt(14), m_d: pt(16), mano_d: pt(20),
         h_i: pt(11), c_i: pt(13), m_i: pt(15), mano_i: pt(19),
         p_d: pt(24), r_d: pt(26), t_d: pt(28), pie_d: pt(32),
         p_i: pt(23), r_i: pt(25), t_i: pt(27), pie_i: pt(31)
     };
 
-    // 6. Conteo de Levantamientos (NOM-036)
     if (analizandoRiesgo) {
         const alturaTorso = Math.abs(p.h_d.y - p.p_d.y);
         const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-        const umbralMovimiento = alturaTorso * 0.3; 
-
+        const umbralMovimiento = alturaTorso * 0.3;
         if (wbaStats.lastHandY !== null) {
             const desplazamiento = wbaStats.lastHandY - currentHandY;
             if (desplazamiento > umbralMovimiento && !wbaStats.subiendo) {
-                wbaStats.ciclos++; 
+                wbaStats.ciclos++;
                 wbaStats.subiendo = true;
             } else if (desplazamiento < -umbralMovimiento) {
                 wbaStats.subiendo = false;
@@ -497,7 +467,6 @@ function onResults(res) {
         wbaStats.lastHandY = currentHandY;
     }
 
-    // 7. Cálculo de Ángulos y Buffering
     const currentAngles = {
         cue: calcAng3D(p.cab, p.cue, p.tor), 
         abd: calcAng3D(p.tor, p.abd, p.esp_baja),
@@ -512,14 +481,12 @@ function onResults(res) {
         t_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
         t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
     };
-
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // 8. Calibración Automática
     if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
         Object.keys(angleBuffer).forEach(k => { 
             baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
@@ -530,7 +497,6 @@ function onResults(res) {
         txtStatus.innerText = "CALIBRADO - LISTO";
     }
 
-    // 9. Dibujo del Esqueleto y Vectores
     ctx.strokeStyle = "#00ff00"; 
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(p.h_i.x, p.h_i.y); ctx.lineTo(p.h_d.x, p.h_d.y); ctx.stroke();
@@ -542,7 +508,7 @@ function onResults(res) {
     drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
     drawV(p.h_i, p.c_i, 'c_i', 'codos', lm[11], lm[13]); 
     drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
-    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
@@ -550,101 +516,64 @@ function onResults(res) {
     ctx.restore();
 }
 
-
-    
-/** * 🏷️ BLOQUE 6: INICIALIZACIÓN DE IA CON CONTROL DE DETECCIÓN
- * Manejo de motor MediaPipe Pose y bucle de análisis en tiempo real.
+/** * 🏷️ INICIALIZACIÓN DE IA
  */
-let timeoutDeteccion; // Variable global para controlar el tiempo de espera
+let timeoutDeteccion; 
 
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
-    // 1. Reset de estados para nueva calibración
     calibrado = false;
     iaActiva = false; 
     txtStatus.innerText = "BUSCANDO SUJETO...";
 
-    // 2. Temporizador de seguridad (5 segundos)
     clearTimeout(timeoutDeteccion);
     timeoutDeteccion = setTimeout(() => {
         if (!iaActiva) {
             if (loader) loader.style.display = 'none';
-            alert("⚠️ NO SE HA DETECTADO EL SUJETO.\n\nAsegúrate de que la persona sea visible de cuerpo completo.");
+            alert("⚠️ NO SE HA DETECTADO EL SUJETO.");
             txtStatus.innerText = "SISTEMA READY (FALLÓ DETECCIÓN)";
         }
     }, 5000);
 
-    // 3. Inicialización del motor Pose (Singleton)
     if (!pose) {
-        pose = new Pose({ 
-            locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-        });
-
-        pose.setOptions({ 
-            modelComplexity: 1, 
-            smoothLandmarks: true, 
-            minDetectionConfidence: 0.5, 
-            minTrackingConfidence: 0.5 
-        });
-
+        pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         pose.onResults((res) => {
             if (res.poseLandmarks) {
-                // Primera detección exitosa
                 if (!iaActiva) {
                     if (loader) loader.style.display = 'none';
                     iaActiva = true; 
                     startTimeCalib = Date.now(); 
-                    
                     const btn = document.getElementById('recordBtn');
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.style.opacity = "1";
-                    }
+                    if (btn) { btn.disabled = false; btn.style.opacity = "1"; }
                 }
-                // Enviar resultados al renderizador (Bloque 5)
                 onResults(res);
-            } else {
-                // Sujeto fuera de cuadro durante el análisis
-                if (iaActiva) {
-                    txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
-                }
+            } else if (iaActiva) {
+                txtStatus.innerText = "⚠️ SUJETO FUERA DE CUADRO";
             }
         });
     }
 
-    // 4. Bucle de procesamiento de frames (Recursivo)
     async function procesarFrame() {
-        // Solo procesamos si el contenedor es visible (evita gasto de recursos en menú)
         if (document.getElementById('contenedor-analisis').style.display === 'block') {
-            if (video.readyState >= 2) {
-                await pose.send({ image: video });
-            }
-            // Solicita el siguiente frame inmediatamente después de procesar el actual
+            if (video.readyState >= 2) { await pose.send({ image: video }); }
             requestAnimationFrame(procesarFrame);
         }
     }
-
-    // 5. Arranque del bucle con delay para estabilización de hardware
-    setTimeout(() => {
-        procesarFrame();
-    }, 800);
+    setTimeout(() => { procesarFrame(); }, 800);
 }
 
-
-
-
-  /**
- * 🏷️ BLOQUE 7: GENERACIÓN DE REPORTE PDF (FORMATO INFOGRAFÍA NOM-036)
+/**
+ * 🏷️ REPORTE PDF
  */
 function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // --- DATOS DE ENTRADA ---
-    const empresa = document.getElementById('nombreEmpresa')?.value || "CERVECERÍA MODELO";
-    const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
+    const empresa = document.getElementById('nombreEmpresa')?.value || "N/A";
+    const puesto = document.getElementById('puestoTrabajo')?.value || "N/A";
     const trabajador = document.getElementById('nombreTrabajador')?.value || "N/A";
     const peso = parseFloat(document.getElementById('pesoCarga')?.value) || 0;
     const porcentajeRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
@@ -653,83 +582,36 @@ function generarReporteWBA() {
     const frecuencia = (wbaStats.ciclos / (duracionMinutos || 0.01)).toFixed(2);
     const zonas = Array.from(wbaStats.zonasAfectadas).join(', ') || 'NINGUNA';
 
-    // --- 1. ENCABEZADO (ESTILO LYA-ERGO) ---
-    doc.setFillColor(13, 17, 23); 
-    doc.rect(0, 0, 210, 25, 'F');
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 25, 'F');
     doc.setTextColor(0, 255, 0); doc.setFontSize(20);
     doc.text("LYA – ERGONOMI", 105, 12, { align: "center" });
     doc.setTextColor(255, 255, 255); doc.setFontSize(10);
     doc.text("REPORTE MIXTO: WBA + NOM-036-STPS", 105, 18, { align: "center" });
-
-    // --- 2. APARTADO DE RESULTADOS (CUADRO AZUL OSCURO) ---
-    doc.setFillColor(5, 30, 85); // Azul Marino Profundo
-    doc.rect(10, 30, 190, 45, 'F');
     
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14); doc.setFont("helvetica", "bold");
-    doc.text("RESULTADOS DE LA EVALUACIÓN Y RECOMENDACIONES", 105, 40, { align: "center" });
+    doc.setFillColor(5, 30, 85); doc.rect(10, 30, 190, 45, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text("RESULTADOS DE LA EVALUACIÓN", 105, 40, { align: "center" });
     
     doc.setFontSize(11); doc.setFont("helvetica", "normal");
     doc.text(`TRABAJADOR: ${trabajador}`, 20, 52);
     doc.text(`PUESTO: ${puesto}`, 20, 58);
     doc.text(`PLANTA: ${empresa}`, 20, 64);
     
-    // Recomendación dinámica basada en riesgo
-    let recText = porcentajeRiesgo > 40 ? "⚠️ ALERTA: Rediseñar puesto o rotar personal." : "✅ ESTATUS: Postura dentro de límites permitidos.";
-    doc.setTextColor(0, 255, 0);
-    doc.text(`RECOMENDACIÓN: ${recText}`, 20, 70);
+    let recText = porcentajeRiesgo > 40 ? "⚠️ ALERTA: Rediseñar puesto." : "✅ ESTATUS: Postura aceptable.";
+    doc.setTextColor(0, 255, 0); doc.text(`RECOMENDACIÓN: ${recText}`, 20, 70);
 
-    // --- 3. TABLA 1: CRITERIOS POR EDAD/GÉNERO (SEGÚN TU IMAGEN) ---
     doc.autoTable({
         startY: 80,
-        head: [['FACTOR ANALIZADO', 'VALOR OBTENIDO', 'ESTATUS NOM-036', 'CRITERIO']],
-        body: [
-            ['Peso de Carga Real', `${peso} kg`, peso > 25 ? 'EXCEDE' : 'ACEPTABLE', 'Límite Máximo NOM'],
-            ['Hombres 18-45 años', '≤ 25 kg', 'ACEPTABLE', 'Límite Inicial'],
-            ['Mujeres 18-45 años', '≤ 15 kg', 'ACEPTABLE', 'Capacidad Media'],
-            ['Menores de edad', '≤ 7 kg', 'RESTRINGIDA', 'No permitido >7kg'],
-            ['Embarazo / Postparto', '≤ 5 kg', 'CRÍTICO', 'Protección Especial']
-        ],
-        headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
-        styles: { fontSize: 8 }
+        head: [['FACTOR', 'VALOR', 'ESTATUS', 'CRITERIO']],
+        body: [['Peso Carga', `${peso} kg`, peso > 25 ? 'EXCEDE' : 'OK', 'NOM-036']],
+        headStyles: { fillColor: [41, 128, 185] }
     });
 
-    // --- 4. TABLA 2: FACTORES ERGONÓMICOS INTEGRADOS ---
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 10,
-        head: [['FACTOR', 'BAJO RIESGO', 'RIESGO MEDIO', 'ALTO RIESGO']],
-        body: [
-            ['Peso Levantado', `${peso} kg`, 'Cercano al máximo', 'Excede Límite'],
-            ['Frecuencia', `${frecuencia} lev/min`, '2-5 veces/min', '> 5 veces/min'],
-            ['Flexión Espalda', `${porcentajeRiesgo}% tiempo`, '21° - 45°', '> 45°'],
-            ['Zonas Críticas', zonas, 'Giro < 30°', 'Giro Crítico']
-        ],
-        headStyles: { fillColor: [44, 62, 80], fontSize: 9 },
-        styles: { fontSize: 8 },
-        columnStyles: { 0: { fontStyle: 'bold' } }
-    });
-
-    // --- 5. CUADROS DE ADVERTENCIA (PIE DE PÁGINA) ---
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setDrawColor(241, 196, 15); doc.setLineWidth(1);
-    doc.rect(10, finalY, 90, 25); // Cuadro Mayores 45
-    doc.setTextColor(0); doc.setFontSize(9);
-    doc.text("MAYORES DE 45 AÑOS", 15, finalY + 7);
-    doc.setFontSize(7);
-    doc.text("• Disminuir peso un 10-20%\n• Reducir frecuencia\n• Ajuste médico periódico", 15, finalY + 13);
-
-    doc.rect(110, finalY, 90, 25); // Cuadro Mujeres
-    doc.text("MUJERES", 115, finalY + 7);
-    doc.text("• Priorizar cargas cercanas al cuerpo\n• Evitar posturas en grandes alcances\n• Considerar capacidad menor", 115, finalY + 13);
-
-    // --- FINALIZACIÓN ---
-    doc.setFontSize(8); doc.setTextColor(100);
-    doc.text("GRACIAS Y ATENCIÓN A LA NOM-036 PARA PREVENIR TME", 105, 290, { align: "center" });
-    
     doc.save(`REPORTE_LYA_${puesto.replace(/\s+/g, '_')}.pdf`);
 }
+
 /**
- * 🏷️ BLOQUE 8: CONTROL DE GRABACIÓN Y CÁMARA
+ * 🏷️ GRABACIÓN
  */
 function toggleGrabacion() {
     if (!calibrado) return;
@@ -737,46 +619,25 @@ function toggleGrabacion() {
     const btn = document.getElementById('recordBtn');
 
     if (analizandoRiesgo) {
-        // --- INICIO DE AUDITORÍA Y VIDEO ---
         recordedChunks = [];
         const stream = canvas.captureStream(30); 
-        
         const tipos = ['video/webm; codecs=vp9', 'video/webm', 'video/mp4'];
         const mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || '';
-        
         mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = descargarVideo; 
-        
         mediaRecorder.start();
 
-        wbaStats = { 
-            riesgoAltoTotal: 0, 
-            framesAnalizados: 0, 
-            zonasAfectadas: new Set(), 
-            inicioAuditoria: Date.now(), 
-            ciclos: 0, 
-            lastHandY: null, 
-            subiendo: false 
-        };
-
+        wbaStats = { riesgoAltoTotal: 0, framesAnalizados: 0, zonasAfectadas: new Set(), inicioAuditoria: Date.now(), ciclos: 0, lastHandY: null, subiendo: false };
         txtStatus.innerText = "ANALIZANDO...";
         btn.innerHTML = "⏹️<br>DETENER";
         btn.classList.add('rec-active');
     } else {
-        // --- FIN DE AUDITORÍA ---
         txtStatus.innerText = "PROCESANDO...";
         btn.innerHTML = "🔴<br>AUDITAR";
         btn.classList.remove('rec-active');
-        
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-            mediaRecorder.stop(); 
-        }
-
-        setTimeout(() => { 
-            generarReporteWBA(); 
-            txtStatus.innerText = "FIN AUDITORÍA"; 
-        }, 600);
+        if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+        setTimeout(() => { generarReporteWBA(); txtStatus.innerText = "FIN AUDITORÍA"; }, 600);
     }
 }
 
@@ -789,40 +650,24 @@ async function cambiarCamara() {
 
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
-
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const puesto = document.getElementById('puestoTrabajo')?.value || "GENERAL";
-    
     a.href = url;
     a.download = `EVIDENCIA_LYA_${puesto.replace(/\s+/g, '_')}.webm`;
     document.body.appendChild(a);
     a.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }, 100);
+    setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
 }
-// Forzar ajuste de dimensiones en cambios de orientación (Tablets)
-window.addEventListener('resize', () => {
-    if (iaActiva) {
-        setupCanvas();
-    }
-});let resizeTimer;
+
+let resizeTimer;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-        if (video.readyState >= 2) {
-            setupCanvas();
-            // Si la IA está corriendo, MediaPipe se ajustará al nuevo canvas en el siguiente frame
-        }
-    }, 300); // 300ms permite que el navegador termine de acomodar los elementos
+        if (video.readyState >= 2) { setupCanvas(); }
+    }, 300);
 });
-    
 </script>
-
-
 </body>
 </html>
