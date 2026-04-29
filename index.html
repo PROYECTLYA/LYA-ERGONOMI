@@ -200,24 +200,25 @@ V9 MIER
         <div class="row">
             <div class="col-12 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; text-align: left; display: block;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreEmpresa" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Cervecería Modelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">PUESTO DE TRABAJO:</label>
-                <input type="text" id="puestoTrabajo" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="puestoTrabajo" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Estibador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">ID / NOMBRE TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" class="form-val" pattern="[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+" title="Solo texto" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
+                <input type="text" id="nombreTrabajador" class="form-val" pattern="[A-Za-zñÑáéíóúÁÉÍÓÚ]+(\s[A-Za-zñÑáéíóúÁÉÍÓÚ]+)*" title="Solo texto" placeholder="Ej: Juan Pérez" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
             </div>
 
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">GÉNERO:</label>
-                <select id="generoTrabajador" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white;">
-                    <option value="H">Hombre</option>
-                    <option value="M">Mujer</option>
-                </select>
+               <select id="generoTrabajador">
+    <option value="">Seleccionar...</option> <!-- 🔥 NUEVO -->
+    <option value="H">Hombre</option>
+    <option value="M">Mujer</option>
+</select>
             </div>
             <div class="col-md-6 mb-3">
                 <label style="color: #8b949e; font-size: 0.7rem; display: block;">EDAD:</label>
@@ -267,50 +268,73 @@ const inputs = document.querySelectorAll('.form-val');
 const btnVivo = document.getElementById('btn-vivo');
 const btnArchivo = document.getElementById('btn-archivo');
 
-
 function validarFormulario() {
     let completo = true;
     const inputsVal = document.querySelectorAll('.form-val');
     
     inputsVal.forEach(input => {
         const val = input.value.trim();
+
+        // 🔴 VACÍO
         if (val === "") {
             completo = false;
+            return;
         }
         
-        // Validación extra por tipo
+        // 🔢 VALIDACIÓN NUMÉRICA ESPECÍFICA
         if (input.type === "number") {
             const num = parseFloat(val);
-            if (isNaN(num) || num <= 0) completo = false;
+
+           if (isNaN(num)) {
+    completo = false;
+    input.style.borderColor = "red";
+    return;
+} else {
+    input.style.borderColor = "#30363d";
+}
+
+            // Validar rangos específicos por ID
+            if (input.id === "edadTrabajador") {
+                if (num < 15 || num > 80) completo = false;
+            }
+
+            if (input.id === "pesoCarga") {
+                if (num <= 0 || num > 50) completo = false;
+            }
         }
-        
-        // Validación de texto (pattern)
-        if (input.hasAttribute('pattern')) {
-            const reg = new RegExp("^" + input.getAttribute('pattern') + "$");
-            if (!reg.test(val)) completo = false;
-        }
+        if (val === "") {
+    completo = false;
+    return;
+}
+        if (!val || val.trim().length === 0) {
+    completo = false;
+    return;
+}
+      // 🔤 VALIDACIÓN DE TEXTO CON PATTERN
+if (input.hasAttribute('pattern')) {
+    const reg = new RegExp("^" + input.getAttribute('pattern') + "$");
+
+    if (!reg.test(val)) {
+        completo = false;
+        input.style.borderColor = "red";
+    } else {
+        input.style.borderColor = "#30363d";
+    }
+}
     });
     
+    // 🚫 GÉNERO OBLIGATORIO (SIN VALOR POR DEFECTO)
     const selectGen = document.getElementById('generoTrabajador');
-    if(!selectGen.value) completo = false;
+    if (!selectGen.value) completo = false;
 
+    // 🔒 BLOQUEO DE BOTONES
     btnVivo.disabled = !completo;
     btnArchivo.disabled = !completo;
     
-    // Feedback visual de los botones
+    // 🎯 FEEDBACK VISUAL
     btnVivo.style.opacity = completo ? "1" : "0.5";
     btnArchivo.style.opacity = completo ? "1" : "0.5";
 }
-
-// Escuchar todos los eventos relevantes
-inputs.forEach(input => {
-    input.addEventListener('input', validarFormulario);
-    input.addEventListener('change', validarFormulario);
-});
-document.getElementById('generoTrabajador').addEventListener('change', validarFormulario);
-
-// Ejecutar una vez al cargar por si hay autocompletado
-validarFormulario();
 
 
 /**
@@ -362,7 +386,8 @@ async function prepararSistema(fuente) {
     }
     
     async function encenderCamara() {
-    loader.style.display = "none"; // Asegurar que el loader no se vea al inicio
+    const loader = document.getElementById('loader-ia');
+if (loader) loader.style.display = "none";
         try {
             if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -503,8 +528,7 @@ function onResults(res) {
     };
 
     
-        const pt = (i) => ({ x: lm[i].x * canvas.width, y: lm[i].y * canvas.height, z: lm[i].z, visibility: lm[i].visibility });
-        
+    
         // JERARQUÍA MUSCULAR SEGÚN DIAGRAMA
         const p = {
             cab: pt(0),
@@ -734,6 +758,26 @@ window.addEventListener('resize', () => {
         if (video.readyState >= 2) { setupCanvas(); }
     }, 300);
 });
+    inputs.forEach(input => {
+    input.addEventListener('input', validarFormulario);
+    input.addEventListener('change', validarFormulario);
+});
+
+document.getElementById('generoTrabajador')
+    .addEventListener('change', validarFormulario);
+
+// Ejecutar al cargar
+validarFormulario();
+    inputs.forEach(input => {
+    input.addEventListener('input', validarFormulario);
+    input.addEventListener('change', validarFormulario);
+});
+
+document.getElementById('generoTrabajador')
+    .addEventListener('change', validarFormulario);
+
+// Ejecutar al cargar
+validarFormulario();
 </script>
 </body>
 </html>
