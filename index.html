@@ -1,4 +1,4 @@
-V3 JUEVES BUENO
+FINAL JUEVES
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -644,8 +644,20 @@ async function prepararSistema(fuente) {
 
 async function activarIA() {
     document.getElementById('loader-ia').style.display = 'flex';
-    pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
+
+    // AJUSTE DE SENSIBILIDAD: Bajamos a 0.4 para vectorizar partes parciales
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        enableSegmentation: false,
+        minDetectionConfidence: 0.4, // Antes 0.6: Ahora detecta el cuerpo más rápido
+        minTrackingConfidence: 0.4    // Antes 0.6: Mantiene el rastreo aunque se pierda parte del brazo
+    });
+
     pose.onResults((res) => {
         iaActiva = true;
         document.getElementById('loader-ia').style.display = 'none';
@@ -653,21 +665,25 @@ async function activarIA() {
     });
 
     async function frameLoop() {
-        await pose.send({ image: video });
+        if (iaActiva) {
+            await pose.send({ image: video });
+        }
         requestAnimationFrame(frameLoop);
     }
     frameLoop();
 }
 
 function descargarVideo() {
+    if (recordedChunks.length === 0) return;
+
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; 
-    a.download = 'EVIDENCIA_AUDITORIA.webm'; 
+    a.download = `EVIDENCIA_LYA_${document.getElementById('nombreTrabajador').value}_${Date.now()}.webm`; 
     a.click();
 
-    // 🧹 LIMPIEZA DE MEMORIA (AQUÍ VA LA LÍNEA)
+    // 🧹 LIMPIEZA DE MEMORIA
     // Liberamos la URL del objeto después de 100ms para asegurar que la descarga inició
     setTimeout(() => {
         URL.revokeObjectURL(url);
@@ -675,6 +691,9 @@ function descargarVideo() {
     }, 100);
 }
 
+
+
+    
 function cambiarCamara() {
     currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
     prepararSistema('camara');
