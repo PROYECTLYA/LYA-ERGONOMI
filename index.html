@@ -474,7 +474,6 @@ function onResults(res) {
     if (currentFacingMode === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
     ctx.drawImage(res.image, 0, 0, w, h);
 
-    // Función de suavizado unificada
     const pt = (i) => {
         if (!posBuffer[i]) posBuffer[i] = { history: [] };
         if (lm[i].visibility > 0.5) {
@@ -486,72 +485,66 @@ function onResults(res) {
         return { x: avgX, y: avgY, z: lm[i].z };
     };
 
-    // Mapeo anatómico
+    // --- MAPEO ANATÓMICO CON REFERENCIA DE OREJAS ---
     const p = {
-        cab: pt(0), h_d: pt(12), c_d: pt(14), m_d: pt(16), 
-        h_i: pt(11), c_i: pt(13), m_i: pt(15), p_d: pt(24), 
-        r_d: pt(26), t_d: pt(28), p_i: pt(23), r_i: pt(25), t_i: pt(27)
+        ore_d: pt(8), ore_i: pt(7), // Puntos de las orejas para la línea horizontal
+        h_d: pt(12), c_d: pt(14), m_d: pt(16), 
+        h_i: pt(11), c_i: pt(13), m_i: pt(15), 
+        p_d: pt(24), r_d: pt(26), t_d: pt(28), 
+        p_i: pt(23), r_i: pt(25), t_i: pt(27)
     };
-    p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
-    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
-    p.tor = { x: p.cue.x, y: p.cue.y + (h * 0.05), z: p.cue.z };
-    p.abd = { x: p.esp_baja.x, y: p.esp_baja.y - (h * 0.04), z: p.esp_baja.z };
 
-    // Lógica NOM-036: Ciclos y Agarre Alto
-    if (analizandoRiesgo) {
-        const alturaRef = Math.abs(p.h_d.y - p.p_d.y);
-        const currentHandY = (p.m_d.y + p.m_i.y) / 2;
-        const umbral = alturaRef * 0.25; 
-        if (wbaStats.lastHandY !== null) {
-            const dif = wbaStats.lastHandY - currentHandY;
-            if (dif > umbral && !wbaStats.subiendo) { wbaStats.ciclos++; wbaStats.subiendo = true; }
-            else if (dif < -umbral) { wbaStats.subiendo = false; }
-        }
-        wbaStats.lastHandY = currentHandY;
-
-        if (p.m_d.y < p.h_d.y || p.m_i.y < p.h_i.y) {
-            wbaStats.zonasAfectadas.add("AGARRE ALTO");
-            ctx.save(); if (currentFacingMode === "user") { ctx.scale(-1, 1); ctx.translate(-w, 0); }
-            ctx.fillStyle = "#ff4d4d"; ctx.font = "900 14px Segoe UI";
-            ctx.fillText("⚠️ RIESGO: AGARRE ALTO", 20, h - 100); ctx.restore();
-        }
-    }
-
-    // Buffering de ángulos y fin de calibración
-    const currentAngles = {
-        cue: calcAng3D(p.cab, p.cue, p.tor), abd: calcAng3D(p.tor, p.abd, p.esp_baja),
-        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        h_d: calcAng3D(p.p_d, p.h_d, p.c_d), h_i: calcAng3D(p.p_i, p.h_i, p.c_i),
-        r_d: calcAng3D(p.p_d, p.r_d, p.t_d), r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
-    };
-    Object.keys(currentAngles).forEach(k => {
-        if (!angleBuffer[k]) angleBuffer[k] = [];
-        angleBuffer[k].push(currentAngles[k]);
-        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-    });
-
-    if (iaActiva && !calibrado && (Date.now() - startTimeCalib > 3000)) {
-        Object.keys(angleBuffer).forEach(k => { 
-            baseAngles[k] = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length; 
-        });
-        calibrado = true; txtStatus.innerText = "CALIBRADO - LISTO";
-    }
-
-    // Dibujo del esqueleto
-    drawV(p.cue, p.esp_baja, 'abd', 'tronco', lm[11], lm[23]);
-    drawV(p.cue, p.cab, 'cue', 'cuello', lm[11], lm[0]);
-    drawV(p.h_d, p.c_d, 'h_d', 'hombros', lm[12], lm[14]); 
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
-    drawV(p.h_i, p.c_i, 'h_i', 'hombros', lm[11], lm[13]); 
-    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
-    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]); 
-    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
-    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]); 
-    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+    // Nodo Central Superior (Medio de las orejas)
+    p.cab = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
     
+    // Nodo de Cuello/Hombros (Medio de los hombros)
+    p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
+    
+    // Nodo de Espalda Baja (Medio de la cadera)
+    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
+    
+    // Segmentación del Tronco (Tórax y Abdomen)
+    const distTronco = p.esp_baja.y - p.cue.y;
+    p.tor = { x: p.cue.x, y: p.cue.y + (distTronco * 0.33), z: p.cue.z };
+    p.abd = { x: p.cue.x, y: p.cue.y + (distTronco * 0.66), z: p.cue.z };
+
+    // --- DIBUJO DE VECTORES EN JERARQUÍA ---
+    
+    // 1. Línea Horizontal de la "T" (Oreja a Oreja)
+    drawV(p.ore_d, p.ore_i, 'cue', 'cuello', lm[8], lm[7]);
+
+    // 2. Línea Vertical de la "T" (Cabeza al Cuello)
+    drawV(p.cab, p.cue, 'cue', 'cuello', lm[7], lm[11]);
+
+    // 3. Eje Central (Tronco descendente)
+    drawV(p.cue, p.tor, 'abd', 'tronco', lm[11], lm[12]);
+    drawV(p.tor, p.abd, 'abd', 'tronco', lm[11], lm[23]);
+    drawV(p.abd, p.esp_baja, 'abd', 'tronco', lm[23], lm[24]);
+
+    // 4. Conexión Cuello a Hombros
+    drawV(p.cue, p.h_d, 'h_d', 'hombros', lm[11], lm[12]);
+    drawV(p.cue, p.h_i, 'h_i', 'hombros', lm[11], lm[11]);
+
+    // 5. Brazos (Hombro -> Codo -> Muñeca)
+    drawV(p.h_d, p.c_d, 'h_d', 'hombros', lm[12], lm[14]);
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', lm[14], lm[16]);
+    drawV(p.h_i, p.c_i, 'h_i', 'hombros', lm[11], lm[13]);
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', lm[13], lm[15]);
+
+    // 6. Piernas (Espalda Baja -> Cadera -> Rodilla -> Tobillo)
+    drawV(p.esp_baja, p.p_d, 'r_d', 'piernas', lm[24], lm[24]);
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', lm[24], lm[26]);
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', lm[26], lm[28]);
+    
+    drawV(p.esp_baja, p.p_i, 'r_i', 'piernas', lm[23], lm[23]);
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', lm[23], lm[25]);
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', lm[25], lm[27]);
+
     ctx.restore();
 }
 
+
+    
 /**
  * 🏷️ BLOQUE 6: INICIALIZACIÓN DE MOTOR IA (MEDIAPIPE)
  */
