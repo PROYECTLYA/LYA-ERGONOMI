@@ -268,7 +268,13 @@ const inputs = document.querySelectorAll('.form-val');
 const btnVivo = document.getElementById('btn-vivo');
 const btnArchivo = document.getElementById('btn-archivo');
 const selectGen = document.getElementById('generoTrabajador');
+let anguloBrazoAnterior = 0;
 
+    // --- FUNCIONES DE CÁLCULO ---
+function suavizarAngulo(nuevoAngulo, anguloAnterior) {
+    const alpha = 0.3; // Mientras más bajo sea el alpha, más suave (pero lento) es el movimiento
+    return (alpha * nuevoAngulo) + (1 - alpha) * anguloAnterior;
+}
 function validarFormulario() {
     let completo = true;
 
@@ -650,26 +656,7 @@ window.addEventListener('resize', () => {
         if (video.readyState >= 2) { setupCanvas(); }
     }, 300);
 });
-    inputs.forEach(input => {
-    input.addEventListener('input', validarFormulario);
-    input.addEventListener('change', validarFormulario);
-});
-
-document.getElementById('generoTrabajador')
-    .addEventListener('change', validarFormulario);
-
-const inputs = document.querySelectorAll('.form-val');
-
-// Eventos en inputs
-inputs.forEach(input => {
-    input.addEventListener('input', validarFormulario);
-    input.addEventListener('change', validarFormulario);
-});
-
-// Evento en select
-document.getElementById('generoTrabajador')
-    .addEventListener('change', validarFormulario);
-
+    
 // Ejecutar validación inicial
 validarFormulario();
     
