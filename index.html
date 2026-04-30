@@ -507,31 +507,87 @@ function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
+    // Recolección de datos del formulario
     const info = {
         emp: document.getElementById('nombreEmpresa').value,
+        puesto: document.getElementById('puestoTrabajo').value,
         trab: document.getElementById('nombreTrabajador').value,
-        peso: document.getElementById('pesoCarga').value,
-        gen: document.getElementById('generoTrabajador').value
+        peso: parseFloat(document.getElementById('pesoCarga').value),
+        gen: document.getElementById('generoTrabajador').value,
+        edad: document.getElementById('edadTrabajador').value
     };
 
     const porcRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
+    const nivelRiesgo = porcRiesgo > 20 ? 'MUY ALTO' : (porcRiesgo > 5 ? 'MODERADO' : 'BAJO');
+    const colorRiesgo = porcRiesgo > 20 ? [231, 76, 60] : (porcRiesgo > 5 ? [241, 196, 15] : [46, 204, 113]);
 
-    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 30, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(22); doc.text("REPORTE LYA-ERGO NOM-036", 105, 20, { align: "center" });
+    // --- ENCABEZADO INSTITUCIONAL ---
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(20); doc.text("INFORME DE EVALUACIÓN ERGONÓMICA", 105, 15, { align: "center" });
+    doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+    doc.text(`CONFORME A LA NORMA OFICIAL MEXICANA NOM-036-1-STPS-2018`, 105, 22, { align: "center" });
+    doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 28, { align: "center" });
 
+    // --- 1. DATOS DE IDENTIFICACIÓN ---
+    doc.setTextColor(0, 0, 0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("1. DATOS GENERALES Y DEL PUESTO", 15, 50);
     doc.autoTable({
-        startY: 40,
-        head: [['MÉTRICA', 'VALOR DETECTADO', 'LÍMITE NOM-036', 'ESTATUS']],
+        startY: 55,
         body: [
-            ['Peso de Carga', `${info.peso} kg`, info.gen === 'H' ? '25 kg' : '15 kg', info.peso > (info.gen === 'H' ? 25 : 15) ? 'EXCEDE' : 'CUMPLE'],
-            ['Riesgo Postural', `${porcRiesgo}%`, '20%', porcRiesgo > 20 ? 'ALTO RIESGO' : 'ACEPTABLE'],
-            ['Zonas Críticas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
+            ['Empresa/Planta:', info.emp, 'Fecha:', new Date().toLocaleDateString()],
+            ['Trabajador:', info.trab, 'Edad:', info.edad],
+            ['Puesto de Trabajo:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
         ],
-        theme: 'grid',
-        headStyles: { fillColor: [46, 204, 113] }
+        theme: 'plain', styles: { fontSize: 9 }
     });
 
-    doc.save(`REPORTE_${info.trab}.pdf`);
+    // --- 2. RESULTADOS DE LA EVALUACIÓN ---
+    doc.text("2. ANÁLISIS DE RIESGO DETECTADO", 15, doc.lastAutoTable.finalY + 10);
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 15,
+        head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE NORMATIVO', 'ESTADO']],
+        body: [
+            ['Manejo Manual de Carga', `${info.peso} kg`, info.gen === 'H' ? '25 kg' : '15 kg', info.peso > (info.gen === 'H' ? 25 : 15) ? 'EXCEDE' : 'DENTRO DE LÍMITE'],
+            ['Frecuencia de Postura Crítica', `${porcRiesgo}%`, 'máx. 20%', nivelRiesgo],
+            ['Zonas de Mayor Tensión', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Sin anomalías', 'N/A', '-']
+        ],
+        headStyles: { fillColor: colorRiesgo }
+    });
+
+    // --- 3. TABLA DE REFERENCIA NOM-036 (FIJA) ---
+    doc.text("3. TABLA DE REFERENCIA TÉCNICA (POSTURAS)", 15, doc.lastAutoTable.finalY + 10);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.text("Valores de umbral angular utilizados para la determinación de riesgo postural:", 15, doc.lastAutoTable.finalY + 15);
+    
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [['REGIÓN ANATÓMICA', 'ÁNGULO NEUTRO', 'UMBRAL RIESGO', 'TIPO DE LESIÓN ASOCIADA']],
+        body: [
+            ['Tronco/Espalda', '0° - 10°', '> 20° Flexión', 'Lumbalgia / Hernia Discal'],
+            ['Cuello (Cervical)', '180°', '+/- 15° Desv.', 'Sindrome Cervical / Fatiga'],
+            ['Hombros', 'Neutro', '> 15° Elevación', 'Tendinitis del Manguito Rotador'],
+            ['Codos/Brazos', 'Neutro', '> 25° Flexión', 'Epicondilitis (Codo de Tenista)'],
+            ['Muñecas', 'Plano', '> 20° Desv.', 'Síndrome del Túnel Carpiano']
+        ],
+        styles: { fillColor: [240, 240, 240], fontSize: 8 }
+    });
+
+    // --- 4. RECOMENDACIONES TÉCNICAS ---
+    const recomendaciones = info.peso > (info.gen === 'H' ? 25 : 15) 
+        ? "ALERTA: Reducir carga inmediatamente o implementar ayudas mecánicas (patines, montacargas)."
+        : (porcRiesgo > 20 ? "RECOMIENDA: Rotación de personal y ejercicios de estiramiento cada 30 min." : "Sugerencia: Mantener técnica de levantamiento actual.");
+
+    doc.setFont("helvetica", "bold");
+    doc.text("4. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, 20);
+    doc.text(doc.splitTextToSize(recomendaciones, 175), 20, doc.lastAutoTable.finalY + 22);
+
+    // --- FIRMAS ---
+    doc.line(40, 260, 90, 260); doc.text("Firma del Auditor", 50, 265);
+    doc.line(120, 260, 170, 260); doc.text("Firma del Trabajador", 130, 265);
+
+    doc.save(`REPORTE_NOM036_${info.trab}_${Date.now()}.pdf`);
 }
 
 /**
