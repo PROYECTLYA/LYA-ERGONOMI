@@ -264,6 +264,18 @@ SEPARAR BOTONES VIVO Y ARCHIVO
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
     </div>
+    <div id="contenedor-video-relativo" style="position: relative; width: fit-content;">
+    <video id="video" style="display: block;"></video>
+    <canvas id="output_canvas" style="position: absolute; top: 0; left: 0;"></canvas>
+    
+    <!-- Controles personalizados -->
+    <div id="controles-video" style="position: absolute; bottom: 20px; width: 100%; display: none; z-index: 10;">
+        <button onclick="retrocederVideo()" style="position: absolute; left: 10px; bottom: 0;">⏪ -5s</button>
+        <button id="btnPlayPausa" onclick="togglePlay()" style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; font-size: 20px;">▶️</button>
+        <button onclick="adelantarVideo()" style="position: absolute; right: 10px; bottom: 0;">5s ⏩</button>
+    </div>
+</div>
+    
 </div>
 
 <script>
@@ -890,10 +902,8 @@ function validarYAbrirArchivo() {
  * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
  * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
  */
+/* --- BLOQUE CORREGIDO: GESTIÓN DE ARCHIVO Y CONTROLES --- */
 
-/**
- * Valida que los datos del trabajador estén completos antes de abrir el explorador de archivos.
- */
 function validarYAbrirArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
@@ -908,7 +918,7 @@ function validarYAbrirArchivo() {
 }
 
 /**
- * Configura el entorno específicamente para la reproducción y análisis de un archivo local.
+ * Configura el entorno para video local con controles manuales.
  */
 async function procesarVideoArchivo() {
     const fileInput = document.getElementById('fileInput');
@@ -916,44 +926,79 @@ async function procesarVideoArchivo() {
 
     if (!file) return;
 
-    // 1. Ocultar el botón de "Girar Cámara" ya que no aplica para archivos
+    // 1. Ajustes de Interfaz
     const btnGirar = document.querySelector('button[onclick="cambiarCamara()"]');
     if (btnGirar) btnGirar.style.display = 'none';
 
-    // 2. Cambiar visualización de interfaz
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
     
-    // 3. Preparar el elemento video para el archivo
+    // Mostrar la capa de controles personalizados
+    const capaControles = document.getElementById('controles-video');
+    if (capaControles) capaControles.style.display = 'block';
+
+    // 2. Limpieza de flujos previos (Cámara)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
     
-    // Crear URL temporal para el video cargado
+    // 3. Carga del archivo
     video.src = URL.createObjectURL(file);
-    video.loop = false; // No queremos que se cicle para no duplicar estadísticas
+    video.loop = false; 
+    video.autoplay = false; // 🚩 Corregido: No se reproduce automáticamente
 
-    // 4. Iniciar el motor cuando el video esté listo
     video.onloadedmetadata = async () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
         try {
-            txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
-            await video.play();
-            activarIA(); // Reutiliza tu función principal de MediaPipe
+            txtStatus.innerText = "📁 ARCHIVO CARGADO: USE LOS CONTROLES PARA INICIAR";
+            
+            // Sincronizamos la IA para que analice el primer frame estático[cite: 1]
+            activarIA(); 
+            
+            // Aseguramos que el botón muestre el icono de Play al inicio[cite: 1]
+            document.getElementById('btnPlayPausa').innerText = "▶️";
         } catch (e) {
-            console.error("Error al reproducir el archivo:", e);
-            alert("No se pudo reproducir el archivo de video. Asegúrese de que sea un formato compatible (MP4, WebM).");
+            console.error("Error al preparar el archivo:", e);
+            alert("Error al cargar el video. Intente con otro formato.");
         }
     };
 }
 
-// Vinculamos el cambio del input file a la función de procesamiento
+/**
+ * FUNCIONES DE CONTROL DE VIDEO
+ */
+
+function togglePlay() {
+    const btn = document.getElementById('btnPlayPausa');
+    if (video.paused) {
+        video.play();
+        btn.innerText = "⏸️"; // Cambia a pausa[cite: 1]
+        txtStatus.innerText = "▶️ ANALIZANDO...";
+    } else {
+        video.pause();
+        btn.innerText = "▶️"; // Cambia a play[cite: 1]
+        txtStatus.innerText = "⏸️ PAUSADO";
+    }
+}
+
+function retrocederVideo() {
+    // Retrocede 5 segundos o vuelve al inicio[cite: 1]
+    video.currentTime = Math.max(0, video.currentTime - 5);
+}
+
+function adelantarVideo() {
+    // Adelanta 5 segundos o llega al final[cite: 1]
+    video.currentTime = Math.min(video.duration, video.currentTime + 5);
+}
+
+// Evento de cambio para el input de archivo[cite: 1]
 document.getElementById('fileInput').addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
-        prepararSistema('archivo');
+        // Asumiendo que prepararSistema('archivo') termina llamando a procesarVideoArchivo()[cite: 1]
+        prepararSistema('archivo'); 
     }
 });
 
