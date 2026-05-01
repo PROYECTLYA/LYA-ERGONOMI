@@ -256,7 +256,7 @@ JUE NOCH
 <div id="contenedor-analisis">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
     <canvas id="output_canvas"></canvas>
-    <video id="input_video" playsinline muted style="display:none;"></video>
+  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
@@ -362,29 +362,67 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (MEDIAPIPE HANDLER)
  * Transforma los puntos de la IA en el modelo jerárquico de la "T".
  */
+
 function onResults(res) {
-    if (!res.poseLandmarks) { txtStatus.innerText = "BUSCANDO TRABAJADOR..."; return; }
+    const w = canvas.width, h = canvas.height;
+
+    // 1. Limpieza y Renderizado Base del Video (Crucial para que no se vea "trabada")
+    ctx.save();
+    ctx.clearRect(0, 0, w, h);
+    
+    // Manejo de espejo para cámara frontal
+    if (currentFacingMode === "user") { 
+        ctx.translate(w, 0); 
+        ctx.scale(-1, 1); 
+    }
+    
+    // Dibujamos el video siempre, haya o no detección
+    if (res.image) {
+        ctx.drawImage(res.image, 0, 0, w, h);
+    }
+
+    // 2. Validación de presencia de sujeto
+    if (!res.poseLandmarks) { 
+        txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
+        ctx.restore(); // Importante cerrar el context antes del return
+        return; 
+    }
+
+    // Una vez detectado, ocultamos definitivamente el loader si aún estuviera visible
+    const loader = document.getElementById('loader-ia');
+    if (loader && loader.style.display !== 'none') {
+        loader.style.display = 'none';
+        iaActiva = true;
+    }
+
     txtStatus.innerText = analizandoRiesgo ? "🔴 AUDITANDO EN TIEMPO REAL" : "✅ IA LISTA - ESPERANDO AUDITORÍA";
 
     const lm = res.poseLandmarks;
-    const w = canvas.width, h = canvas.height;
 
-    ctx.save();
-    ctx.clearRect(0, 0, w, h);
-    if (currentFacingMode === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(res.image, 0, 0, w, h);
-
-    // Suavizado de posición (Helper)
+    // 3. Suavizado de posición (Helper con manejo de errores)
     const pt = (i) => {
+        if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
+        
         posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
         if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
+        
         const len = posBuffer[i].h.length;
-        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
+        const avg = posBuffer[i].h.reduce((a, b) => ({ 
+            x: a.x + b.x, 
+            y: a.y + b.y, 
+            z: a.z + b.z 
+        }), { x: 0, y: 0, z: 0 });
+        
+        return { 
+            x: avg.x / len, 
+            y: avg.y / len, 
+            z: avg.z / len, 
+            v: lm[i].visibility 
+        };
     };
 
-    // --- NODOS JERÁRQUICOS AMPLIADOS ---
+    // --- NODOS JERÁRQUICOS ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11), 
@@ -394,21 +432,19 @@ function onResults(res) {
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
         t_d: pt(28), t_i: pt(27),
-        talon_d: pt(30), talon_i: pt(29),
         pie_d: pt(32), pie_i: pt(31)
     };
 
-    // Centros de masa y Cuello
+    // Centros de masa
     p.cab = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
     p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
     p.esp = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
 
-    // 📍 MEJORA DE LÓGICA: Referencia vertical absoluta para flexión de cuello
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    // --- CÁLCULO Y ALMACENAMIENTO DE ÁNGULOS ---
+    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
-        cuello: calcAng3D(p.cab, p.cue, verticalRef), // Detecta flexión/extensión real
+        cuello: calcAng3D(p.cab, p.cue, verticalRef),
         pecho: calcAng3D(p.h_d, p.cue, p.h_i),
         tronco: calcAng3D(p.cue, p.p_d, p.esp),
         h_d: calcAng3D(p.cue, p.h_d, p.c_d),
@@ -418,12 +454,10 @@ function onResults(res) {
         m_d: calcAng3D(p.c_d, p.m_d, p.dedo_d),
         m_i: calcAng3D(p.c_i, p.m_i, p.dedo_i),
         r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-        t_d: calcAng3D(p.r_d, p.t_d, p.pie_d),
-        t_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
-    // Actualización de búferes de suavizado de ángulos
+    // Búfer de suavizado
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
@@ -431,34 +465,21 @@ function onResults(res) {
     });
 
     // --- RENDERIZADO DE VECTORES ---
-    // Pecho y Hombros
     drawV(p.h_d, p.h_i, 'pecho', 'hombros', p.h_d.v, p.h_i.v);
-    
-    // Brazos y Muñecas
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.m_d, p.dedo_d, 'm_d', 'munecas', p.m_d.v, p.dedo_d.v);
-    
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
     drawV(p.m_i, p.dedo_i, 'm_i', 'munecas', p.m_i.v, p.dedo_i.v);
-
-    // Tronco y Cuello (Visual)
     drawV(p.cue, p.esp, 'tronco', 'tronco', 1, 1);
-    drawV(p.cab, p.cue, 'cuello', 'cuello', 1, 1); // Vector visual del cuello
-
-    // Piernas y Pies
+    drawV(p.cab, p.cue, 'cuello', 'cuello', 1, 1);
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
-    drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
-    drawV(p.t_d, p.pie_d, 't_d', 'piernas', p.t_d.v, p.pie_d.v);
-    
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
-    drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_i, p.pie_i, 't_i', 'piernas', p.t_i.v, p.pie_i.v);
 
     ctx.restore();
 }
-
+    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
@@ -665,11 +686,18 @@ function generarReporteWBA() {
         location.reload();
     }
 }
-
-
 async function activarIA() {
-    document.getElementById('loader-ia').style.display = 'flex';
+    const loader = document.getElementById('loader-ia');
+    loader.style.display = 'flex';
     
+    // Timeout de seguridad: Si en 8 segundos no inicia, quitamos el loader y avisamos
+    const safetyTimeout = setTimeout(() => {
+        if (loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            alert("⚠️ El motor de IA está tardando en responder. Verifique su conexión o reinicie la cámara.");
+        }
+    }, 8000);
+
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
@@ -677,39 +705,32 @@ async function activarIA() {
     pose.setOptions({ 
         modelComplexity: 1, 
         smoothLandmarks: true, 
-        minDetectionConfidence: 0.4, 
-        minTrackingConfidence: 0.4 
+        minDetectionConfidence: 0.5, 
+        minTrackingConfidence: 0.5 
     });
 
     pose.onResults((res) => {
-        // Ocultar loader solo cuando recibimos el primer resultado real
-        document.getElementById('loader-ia').style.display = 'none';
+        // En cuanto llega el primer resultado, limpiamos el timeout y ocultamos el loader
+        clearTimeout(safetyTimeout);
+        if (loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            console.log("IA Inicializada con éxito");
+        }
         iaActiva = true;
         onResults(res);
     });
 
-    // Bucle optimizado que no satura el procesador
     async function frameLoop() {
-        if (video.paused || video.ended) return; 
-        
-        try {
+        if (!iaActiva && !video.paused) {
+            // Intentar enviar el primer frame para despertar a la IA
+            try { await pose.send({ image: video }); } catch(e) {}
+        } else if (iaActiva) {
             await pose.send({ image: video });
-        } catch (e) {
-            console.error("Error en sensor IA:", e);
         }
-        
-        // Solo solicita el siguiente frame si la pestaña está activa
-        if (window.requestAnimationFrame) {
-            requestAnimationFrame(frameLoop);
-        } else {
-            setTimeout(frameLoop, 33);
-        }
+        requestAnimationFrame(frameLoop);
     }
     
-    // Esperar a que el video realmente esté listo para procesar
-    video.addEventListener('playing', () => {
-        frameLoop();
-    });
+    frameLoop();
 }
 
 function descargarVideo() {
