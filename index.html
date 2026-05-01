@@ -1,4 +1,4 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V5
+SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA
 ERRORES EN LOS BOTONES ADELANTAR Y ATRAZAR VIDEO, LOS CALCULOS NO SON CORRECTOS NI LA SEMAFORIZACION DE VECTORES, NO SE ESTAN VECTORIZANDO LOS PIES NI ES ESTAN UNIENDO LAS PIERNAS CON LA COLUMNA 
 <!DOCTYPE html> 
 <html lang="es">
@@ -410,47 +410,73 @@ function calcAng3D(a, b, c) {
 }
 
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    if (vis1 < 0.5 || vis2 < 0.5) return;
+    // CORRECCIÓN: Bajamos el umbral de visibilidad a 0.4 para evitar parpadeos
+    // en los pies y en videos de archivo con poca luz.
+    if (vis1 < 0.4 || vis2 < 0.4) return;
 
     const buffer = angleBuffer[angKey] || [];
     if (buffer.length === 0) return;
     const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
 
-    let color = "#00ff00", thickness = 4, status = "SEGURO";
+    let color = "#00ff00", thickness = 3, status = "SEGURO";
 
     if (analizandoRiesgo && calibrado) {
-        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const limit = TH[groupKey];
-        wbaStats.framesAnalizados++;
+        // CORRECCIÓN: Aseguramos que la diferencia se calcule contra la base real
+        const base = baseAngles[angKey] !== undefined ? baseAngles[angKey] : avgAngle;
+        const diff = Math.abs(avgAngle - base);
+        const limit = TH[groupKey] || 20; // Valor por defecto si TH no carga
 
-        if (diff > (limit * 2)) {
-            color = "#ff3838"; thickness = 10; status = "CRÍTICO";
-            wbaStats.riesgoAltoTotal++;
-            wbaStats.zonasAfectadas.add(groupKey);
+        // Solo sumamos a estadísticas si el video NO está pausado para no inflar datos
+        if (!video.paused) {
+            wbaStats.framesAnalizados++;
+        }
+
+        // SEMAFORIZACIÓN: Ajuste de grosores para no tapar la imagen
+        if (diff > (limit * 1.5)) { 
+            color = "#ff3838"; thickness = 7; status = "CRÍTICO";
+            if (!video.paused) {
+                wbaStats.riesgoAltoTotal++;
+                wbaStats.zonasAfectadas.add(groupKey);
+            }
         } else if (diff > limit) {
-            color = "#f1c40f"; thickness = 6; status = "RIESGO";
+            color = "#f1c40f"; thickness = 5; status = "RIESGO";
         }
     }
 
-    // Dibujo del vector
+    // --- RENDERIZADO DEL VECTOR ---
     ctx.beginPath();
-    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
-    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    ctx.strokeStyle = color; 
+    ctx.lineWidth = thickness; 
+    ctx.lineCap = "round";
+    // Efecto de brillo para mejor visibilidad en plantas industriales
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = color;
+    ctx.moveTo(p1.x, p1.y); 
+    ctx.lineTo(p2.x, p2.y); 
+    ctx.stroke();
+    ctx.shadowBlur = 0; // Limpiar sombra para el texto
 
-    // Etiqueta de datos si está calibrado
+    // --- ETIQUETA DE DATOS ---
     if (calibrado) {
         const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(mx + 10, my - 20, 70, 30);
-        ctx.fillStyle = color; ctx.font = "bold 10px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
-        ctx.fillText(status, mx + 15, my + 5);
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.beginPath();
+        ctx.roundRect(mx + 10, my - 25, 65, 35, 5);
+        ctx.fill();
+        
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Arial";
+        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 12);
+        
+        ctx.fillStyle = color; ctx.font = "9px Arial";
+        ctx.fillText(status, mx + 15, my + 2);
     }
 };
+    
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
  * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
  */
+
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
 
@@ -495,32 +521,30 @@ function onResults(res) {
         dedo_d: pt(20), dedo_i: pt(19),
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27)
+        t_d: pt(28), t_i: pt(27),
+        // CORRECCIÓN: Puntos adicionales para los pies
+        pie_d: pt(32), pie_i: pt(31) 
     };
 
-    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
-    // 1. Creamos el punto central exacto entre las orejas
+    // --- LÓGICA DE PUNTOS CENTRALES ---
     p.centro_orejas = { 
         x: (p.ore_d.x + p.ore_i.x) / 2, 
         y: (p.ore_d.y + p.ore_i.y) / 2, 
         z: (p.ore_d.z + p.ore_i.z) / 2 
     };
 
-    // 2. Punto central de los hombros (Cuello base)
     p.cue = { 
         x: (p.h_d.x + p.h_i.x) / 2, 
         y: (p.h_d.y + p.h_i.y) / 2, 
         z: (p.h_d.z + p.h_i.z) / 2 
     };
 
-    // 3. Punto central de la cadera (Espalda baja)
     p.esp_baja = { 
         x: (p.p_d.x + p.p_i.x) / 2, 
         y: (p.p_d.y + p.p_i.y) / 2, 
         z: (p.p_d.z + p.p_i.z) / 2 
     };
 
-    // Segmentos del tronco para mayor estabilidad visual
     p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
     p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
 
@@ -544,18 +568,18 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
+    // --- RENDERIZADO DEL ESQUEMA ---
     
-    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
+    // Cabeza y Cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
 
     // Eje Central (Columna)
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
 
-    // Conexión de Hombros (Barra horizontal del pecho)
+    // Conexión de Hombros
     drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
 
     // Brazos
@@ -564,14 +588,23 @@ function onResults(res) {
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
 
-    // Piernas (Desde los puntos de la cadera)
+    // CORRECCIÓN PIERNAS: Conexión de Cadera a Columna (Une el esqueleto)
+    drawV(p.esp_baja, p.p_d, 'tronco', 'piernas', 1, p.p_d.v);
+    drawV(p.esp_baja, p.p_i, 'tronco', 'piernas', 1, p.p_i.v);
+
+    // Muslos y Pantorrillas
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
 
+    // CORRECCIÓN PIES: Dibujo de vectores finales[cite: 1]
+    drawV(p.t_d, p.pie_d, 'r_d', 'piernas', p.t_d.v, p.pie_d.v);
+    drawV(p.t_i, p.pie_i, 'r_i', 'piernas', p.t_i.v, p.pie_i.v);
+
     ctx.restore();
 }
+    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
@@ -1102,13 +1135,21 @@ function gestionarReproduccion() {
         txtStatus.innerText = "⏸️ PAUSADO";
     }
 }
-
+// REEMPLAZA ESTAS FUNCIONES EN EL BLOQUE DE ARCHIVO
 function retrocederSegundos() {
     video.currentTime = Math.max(0, video.currentTime - 5);
+    // Forzar a la IA a procesar el frame estático después del salto
+    if (video.paused && iaActiva) {
+        pose.send({ image: video });
+    }
 }
 
 function adelantarSegundos() {
     video.currentTime = Math.min(video.duration, video.currentTime + 5);
+    // Forzar a la IA a procesar el frame estático después del salto[cite: 4]
+    if (video.paused && iaActiva) {
+        pose.send({ image: video });
+    }
 }
 
 document.getElementById('fileInput').addEventListener('change', (e) => {
