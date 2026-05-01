@@ -391,14 +391,13 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         ctx.fillText(status, mx + 15, my + 5);
     }
 };
-  /**
- * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (MEDIAPIPE HANDLER)
- * Transforma los puntos de la IA en el modelo jerárquico de la "T".
+/**
+ * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
+ * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
  */
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
 
-    // 1. Limpieza y Renderizado Base del Video
     ctx.save();
     ctx.clearRect(0, 0, w, h);
     
@@ -407,11 +406,8 @@ function onResults(res) {
         ctx.scale(-1, 1); 
     }
     
-    if (res.image) {
-        ctx.drawImage(res.image, 0, 0, w, h);
-    }
+    if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
 
-    // 2. Validación de presencia de sujeto
     if (!res.poseLandmarks) { 
         txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
         ctx.restore(); 
@@ -419,39 +415,22 @@ function onResults(res) {
     }
 
     const loader = document.getElementById('loader-ia');
-    if (loader && loader.style.display !== 'none') {
-        loader.style.display = 'none';
-        iaActiva = true;
-    }
-
-    txtStatus.innerText = analizandoRiesgo ? "🔴 AUDITANDO EN TIEMPO REAL" : "✅ IA LISTA - ESPERANDO AUDITORÍA";
+    if (loader && loader.style.display !== 'none') loader.style.display = 'none';
 
     const lm = res.poseLandmarks;
 
-    // 3. Suavizado de posición (Helper)
+    // Helper de suavizado
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
-        
         posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
         if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-        
         const len = posBuffer[i].h.length;
-        const avg = posBuffer[i].h.reduce((a, b) => ({ 
-            x: a.x + b.x, 
-            y: a.y + b.y, 
-            z: a.z + b.z 
-        }), { x: 0, y: 0, z: 0 });
-        
-        return { 
-            x: avg.x / len, 
-            y: avg.y / len, 
-            z: avg.z / len, 
-            v: lm[i].visibility 
-        };
+        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
+        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- 4. NUEVA ESTRUCTURA JERÁRQUICA "T" ---
+    // --- MAPEO DE PUNTOS CLAVE ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11), 
@@ -463,65 +442,73 @@ function onResults(res) {
         t_d: pt(28), t_i: pt(27)
     };
 
-    // Cálculos de puntos centrales para la columna vertebral
-    p.cab_centro = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
-    p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
-    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
+    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
+    // 1. Creamos el punto central exacto entre las orejas
+    p.centro_orejas = { 
+        x: (p.ore_d.x + p.ore_i.x) / 2, 
+        y: (p.ore_d.y + p.ore_i.y) / 2, 
+        z: (p.ore_d.z + p.ore_i.z) / 2 
+    };
 
-    // Puntos intermedios para mayor detalle en tronco (IA Progresiva)
-    p.torax = { 
-        x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, 
-        y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3,
-        z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.3
+    // 2. Punto central de los hombros (Cuello base)
+    p.cue = { 
+        x: (p.h_d.x + p.h_i.x) / 2, 
+        y: (p.h_d.y + p.h_i.y) / 2, 
+        z: (p.h_d.z + p.h_i.z) / 2 
     };
-    p.abdomen = { 
-        x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, 
-        y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6,
-        z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.6
+
+    // 3. Punto central de la cadera (Espalda baja)
+    p.esp_baja = { 
+        x: (p.p_d.x + p.p_i.x) / 2, 
+        y: (p.p_d.y + p.p_i.y) / 2, 
+        z: (p.p_d.z + p.p_i.z) / 2 
     };
+
+    // Segmentos del tronco para mayor estabilidad visual
+    p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
+    p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
 
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    // --- 5. CÁLCULO DE ÁNGULOS ---
+    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
-        cuello: calcAng3D(p.cab_centro, p.cue, verticalRef),
-        pecho: calcAng3D(p.h_d, p.cue, p.h_i),
+        cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
         tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
         h_d: calcAng3D(p.cue, p.h_d, p.c_d),
         h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
         c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        m_d: calcAng3D(p.c_d, p.m_d, p.dedo_d),
-        m_i: calcAng3D(p.c_i, p.m_i, p.dedo_i),
         r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
         r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
-    // Actualizar búfer
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- 6. RENDERIZADO DE VECTORES (LA "T") ---
+    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
+    
+    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
+
     // Eje Central (Columna)
-    drawV(p.cab_centro, p.cue, 'cuello', 'cuello', 1, 1);
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
 
-    // Extremidades Superiores (Conexión desde el Cuello/Centro)
-    drawV(p.cue, p.h_d, 'pecho', 'hombros', 1, p.h_d.v);
-    drawV(p.cue, p.h_i, 'pecho', 'hombros', 1, p.h_i.v);
+    // Conexión de Hombros (Barra horizontal del pecho)
+    drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
+
+    // Brazos
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_d, p.dedo_d, 'm_d', 'munecas', p.m_d.v, p.dedo_d.v);
-    drawV(p.m_i, p.dedo_i, 'm_i', 'munecas', p.m_i.v, p.dedo_i.v);
 
-    // Extremidades Inferiores
+    // Piernas (Desde los puntos de la cadera)
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
