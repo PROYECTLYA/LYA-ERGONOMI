@@ -1,4 +1,4 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V2
+SEPARAR BOTONES VIVO Y ARCHIVO V3
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -945,10 +945,8 @@ function validarYAbrirArchivo() {
  * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
  * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
  */
-/* --- BLOQUE CORREGIDO: GESTIÓN DE ARCHIVO Y CONTROLES --- */
-
 /**
- * Valida el formulario y abre el selector de archivos.
+ * Valida el formulario y dispara la selección de archivo local.
  */
 function validarYAbrirArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
@@ -963,50 +961,53 @@ function validarYAbrirArchivo() {
 }
 
 /**
- * Configura el entorno para video local con los nuevos controles flotantes.
+ * Configura el entorno para video local con prevención de errores de GPU.
  */
 async function procesarVideoArchivo() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
-
     if (!file) return;
 
-    // 1. Ajustes de Interfaz: Ocultar botón girar y mostrar controles de archivo
-    const btnGirar = document.getElementById('btn-girar-cam');
-    if (btnGirar) btnGirar.style.display = 'none';
+    // 1. Limpieza de flujos previos (Cámara) para evitar conflictos de hardware
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => {
+            track.stop();
+            console.log("Cámara detenida para modo archivo");
+        });
+        video.srcObject = null;
+    }
 
+    // 2. Ajustes de Interfaz
+    if (document.getElementById('btn-girar-cam')) {
+        document.getElementById('btn-girar-cam').style.display = 'none';
+    }
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
     
-    // Mostrar la nueva capa de controles flotantes
     const capaControles = document.getElementById('controles-archivo-flotantes');
     if (capaControles) capaControles.style.display = 'flex';
 
-    // 2. Limpieza de flujos previos (Cámara) para evitar conflictos
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
+    // 3. Carga del archivo sin reproducción automática para permitir calibración
+    if (video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src); // Liberar memoria del video anterior[cite: 4]
     }
-    
-    // 3. Carga del archivo sin reproducción automática
     video.src = URL.createObjectURL(file);
     video.loop = false; 
     video.autoplay = false; 
 
     video.onloadedmetadata = async () => {
-        // Ajustar canvas al tamaño real del video cargado
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
         try {
-            txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA ANALIZAR";
+            txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
             
-            // Sincronizar IA para detectar postura en el frame inicial estático[cite: 4]
-            activarIA(); 
-            
-            // Resetear el icono del botón central a "Play"[cite: 4]
+            // Reiniciar estado de iconos[cite: 4]
             const iconPath = document.getElementById('svg-play-icon');
             if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            
+            // Inicializar IA con protección contra cuelgues[cite: 6]
+            activarIA(); 
             
         } catch (e) {
             console.error("Error al preparar el archivo:", e);
@@ -1016,41 +1017,87 @@ async function procesarVideoArchivo() {
 }
 
 /**
- * FUNCIONES DE CONTROL DE VIDEO (Adaptadas a la nueva interfaz)
+ * Motor de IA con protección contra el error "IA tardando en responder"[cite: 6].
  */
+async function activarIA() {
+    const loader = document.getElementById('loader-ia');
+    if (loader) loader.style.display = 'flex';
+    
+    // Timeout extendido para evitar bloqueos por carga de modelo[cite: 6]
+    const safetyTimeout = setTimeout(() => {
+        if (loader && loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            alert("⚠️ El motor de IA está tardando en responder. Esto sucede si la GPU está saturada. Intente recargar.");
+        }
+    }, 20000);
 
+    // Cerrar instancia previa de Pose para liberar memoria GPU[cite: 6]
+    if (pose) { try { await pose.close(); } catch(e) {} }
+
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
+
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.5, 
+        minTrackingConfidence: 0.5 
+    });
+
+    pose.onResults((res) => {
+        clearTimeout(safetyTimeout);
+        if (loader) loader.style.display = 'none';
+        iaActiva = true;
+        onResults(res); // Envía resultados al canvas
+    });
+
+    // Bucle de procesamiento controlado para no saturar el navegador[cite: 6]
+    async function loopIA() {
+        if (video.paused && !video.ended) {
+            // Permitir detección incluso en pausa para calibrar el frame actual[cite: 4]
+            try { await pose.send({ image: video }); } catch(e){}
+            return;
+        }
+        if (!video.ended) {
+            try { await pose.send({ image: video }); } catch(e){}
+            requestAnimationFrame(loopIA);
+        }
+    }
+    
+    // Iniciar el loop solo si el video está listo
+    video.addEventListener('play', () => {
+        if (iaActiva) loopIA();
+    });
+}
+
+/**
+ * Controles de Video
+ */
 function gestionarReproduccion() {
     const iconPath = document.getElementById('svg-play-icon');
-    
     if (video.paused) {
         video.play();
-        // Cambiar a icono de PAUSA (dos barras verticales)[cite: 4]
         if (iconPath) iconPath.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-        txtStatus.innerText = "▶️ ANALIZANDO ARCHIVO...";
+        txtStatus.innerText = "▶️ ANALIZANDO...";
     } else {
         video.pause();
-        // Cambiar a icono de PLAY (triángulo)[cite: 4]
         if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
         txtStatus.innerText = "⏸️ PAUSADO";
     }
 }
 
 function retrocederSegundos() {
-    // Retrocede 5 segundos de forma segura[cite: 4]
-    video.currentTime = Math.max(0, video.currentTime - 5);
+    video.currentTime = Math.max(0, video.currentTime - 5); // Seguro[cite: 4]
 }
 
 function adelantarSegundos() {
-    // Adelanta 5 segundos sin sobrepasar el final[cite: 4]
-    video.currentTime = Math.min(video.duration, video.currentTime + 5);
+    video.currentTime = Math.min(video.duration, video.currentTime + 5); // Seguro[cite: 4]
 }
 
-// Evento de cambio para el input de archivo
+// Evento Listener
 document.getElementById('fileInput').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        // Llamada directa para iniciar el procesamiento del archivo local[cite: 4]
-        procesarVideoArchivo(); 
-    }
+    if (e.target.files.length > 0) procesarVideoArchivo(); 
 });
 
     
