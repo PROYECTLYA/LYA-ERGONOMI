@@ -703,37 +703,48 @@ function generarReporteWBA() {
     doc.save(`Reporte_NOM036_${info.trab.replace(/\s+/g, '_')}.pdf`);
 }
     
-    
- /**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE
+    /**
+ * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
 async function prepararSistema(fuente) {
-    // 1. Referencias y Validación
+    // 1. Referencias y Captura de Datos
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     
+    // Validación de campos vacíos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
     if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario."); 
+        alert("⚠️ Por favor, complete todos los campos del formulario antes de iniciar el análisis."); 
         return; 
     }
 
-    if (parseFloat(edadInput.value) <= 0 || parseFloat(pesoInput.value) <= 0) {
-        alert("❌ La edad y el peso de la carga deben ser números positivos mayores a cero.");
+    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    const edadValor = edadInput.value.trim();
+    // Verifica que sean exactamente 2 dígitos (10-99 años)
+    if (!/^\d{2}$/.test(edadValor)) {
+        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
+        edadInput.focus();
         return;
     }
 
-    // --- CORRECCIÓN: LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Evita que datos del trabajador anterior se mezclen con el nuevo
+    // Validación de peso
+    if (parseFloat(pesoInput.value) <= 0) {
+        alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
+        pesoInput.focus();
+        return;
+    }
+
+    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
+    // Asegura que el análisis ergonómico empiece de cero
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // 2. Limpieza de flujos previos
+    // 2. Limpieza de flujos previos (Cámara o Archivos)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
@@ -743,7 +754,7 @@ async function prepararSistema(fuente) {
         video.src = "";
     }
 
-    // 3. Cambio de interfaz
+    // 3. Transición de Interfaz
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
@@ -760,34 +771,35 @@ async function prepararSistema(fuente) {
         } else {
             const file = document.getElementById('fileInput').files[0];
             if (!file) { 
-                alert("Seleccione un archivo de video"); 
+                alert("Seleccione un archivo de video para procesar."); 
                 location.reload();
                 return; 
             }
             video.src = URL.createObjectURL(file);
         }
 
-        // 4. Manejo robusto del arranque
+        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
             
             try {
                 await video.play();
-                activarIA(); 
+                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
             } catch (playError) {
                 console.error("Error al reproducir video:", playError);
-                alert("Error al iniciar la reproducción del medio.");
+                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
             }
         };
 
     } catch (err) {
         console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos.");
+        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
         location.reload();
     }
 }
 
+    
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     loader.style.display = 'flex';
