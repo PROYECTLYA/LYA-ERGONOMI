@@ -1,4 +1,4 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V3
+SEPARAR BOTONES VIVO Y ARCHIVO V5
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -841,66 +841,78 @@ async function prepararSistema(fuente) {
         location.reload();
     }
 }
-
-    
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
-    loader.style.display = 'flex';
+    if (loader) loader.style.display = 'flex';
     
-    // Timeout de seguridad mejorado
+    // 1. Aumentamos el margen de espera a 20s para videos locales pesados
     const safetyTimeout = setTimeout(() => {
-        if (loader.style.display !== 'none') {
+        if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
+            alert("⚠️ El motor de IA está tardando en responder. Si el problema persiste, reduzca la resolución del video o recargue la página.");
         }
-    }, 10000);
+    }, 20000);
 
-    // Reinicializar instancia de Pose si ya existía para liberar memoria
-    if (pose) {
-        try { await pose.close(); } catch(e) {}
+    // 2. REINICIO PROFUNDO: Liberar memoria de GPU antes de crear nueva instancia
+    if (typeof pose !== 'undefined' && pose) {
+        try { 
+            await pose.close(); 
+            pose = null; // Forzar recolección de basura
+        } catch(e) { console.warn("Error liberando instancia previa"); }
     }
 
+    // 3. Nueva instancia de MediaPipe
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
     pose.setOptions({ 
-        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
+        modelComplexity: 1, 
         smoothLandmarks: true, 
+        enableSegmentation: false, // Desactivar si no se usa para ahorrar GPU
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
     pose.onResults((res) => {
         clearTimeout(safetyTimeout);
-        if (loader.style.display !== 'none') {
+        if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            console.log("IA Operativa - Modelo Jerárquico T Cargado");
+            console.log("IA Operativa - Motor Sincronizado");
         }
         iaActiva = true;
         onResults(res);
     });
 
-    // Loop de frames con control de estado
+    // 4. Loop de frames optimizado para ARCHIVO y VIVO
     async function frameLoop() {
-        if (video.paused || video.ended) return;
+        // En modo archivo, permitimos un frame inicial incluso en pausa para calibrar
+        if (video.ended || (!iaActiva && video.paused)) return;
 
         try {
-            await pose.send({ image: video });
+            if (video.readyState >= 2) { // Verificar que el video tiene datos suficientes
+                await pose.send({ image: video });
+            }
         } catch (e) {
-            console.warn("Frame omitido por procesamiento pesado.");
+            console.warn("GPU Saturada: Frame omitido.");
         }
         
-        if (iaActiva) {
+        // Si el video está reproduciéndose, seguimos el loop[cite: 4]
+        if (!video.paused && !video.ended) {
             requestAnimationFrame(frameLoop);
-        } else {
-            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
+        } else if (!iaActiva) {
+            // Reintento lento inicial si la IA aún no responde
             setTimeout(frameLoop, 500);
         }
     }
     
+    // Iniciar loop cuando el video empiece a reproducirse[cite: 4]
+    video.removeEventListener('play', frameLoop); // Evitar duplicados
+    video.addEventListener('play', frameLoop);
+    
+    // Ejecución inicial para detectar al trabajador en el frame estático[cite: 4]
     frameLoop();
-}   
+}
 
 
     
@@ -948,7 +960,7 @@ function validarYAbrirArchivo() {
 /**
  * Valida el formulario y dispara la selección de archivo local.
  */
-function validarYAbrirArchivo() {
+    function validarYAbrirArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
 
@@ -968,7 +980,7 @@ async function procesarVideoArchivo() {
     const file = fileInput.files[0];
     if (!file) return;
 
-    // 1. Limpieza de flujos previos (Cámara) para evitar conflictos de hardware
+    // 1. Limpieza de flujos previos (Cámara)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => {
             track.stop();
@@ -987,52 +999,53 @@ async function procesarVideoArchivo() {
     const capaControles = document.getElementById('controles-archivo-flotantes');
     if (capaControles) capaControles.style.display = 'flex';
 
-    // 3. Carga del archivo sin reproducción automática para permitir calibración
+    // 3. Carga del archivo con gestión de memoria
     if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src); // Liberar memoria del video anterior[cite: 4]
+        URL.revokeObjectURL(video.src); 
     }
     video.src = URL.createObjectURL(file);
     video.loop = false; 
     video.autoplay = false; 
 
+    // Bloque de sincronización crítica
     video.onloadedmetadata = async () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        try {
-            txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
-            
-            // Reiniciar estado de iconos[cite: 4]
-            const iconPath = document.getElementById('svg-play-icon');
-            if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
-            
-            // Inicializar IA con protección contra cuelgues[cite: 6]
-            activarIA(); 
-            
-        } catch (e) {
-            console.error("Error al preparar el archivo:", e);
-            alert("Error al cargar el video. Intente con otro formato.");
-        }
+        // Forzar salto a 0.1s para despertar el buffer de la GPU
+        video.currentTime = 0.1; 
+
+        txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
+        
+        const iconPath = document.getElementById('svg-play-icon');
+        if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        
+        // Iniciar motor de IA después de estabilizar el video
+        activarIA(); 
     };
 }
 
 /**
- * Motor de IA con protección contra el error "IA tardando en responder"[cite: 6].
+ * Motor de IA con protección contra saturación de GPU.
  */
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
-    // Timeout extendido para evitar bloqueos por carga de modelo[cite: 6]
     const safetyTimeout = setTimeout(() => {
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Esto sucede si la GPU está saturada. Intente recargar.");
+            alert("⚠️ El motor de IA está tardando en responder. Intente recargar la página.");
         }
     }, 20000);
 
-    // Cerrar instancia previa de Pose para liberar memoria GPU[cite: 6]
-    if (pose) { try { await pose.close(); } catch(e) {} }
+    // Hard Reset de la instancia Pose para liberar recursos
+    if (typeof pose !== 'undefined' && pose) {
+        try { 
+            await pose.close(); 
+            pose = null; 
+        } catch(e) { console.warn("Reinicio de instancia fallido"); }
+    }
 
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
@@ -1049,31 +1062,34 @@ async function activarIA() {
         clearTimeout(safetyTimeout);
         if (loader) loader.style.display = 'none';
         iaActiva = true;
-        onResults(res); // Envía resultados al canvas
+        onResults(res);
     });
 
-    // Bucle de procesamiento controlado para no saturar el navegador[cite: 6]
+    // Bucle optimizado para frames estáticos y dinámicos
     async function loopIA() {
-        if (video.paused && !video.ended) {
-            // Permitir detección incluso en pausa para calibrar el frame actual[cite: 4]
-            try { await pose.send({ image: video }); } catch(e){}
-            return;
+        if (video.ended) return;
+
+        try {
+            if (video.readyState >= 2) { // Asegurar que hay datos de imagen
+                await pose.send({ image: video });
+            }
+        } catch (e) {
+            console.warn("GPU ocupada, saltando frame...");
         }
-        if (!video.ended) {
-            try { await pose.send({ image: video }); } catch(e){}
+
+        if (!video.paused && !video.ended) {
             requestAnimationFrame(loopIA);
         }
     }
     
-    // Iniciar el loop solo si el video está listo
-    video.addEventListener('play', () => {
-        if (iaActiva) loopIA();
-    });
+    // Escuchar cambios de reproducción
+    video.removeEventListener('play', loopIA);
+    video.addEventListener('play', loopIA);
+    
+    // Primer escaneo para calibración en pausa
+    loopIA();
 }
 
-/**
- * Controles de Video
- */
 function gestionarReproduccion() {
     const iconPath = document.getElementById('svg-play-icon');
     if (video.paused) {
@@ -1088,19 +1104,17 @@ function gestionarReproduccion() {
 }
 
 function retrocederSegundos() {
-    video.currentTime = Math.max(0, video.currentTime - 5); // Seguro[cite: 4]
+    video.currentTime = Math.max(0, video.currentTime - 5);
 }
 
 function adelantarSegundos() {
-    video.currentTime = Math.min(video.duration, video.currentTime + 5); // Seguro[cite: 4]
+    video.currentTime = Math.min(video.duration, video.currentTime + 5);
 }
 
-// Evento Listener
 document.getElementById('fileInput').addEventListener('change', (e) => {
     if (e.target.files.length > 0) procesarVideoArchivo(); 
 });
 
-    
 /* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
 </script>
 </body>
