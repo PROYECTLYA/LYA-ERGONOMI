@@ -1,4 +1,4 @@
-FINAL JUEVES
+JUE NOCH
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -593,54 +593,79 @@ function generarReporteWBA() {
 /**
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE
  */
-async function prepararSistema(fuente) {
-    // 1. Referencias a los campos numéricos para validación
+    async function prepararSistema(fuente) {
+    // 1. Referencias y Validación
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
-
-    // 2. Validación de campos vacíos
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
     
+    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
     if (incompleto) { 
         alert("⚠️ Por favor, complete todos los campos del formulario."); 
         return; 
     }
 
-    // 3. Validación de Números Positivos (Garantiza integridad para la NOM-036)
     if (parseFloat(edadInput.value) <= 0 || parseFloat(pesoInput.value) <= 0) {
         alert("❌ La edad y el peso de la carga deben ser números positivos mayores a cero.");
         return;
     }
 
-    // Si pasa las validaciones, cambiamos de pantalla
+    // 2. Limpieza de flujos previos (Evita que la cámara se quede encendida o el video buclee)
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    if (video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src);
+        video.src = "";
+    }
+
+    // 3. Cambio de interfaz
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
-    if (fuente === 'camara') {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
-        });
-        video.srcObject = stream;
-    } else {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) { alert("Seleccione un archivo de video"); return; }
-
-        // 4. Gestión de Memoria: Si ya había un video cargado antes, liberamos su URL
-        if (video.src.startsWith('blob:')) {
-            URL.revokeObjectURL(video.src);
+    try {
+        if (fuente === 'camara') {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: currentFacingMode, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 } 
+                } 
+            });
+            video.srcObject = stream;
+        } else {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) { 
+                alert("Seleccione un archivo de video"); 
+                location.reload(); // Reset para evitar estado inconsistente
+                return; 
+            }
+            video.src = URL.createObjectURL(file);
         }
 
-        video.src = URL.createObjectURL(file);
-    }
+        // 4. Manejo robusto del arranque del video y la IA
+        video.onloadedmetadata = async () => {
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            
+            try {
+                // Importante: esperar a que el play sea exitoso antes de lanzar la IA
+                await video.play();
+                activarIA(); 
+            } catch (playError) {
+                console.error("Error al reproducir video:", playError);
+                alert("Error al iniciar la reproducción del medio.");
+            }
+        };
 
-    video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth; 
-        canvas.height = video.videoHeight;
-        video.play();
-        activarIA();
-    };
+    } catch (err) {
+        console.error("Error de acceso al hardware:", err);
+        alert("No se pudo acceder a la cámara. Verifique los permisos.");
+        location.reload();
+    }
 }
+
 
 async function activarIA() {
     document.getElementById('loader-ia').style.display = 'flex';
@@ -649,28 +674,42 @@ async function activarIA() {
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
-    // AJUSTE DE SENSIBILIDAD: Bajamos a 0.4 para vectorizar partes parciales
     pose.setOptions({ 
         modelComplexity: 1, 
         smoothLandmarks: true, 
-        enableSegmentation: false,
-        minDetectionConfidence: 0.4, // Antes 0.6: Ahora detecta el cuerpo más rápido
-        minTrackingConfidence: 0.4    // Antes 0.6: Mantiene el rastreo aunque se pierda parte del brazo
+        minDetectionConfidence: 0.4, 
+        minTrackingConfidence: 0.4 
     });
 
     pose.onResults((res) => {
-        iaActiva = true;
+        // Ocultar loader solo cuando recibimos el primer resultado real
         document.getElementById('loader-ia').style.display = 'none';
+        iaActiva = true;
         onResults(res);
     });
 
+    // Bucle optimizado que no satura el procesador
     async function frameLoop() {
-        if (iaActiva) {
+        if (video.paused || video.ended) return; 
+        
+        try {
             await pose.send({ image: video });
+        } catch (e) {
+            console.error("Error en sensor IA:", e);
         }
-        requestAnimationFrame(frameLoop);
+        
+        // Solo solicita el siguiente frame si la pestaña está activa
+        if (window.requestAnimationFrame) {
+            requestAnimationFrame(frameLoop);
+        } else {
+            setTimeout(frameLoop, 33);
+        }
     }
-    frameLoop();
+    
+    // Esperar a que el video realmente esté listo para procesar
+    video.addEventListener('playing', () => {
+        frameLoop();
+    });
 }
 
 function descargarVideo() {
