@@ -304,7 +304,40 @@ let currentFacingMode = "environment";
 let pose;
 let mediaRecorder;
 let recordedChunks = [];
+// Objeto para almacenar incumplimientos
+let hallazgosNormativos = [];
 
+function validarNormativa() {
+    hallazgosNormativos = []; 
+    const edad = parseInt(document.getElementById('edadTrabajador').value);
+    const genero = document.getElementById('generoTrabajador').value; 
+    const peso = parseFloat(document.getElementById('pesoCarga').value);
+
+    // --- Validación LFT (Edad) ---
+    if (edad < 15) {
+        hallazgosNormativos.push("INCUMPLIMIENTO CRÍTICO LFT: Trabajador menor de edad legal (menor a 15 años).");
+    } else if (edad < 18) {
+        hallazgosNormativos.push("OBSERVACIÓN LFT: Menor en edad de aprendizaje (15-17 años). Carga restringida.");
+    }
+
+    // --- Validación NOM-036 (Peso vs Género/Edad) ---
+    let limiteMax = 0;
+    if (genero === "M") { // 'M' de Mujer en tu select
+        if (edad < 18) limiteMax = 7;
+        else if (edad <= 45) limiteMax = 15;
+        else limiteMax = 10;
+    } else { // Hombre
+        if (edad < 18) limiteMax = 7;
+        else if (edad <= 45) limiteMax = 25;
+        else limiteMax = 20;
+    }
+
+    if (peso > limiteMax) {
+        hallazgosNormativos.push(`INCUMPLIMIENTO NOM-036: Peso de ${peso}kg excede el límite de ${limiteMax}kg para este perfil.`);
+    }
+    
+    return { hallazgos: hallazgosNormativos, limite: limiteMax };
+}
 /**
  * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS
  * Funciones para cálculo de ángulos 3D y dibujo de vectores.
@@ -520,97 +553,134 @@ function toggleAuditoria() {
         setTimeout(generarReporteWBA, 800);
     }
 }
-
 /**
- * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF
+ * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN CORREGIDA NOM-036)
  */
 function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Recolección de datos del formulario
+    // 1. Recolección de datos y cálculo de límites normativos dinámicos
     const info = {
         emp: document.getElementById('nombreEmpresa').value,
         puesto: document.getElementById('puestoTrabajo').value,
         trab: document.getElementById('nombreTrabajador').value,
-        peso: parseFloat(document.getElementById('pesoCarga').value),
-        gen: document.getElementById('generoTrabajador').value,
-        edad: document.getElementById('edadTrabajador').value
+        peso: parseFloat(document.getElementById('pesoCarga').value) || 0,
+        gen: document.getElementById('generoTrabajador').value, // 'H' o 'M'
+        edad: parseInt(document.getElementById('edadTrabajador').value) || 0
     };
 
+    // Determinación del límite de carga según NOM-036-1-STPS-2018
+    let limiteNormativo = 0;
+    if (info.edad < 18) {
+        limiteNormativo = 7; // Límite para menores de edad (ambos sexos)
+    } else {
+        if (info.gen === 'H') {
+            limiteNormativo = (info.edad > 45) ? 20 : 25; // Hombres: 25kg (adultos) / 20kg (>45 años)
+        } else {
+            limiteNormativo = (info.edad > 45) ? 10 : 15; // Mujeres: 15kg (adultas) / 10kg (>45 años)
+        }
+    }
+
+    // Cálculos de riesgo postural
     const porcRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
     const nivelRiesgo = porcRiesgo > 20 ? 'MUY ALTO' : (porcRiesgo > 5 ? 'MODERADO' : 'BAJO');
     const colorRiesgo = porcRiesgo > 20 ? [231, 76, 60] : (porcRiesgo > 5 ? [241, 196, 15] : [46, 204, 113]);
 
     // --- ENCABEZADO INSTITUCIONAL ---
     doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(20); doc.text("INFORME DE EVALUACIÓN ERGONÓMICA", 105, 15, { align: "center" });
+    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
     doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-    doc.text(`CONFORME A LA NORMA OFICIAL MEXICANA NOM-036-1-STPS-2018`, 105, 22, { align: "center" });
-    doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 28, { align: "center" });
+    doc.text(`CUMPLIMIENTO NORMATIVO: NOM-036-1-STPS-2018`, 105, 25, { align: "center" });
+    doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 32, { align: "center" });
 
     // --- 1. DATOS DE IDENTIFICACIÓN ---
     doc.setTextColor(0, 0, 0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES Y DEL PUESTO", 15, 50);
+    doc.text("1. DATOS GENERALES DEL PUESTO", 15, 50);
     doc.autoTable({
         startY: 55,
         body: [
             ['Empresa/Planta:', info.emp, 'Fecha:', new Date().toLocaleDateString()],
-            ['Trabajador:', info.trab, 'Edad:', info.edad],
+            ['Trabajador:', info.trab, 'Edad:', `${info.edad} años`],
             ['Puesto de Trabajo:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
         ],
-        theme: 'plain', styles: { fontSize: 9 }
+        theme: 'grid', styles: { fontSize: 8 }
     });
 
     // --- 2. RESULTADOS DE LA EVALUACIÓN ---
-    doc.text("2. ANÁLISIS DE RIESGO DETECTADO", 15, doc.lastAutoTable.finalY + 10);
+    doc.text("2. ANÁLISIS DE CARGA Y POSTURA", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 15,
+        startY: doc.lastAutoTable.finalY + 13,
         head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE NORMATIVO', 'ESTADO']],
         body: [
-            ['Manejo Manual de Carga', `${info.peso} kg`, info.gen === 'H' ? '25 kg' : '15 kg', info.peso > (info.gen === 'H' ? 25 : 15) ? 'EXCEDE' : 'DENTRO DE LÍMITE'],
-            ['Frecuencia de Postura Crítica', `${porcRiesgo}%`, 'máx. 20%', nivelRiesgo],
-            ['Zonas de Mayor Tensión', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Sin anomalías', 'N/A', '-']
+            [
+                'Manejo Manual de Carga', 
+                `${info.peso} kg`, 
+                `${limiteNormativo} kg`, 
+                info.peso > limiteNormativo ? 'INCUMPLE (EXCEDE)' : 'CUMPLE'
+            ],
+            [
+                'Exposición a Postura Crítica', 
+                `${porcRiesgo}%`, 
+                'Máx. 20%', 
+                nivelRiesgo
+            ],
+            [
+                'Zonas de Mayor Tensión', 
+                Array.from(wbaStats.zonasAfectadas).join(', ') || 'Sin anomalías', 
+                'N/A', 
+                '-'
+            ]
         ],
-        headStyles: { fillColor: colorRiesgo }
+        headStyles: { fillColor: colorRiesgo },
+        styles: { fontSize: 8 }
     });
 
-    // --- 3. TABLA DE REFERENCIA NOM-036 (FIJA) ---
-    doc.text("3. TABLA DE REFERENCIA TÉCNICA (POSTURAS)", 15, doc.lastAutoTable.finalY + 10);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-    doc.text("Valores de umbral angular utilizados para la determinación de riesgo postural:", 15, doc.lastAutoTable.finalY + 15);
-    
+    // --- 3. REFERENCIA TÉCNICA ---
+    doc.text("3. TABLA DE REFERENCIA (NOM-036 / IA)", 15, doc.lastAutoTable.finalY + 10);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
     doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 18,
-        head: [['REGIÓN ANATÓMICA', 'ÁNGULO NEUTRO', 'UMBRAL RIESGO', 'TIPO DE LESIÓN ASOCIADA']],
+        startY: doc.lastAutoTable.finalY + 13,
+        head: [['REGIÓN', 'UMBRAL RIESGO', 'POSIBLE LESIÓN']],
         body: [
-            ['Tronco/Espalda', '0° - 10°', '> 20° Flexión', 'Lumbalgia / Hernia Discal'],
-            ['Cuello (Cervical)', '180°', '+/- 15° Desv.', 'Sindrome Cervical / Fatiga'],
-            ['Hombros', 'Neutro', '> 15° Elevación', 'Tendinitis del Manguito Rotador'],
-            ['Codos/Brazos', 'Neutro', '> 25° Flexión', 'Epicondilitis (Codo de Tenista)'],
-            ['Muñecas', 'Plano', '> 20° Desv.', 'Síndrome del Túnel Carpiano']
+            ['Espalda/Tronco', '> 20° Flexión', 'Lumbalgia Mecánica / Hernias'],
+            ['Cervical', '+/- 15° Desv.', 'Cervicalgia / Fatiga Muscular'],
+            ['Hombros', '> 15° Elevación', 'Tendinitis / Manguito Rotador'],
+            ['Muñecas', '> 20° Desv.', 'Síndrome del Túnel Carpiano']
         ],
-        styles: { fillColor: [240, 240, 240], fontSize: 8 }
+        theme: 'striped',
+        styles: { fontSize: 7 }
     });
 
-    // --- 4. RECOMENDACIONES TÉCNICAS ---
-    const recomendaciones = info.peso > (info.gen === 'H' ? 25 : 15) 
-        ? "ALERTA: Reducir carga inmediatamente o implementar ayudas mecánicas (patines, montacargas)."
-        : (porcRiesgo > 20 ? "RECOMIENDA: Rotación de personal y ejercicios de estiramiento cada 30 min." : "Sugerencia: Mantener técnica de levantamiento actual.");
+    // --- 4. CONCLUSIONES Y RECOMENDACIONES ---
+    let recomendaciones = "";
+    if (info.peso > limiteNormativo) {
+        recomendaciones = `ALERTA CRÍTICA: Se excede el límite de ${limiteNormativo}kg para el perfil del trabajador. Se requiere reducir carga o implementar equipo auxiliar mecánico inmediatamente.`;
+    } else if (porcRiesgo > 20) {
+        recomendaciones = "RECOMENDACIÓN: El porcentaje de postura crítica es alto. Se sugiere rediseñar la estación de trabajo para evitar flexiones de tronco prolongadas y realizar pausas activas.";
+    } else {
+        recomendaciones = "OBSERVACIÓN: La tarea se realiza dentro de los parámetros ergonómicos aceptables. Se recomienda mantener la técnica de levantamiento.";
+    }
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
     doc.text("4. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, 20);
-    doc.text(doc.splitTextToSize(recomendaciones, 175), 20, doc.lastAutoTable.finalY + 22);
+    
+    // Caja de texto para recomendaciones
+    const splitText = doc.splitTextToSize(recomendaciones, 170);
+    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, (splitText.length * 7) + 5);
+    doc.text(splitText, 20, doc.lastAutoTable.finalY + 22);
 
     // --- FIRMAS ---
-    doc.line(40, 260, 90, 260); doc.text("Firma del Auditor", 50, 265);
-    doc.line(120, 260, 170, 260); doc.text("Firma del Trabajador", 130, 265);
+    const finalY = doc.lastAutoTable.finalY + 60;
+    doc.line(40, finalY, 90, finalY); doc.text("Firma del Auditor / Salud Ocupacional", 40, finalY + 5);
+    doc.line(120, finalY, 170, finalY); doc.text("Firma del Trabajador Evaluado", 125, finalY + 5);
 
-    doc.save(`REPORTE_NOM036_${info.trab}_${Date.now()}.pdf`);
+    // Guardar archivo
+    const nombreArchivo = `REPORT_NOM036_${info.trab.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+    doc.save(nombreArchivo);
 }
-
+    
 /**
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE
  */
