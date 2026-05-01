@@ -391,25 +391,22 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         ctx.fillText(status, mx + 15, my + 5);
     }
 };
-/**
+  /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (MEDIAPIPE HANDLER)
  * Transforma los puntos de la IA en el modelo jerárquico de la "T".
  */
-
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
 
-    // 1. Limpieza y Renderizado Base del Video (Crucial para que no se vea "trabada")
+    // 1. Limpieza y Renderizado Base del Video
     ctx.save();
     ctx.clearRect(0, 0, w, h);
     
-    // Manejo de espejo para cámara frontal
     if (currentFacingMode === "user") { 
         ctx.translate(w, 0); 
         ctx.scale(-1, 1); 
     }
     
-    // Dibujamos el video siempre, haya o no detección
     if (res.image) {
         ctx.drawImage(res.image, 0, 0, w, h);
     }
@@ -417,11 +414,10 @@ function onResults(res) {
     // 2. Validación de presencia de sujeto
     if (!res.poseLandmarks) { 
         txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
-        ctx.restore(); // Importante cerrar el context antes del return
+        ctx.restore(); 
         return; 
     }
 
-    // Una vez detectado, ocultamos definitivamente el loader si aún estuviera visible
     const loader = document.getElementById('loader-ia');
     if (loader && loader.style.display !== 'none') {
         loader.style.display = 'none';
@@ -432,7 +428,7 @@ function onResults(res) {
 
     const lm = res.poseLandmarks;
 
-    // 3. Suavizado de posición (Helper con manejo de errores)
+    // 3. Suavizado de posición (Helper)
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
@@ -455,7 +451,7 @@ function onResults(res) {
         };
     };
 
-    // --- NODOS JERÁRQUICOS ---
+    // --- 4. NUEVA ESTRUCTURA JERÁRQUICA "T" ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11), 
@@ -464,22 +460,33 @@ function onResults(res) {
         dedo_d: pt(20), dedo_i: pt(19),
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27),
-        pie_d: pt(32), pie_i: pt(31)
+        t_d: pt(28), t_i: pt(27)
     };
 
-    // Centros de masa
-    p.cab = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
+    // Cálculos de puntos centrales para la columna vertebral
+    p.cab_centro = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
     p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
-    p.esp = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
+    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
+
+    // Puntos intermedios para mayor detalle en tronco (IA Progresiva)
+    p.torax = { 
+        x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, 
+        y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3,
+        z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.3
+    };
+    p.abdomen = { 
+        x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, 
+        y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6,
+        z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.6
+    };
 
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    // --- CÁLCULO DE ÁNGULOS ---
+    // --- 5. CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
-        cuello: calcAng3D(p.cab, p.cue, verticalRef),
+        cuello: calcAng3D(p.cab_centro, p.cue, verticalRef),
         pecho: calcAng3D(p.h_d, p.cue, p.h_i),
-        tronco: calcAng3D(p.cue, p.p_d, p.esp),
+        tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
         h_d: calcAng3D(p.cue, p.h_d, p.c_d),
         h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
@@ -490,29 +497,38 @@ function onResults(res) {
         r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
-    // Búfer de suavizado
+    // Actualizar búfer
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE VECTORES ---
-    drawV(p.h_d, p.h_i, 'pecho', 'hombros', p.h_d.v, p.h_i.v);
+    // --- 6. RENDERIZADO DE VECTORES (LA "T") ---
+    // Eje Central (Columna)
+    drawV(p.cab_centro, p.cue, 'cuello', 'cuello', 1, 1);
+    drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
+    drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
+    drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
+
+    // Extremidades Superiores (Conexión desde el Cuello/Centro)
+    drawV(p.cue, p.h_d, 'pecho', 'hombros', 1, p.h_d.v);
+    drawV(p.cue, p.h_i, 'pecho', 'hombros', 1, p.h_i.v);
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.m_d, p.dedo_d, 'm_d', 'munecas', p.m_d.v, p.dedo_d.v);
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+    drawV(p.m_d, p.dedo_d, 'm_d', 'munecas', p.m_d.v, p.dedo_d.v);
     drawV(p.m_i, p.dedo_i, 'm_i', 'munecas', p.m_i.v, p.dedo_i.v);
-    drawV(p.cue, p.esp, 'tronco', 'tronco', 1, 1);
-    drawV(p.cab, p.cue, 'cuello', 'cuello', 1, 1);
+
+    // Extremidades Inferiores
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
 
     ctx.restore();
 }
-    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
@@ -553,48 +569,63 @@ function toggleAuditoria() {
         setTimeout(generarReporteWBA, 800);
     }
 }
-/**
- * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN CORREGIDA NOM-036)
+
+    /**
+ * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
+ * Genera un documento técnico basado en los hallazgos de la IA y la normativa mexicana.
  */
 function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // 1. Recolección de datos y cálculo de límites normativos dinámicos
+    // 1. Recolección de datos del DOM
     const info = {
-        emp: document.getElementById('nombreEmpresa').value,
-        puesto: document.getElementById('puestoTrabajo').value,
-        trab: document.getElementById('nombreTrabajador').value,
-        peso: parseFloat(document.getElementById('pesoCarga').value) || 0,
-        gen: document.getElementById('generoTrabajador').value, // 'H' o 'M'
-        edad: parseInt(document.getElementById('edadTrabajador').value) || 0
+        emp: document.getElementById('nombreEmpresa')?.value || "Empresa No Especificada",
+        puesto: document.getElementById('puestoTrabajo')?.value || "General",
+        trab: document.getElementById('nombreTrabajador')?.value || "Sin Nombre",
+        peso: parseFloat(document.getElementById('pesoCarga')?.value) || 0,
+        gen: document.getElementById('generoTrabajador')?.value || 'H',
+        edad: parseInt(document.getElementById('edadTrabajador')?.value) || 0
     };
 
-    // Determinación del límite de carga según NOM-036-1-STPS-2018
+    // 2. Lógica de Cumplimiento Normativo (Sincronizado con NOM-036 y LFT)
     let limiteNormativo = 0;
-    if (info.edad < 18) {
-        limiteNormativo = 7; // Límite para menores de edad (ambos sexos)
+    let hallazgosLegales = [];
+
+    // Validación según Ley Federal del Trabajo (Menores)
+    if (info.edad < 15) {
+        hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
+        limiteNormativo = 0;
+    } else if (info.edad < 18) {
+        hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
+        limiteNormativo = 7;
     } else {
+        // Límites NOM-036-1-STPS-2018
         if (info.gen === 'H') {
-            limiteNormativo = (info.edad > 45) ? 20 : 25; // Hombres: 25kg (adultos) / 20kg (>45 años)
+            limiteNormativo = (info.edad > 45) ? 20 : 25;
         } else {
-            limiteNormativo = (info.edad > 45) ? 10 : 15; // Mujeres: 15kg (adultas) / 10kg (>45 años)
+            limiteNormativo = (info.edad > 45) ? 10 : 15;
         }
     }
 
-    // Cálculos de riesgo postural
-    const porcRiesgo = wbaStats.framesAnalizados > 0 ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) : 0;
+    // Cálculos de riesgo postural (IA)
+    const porcRiesgo = wbaStats.framesAnalizados > 0 
+        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
+        : 0;
     const nivelRiesgo = porcRiesgo > 20 ? 'MUY ALTO' : (porcRiesgo > 5 ? 'MODERADO' : 'BAJO');
     const colorRiesgo = porcRiesgo > 20 ? [231, 76, 60] : (porcRiesgo > 5 ? [241, 196, 15] : [46, 204, 113]);
 
-    // --- ENCABEZADO INSTITUCIONAL ---
+    // --- DISEÑO DEL PDF ---
+
+    // Encabezado
     doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
+    doc.setTextColor(0, 255, 0); doc.setFontSize(18); 
+    doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
     doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-    doc.text(`CUMPLIMIENTO NORMATIVO: NOM-036-1-STPS-2018`, 105, 25, { align: "center" });
+    doc.text(`CUMPLIMIENTO: NOM-036-1-STPS-2018 & LFT`, 105, 25, { align: "center" });
     doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 32, { align: "center" });
 
-    // --- 1. DATOS DE IDENTIFICACIÓN ---
+    // 1. Datos Generales
     doc.setTextColor(0, 0, 0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
     doc.text("1. DATOS GENERALES DEL PUESTO", 15, 50);
     doc.autoTable({
@@ -607,17 +638,17 @@ function generarReporteWBA() {
         theme: 'grid', styles: { fontSize: 8 }
     });
 
-    // --- 2. RESULTADOS DE LA EVALUACIÓN ---
-    doc.text("2. ANÁLISIS DE CARGA Y POSTURA", 15, doc.lastAutoTable.finalY + 10);
+    // 2. Análisis de Carga y Postura
+    doc.text("2. ANÁLISIS DE CARGA Y POSTURA (IA)", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE NORMATIVO', 'ESTADO']],
+        head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE MÁX.', 'ESTADO']],
         body: [
             [
                 'Manejo Manual de Carga', 
                 `${info.peso} kg`, 
                 `${limiteNormativo} kg`, 
-                info.peso > limiteNormativo ? 'INCUMPLE (EXCEDE)' : 'CUMPLE'
+                info.peso > limiteNormativo ? 'EXCEDE LÍMITE' : 'CUMPLE'
             ],
             [
                 'Exposición a Postura Crítica', 
@@ -636,55 +667,48 @@ function generarReporteWBA() {
         styles: { fontSize: 8 }
     });
 
-    // --- 3. REFERENCIA TÉCNICA ---
-    doc.text("3. TABLA DE REFERENCIA (NOM-036 / IA)", 15, doc.lastAutoTable.finalY + 10);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['REGIÓN', 'UMBRAL RIESGO', 'POSIBLE LESIÓN']],
-        body: [
-            ['Espalda/Tronco', '> 20° Flexión', 'Lumbalgia Mecánica / Hernias'],
-            ['Cervical', '+/- 15° Desv.', 'Cervicalgia / Fatiga Muscular'],
-            ['Hombros', '> 15° Elevación', 'Tendinitis / Manguito Rotador'],
-            ['Muñecas', '> 20° Desv.', 'Síndrome del Túnel Carpiano']
-        ],
-        theme: 'striped',
-        styles: { fontSize: 7 }
-    });
-
-    // --- 4. CONCLUSIONES Y RECOMENDACIONES ---
+    // 3. Conclusiones y Recomendaciones
     let recomendaciones = "";
     if (info.peso > limiteNormativo) {
-        recomendaciones = `ALERTA CRÍTICA: Se excede el límite de ${limiteNormativo}kg para el perfil del trabajador. Se requiere reducir carga o implementar equipo auxiliar mecánico inmediatamente.`;
-    } else if (porcRiesgo > 20) {
-        recomendaciones = "RECOMENDACIÓN: El porcentaje de postura crítica es alto. Se sugiere rediseñar la estación de trabajo para evitar flexiones de tronco prolongadas y realizar pausas activas.";
-    } else {
-        recomendaciones = "OBSERVACIÓN: La tarea se realiza dentro de los parámetros ergonómicos aceptables. Se recomienda mantener la técnica de levantamiento.";
+        recomendaciones += `ALERTA NORMATIVA: Se excede el límite de ${limiteNormativo}kg. ${hallazgosLegales.join(" ")} Requiere rediseño o ayuda mecánica. `;
+    }
+    if (porcRiesgo > 20) {
+        recomendaciones += "RIESGO POSTURAL: Alta frecuencia de ángulos críticos. Se recomienda rotación de personal y pausas activas.";
+    }
+    if (recomendaciones === "") {
+        recomendaciones = "OPERACIÓN SEGURA: La tarea se ejecuta bajo parámetros aceptables. Continuar con monitoreo preventivo.";
     }
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    doc.text("4. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
+    doc.text("3. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
     
-    // Caja de texto para recomendaciones
-    const splitText = doc.splitTextToSize(recomendaciones, 170);
-    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, (splitText.length * 7) + 5);
-    doc.text(splitText, 20, doc.lastAutoTable.finalY + 22);
+    const splitText = doc.splitTextToSize(recomendaciones, 175);
+    const boxHeight = (splitText.length * 5) + 12;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, boxHeight, 'F');
+    doc.text(splitText, 18, doc.lastAutoTable.finalY + 22);
 
-    // --- FIRMAS ---
-    const finalY = doc.lastAutoTable.finalY + 60;
-    doc.line(40, finalY, 90, finalY); doc.text("Firma del Auditor / Salud Ocupacional", 40, finalY + 5);
-    doc.line(120, finalY, 170, finalY); doc.text("Firma del Trabajador Evaluado", 125, finalY + 5);
+    // 4. Firmas
+    const finalY = doc.lastAutoTable.finalY + boxHeight + 40;
+    doc.setFontSize(8);
+    doc.line(30, finalY, 90, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
+    doc.line(120, finalY, 180, finalY); doc.text("Firma del Trabajador", 135, finalY + 5);
 
-    // Guardar archivo
-    const nombreArchivo = `REPORT_NOM036_${info.trab.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-    doc.save(nombreArchivo);
+    // Pie de Página
+    doc.setFontSize(7); doc.setTextColor(150);
+    doc.text("Generado por LYA-ERGO IA System. Basado en IA Pose Estimation.", 105, 285, { align: "center" });
+
+    // Guardar
+    doc.save(`Reporte_NOM036_${info.trab.replace(/\s+/g, '_')}.pdf`);
 }
     
-/**
+    
+ /**
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE
+ * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
-    async function prepararSistema(fuente) {
+async function prepararSistema(fuente) {
     // 1. Referencias y Validación
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
@@ -701,7 +725,15 @@ function generarReporteWBA() {
         return;
     }
 
-    // 2. Limpieza de flujos previos (Evita que la cámara se quede encendida o el video buclee)
+    // --- CORRECCIÓN: LIMPIEZA DE MEMORIA Y BUFFERS ---
+    // Evita que datos del trabajador anterior se mezclen con el nuevo
+    angleBuffer = {}; 
+    posBuffer = {};
+    wbaStats.zonasAfectadas.clear();
+    wbaStats.framesAnalizados = 0;
+    wbaStats.riesgoAltoTotal = 0;
+
+    // 2. Limpieza de flujos previos
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
@@ -729,19 +761,18 @@ function generarReporteWBA() {
             const file = document.getElementById('fileInput').files[0];
             if (!file) { 
                 alert("Seleccione un archivo de video"); 
-                location.reload(); // Reset para evitar estado inconsistente
+                location.reload();
                 return; 
             }
             video.src = URL.createObjectURL(file);
         }
 
-        // 4. Manejo robusto del arranque del video y la IA
+        // 4. Manejo robusto del arranque
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
             
             try {
-                // Importante: esperar a que el play sea exitoso antes de lanzar la IA
                 await video.play();
                 activarIA(); 
             } catch (playError) {
@@ -756,52 +787,68 @@ function generarReporteWBA() {
         location.reload();
     }
 }
+
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     loader.style.display = 'flex';
     
-    // Timeout de seguridad: Si en 8 segundos no inicia, quitamos el loader y avisamos
+    // Timeout de seguridad mejorado
     const safetyTimeout = setTimeout(() => {
         if (loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Verifique su conexión o reinicie la cámara.");
+            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
         }
-    }, 8000);
+    }, 10000);
+
+    // Reinicializar instancia de Pose si ya existía para liberar memoria
+    if (pose) {
+        try { await pose.close(); } catch(e) {}
+    }
 
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
     pose.setOptions({ 
-        modelComplexity: 1, 
+        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
         smoothLandmarks: true, 
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
     pose.onResults((res) => {
-        // En cuanto llega el primer resultado, limpiamos el timeout y ocultamos el loader
         clearTimeout(safetyTimeout);
         if (loader.style.display !== 'none') {
             loader.style.display = 'none';
-            console.log("IA Inicializada con éxito");
+            console.log("IA Operativa - Modelo Jerárquico T Cargado");
         }
         iaActiva = true;
         onResults(res);
     });
 
+    // Loop de frames con control de estado
     async function frameLoop() {
-        if (!iaActiva && !video.paused) {
-            // Intentar enviar el primer frame para despertar a la IA
-            try { await pose.send({ image: video }); } catch(e) {}
-        } else if (iaActiva) {
+        if (video.paused || video.ended) return;
+
+        try {
             await pose.send({ image: video });
+        } catch (e) {
+            console.warn("Frame omitido por procesamiento pesado.");
         }
-        requestAnimationFrame(frameLoop);
+        
+        if (iaActiva) {
+            requestAnimationFrame(frameLoop);
+        } else {
+            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
+            setTimeout(frameLoop, 500);
+        }
     }
     
     frameLoop();
-}
+}   
+
+
+    
 
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
