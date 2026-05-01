@@ -1,4 +1,4 @@
-JUE NOCH V4
+SEPARAR BOTONES VIVO Y ARCHIVO
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -267,6 +267,7 @@ JUE NOCH V4
 </div>
 
 <script>
+
 /**
  * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
  * Define los límites de desviación angular permitidos para evitar riesgos.
@@ -557,7 +558,7 @@ function toggleAuditoria() {
     }
 }
 
-/**
+    /**
  * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
  * Genera un documento técnico basado en los hallazgos de la IA y la normativa mexicana.
  */
@@ -567,7 +568,7 @@ function generarReporteWBA() {
     
     // 1. Recolección de datos del DOM
     const info = {
-        emp: document.getElementById('nombreEmpresa')?.value.toUpperCase() || "EMPRESA NO ESPECIFICADA",
+        emp: document.getElementById('nombreEmpresa')?.value || "Empresa No Especificada",
         puesto: document.getElementById('puestoTrabajo')?.value || "General",
         trab: document.getElementById('nombreTrabajador')?.value || "Sin Nombre",
         peso: parseFloat(document.getElementById('pesoCarga')?.value) || 0,
@@ -579,6 +580,7 @@ function generarReporteWBA() {
     let limiteNormativo = 0;
     let hallazgosLegales = [];
 
+    // Validación según Ley Federal del Trabajo (Menores)
     if (info.edad < 15) {
         hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
         limiteNormativo = 0;
@@ -586,6 +588,7 @@ function generarReporteWBA() {
         hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
         limiteNormativo = 7;
     } else {
+        // Límites NOM-036-1-STPS-2018
         if (info.gen === 'H') {
             limiteNormativo = (info.edad > 45) ? 20 : 25;
         } else {
@@ -597,103 +600,95 @@ function generarReporteWBA() {
     const porcRiesgo = wbaStats.framesAnalizados > 0 
         ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
         : 0;
-    
-    const cumpleNorma = (info.peso <= limiteNormativo && porcRiesgo <= 20);
-    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60]; // Verde o Rojo
+    const nivelRiesgo = porcRiesgo > 20 ? 'MUY ALTO' : (porcRiesgo > 5 ? 'MODERADO' : 'BAJO');
+    const colorRiesgo = porcRiesgo > 20 ? [231, 76, 60] : (porcRiesgo > 5 ? [241, 196, 15] : [46, 204, 113]);
 
     // --- DISEÑO DEL PDF ---
 
-    // Encabezado Profesional
+    // Encabezado
     doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 255, 0); doc.setFontSize(18); 
     doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
-    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
-    doc.text("AUDITORÍA DE CUMPLIMIENTO: NOM-036-1-STPS-2018 & LEY FEDERAL DEL TRABAJO", 105, 25, { align: "center" });
-    doc.text(`ID Reporte: LYA-${Date.now()} | Planta: ${info.emp}`, 105, 32, { align: "center" });
+    doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+    doc.text(`CUMPLIMIENTO: NOM-036-1-STPS-2018 & LFT`, 105, 25, { align: "center" });
+    doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 32, { align: "center" });
 
     // 1. Datos Generales
-    doc.setTextColor(0); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES Y REFERENCIAS", 15, 50);
+    doc.setTextColor(0, 0, 0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("1. DATOS GENERALES DEL PUESTO", 15, 50);
     doc.autoTable({
-        startY: 53,
+        startY: 55,
         body: [
-            ['Empresa:', info.emp, 'Fecha de Evaluación:', new Date().toLocaleDateString()],
-            ['Trabajador:', info.trab, 'ID/Edad:', `${info.edad} años`],
-            ['Puesto:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
+            ['Empresa/Planta:', info.emp, 'Fecha:', new Date().toLocaleDateString()],
+            ['Trabajador:', info.trab, 'Edad:', `${info.edad} años`],
+            ['Puesto de Trabajo:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
         ],
-        theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
+        theme: 'grid', styles: { fontSize: 8 }
     });
 
-    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
-    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
+    // 2. Análisis de Carga y Postura
+    doc.text("2. ANÁLISIS DE CARGA Y POSTURA (IA)", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
-        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
+        head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE MÁX.', 'ESTADO']],
         body: [
-            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
-            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
-            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
-            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
+            [
+                'Manejo Manual de Carga', 
+                `${info.peso} kg`, 
+                `${limiteNormativo} kg`, 
+                info.peso > limiteNormativo ? 'EXCEDE LÍMITE' : 'CUMPLE'
+            ],
+            [
+                'Exposición a Postura Crítica', 
+                `${porcRiesgo}%`, 
+                'Máx. 20%', 
+                nivelRiesgo
+            ],
+            [
+                'Zonas de Mayor Tensión', 
+                Array.from(wbaStats.zonasAfectadas).join(', ') || 'Sin anomalías', 
+                'N/A', 
+                '-'
+            ]
         ],
-        headStyles: { fillColor: [44, 62, 80] },
+        headStyles: { fillColor: colorRiesgo },
         styles: { fontSize: 8 }
     });
 
-    // 3. Análisis de Resultados (IA)
-    doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
-        body: [
-            ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
-            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
-            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
-        ],
-        theme: 'striped',
-        styles: { fontSize: 8 },
-        columnStyles: { 3: { fontStyle: 'bold' } }
-    });
-
-    // 4. SEMAFORIZACIÓN FINAL Y VERDICTO
-    const ySemaforo = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(colorSemaforo[0], colorSemaforo[1], colorSemaforo[2]);
-    doc.rect(15, ySemaforo, 180, 12, 'F');
-    
-    doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
-    doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
-
-    // 5. Conclusiones y Recomendaciones
+    // 3. Conclusiones y Recomendaciones
     let recomendaciones = "";
     if (info.peso > limiteNormativo) {
-        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
+        recomendaciones += `ALERTA NORMATIVA: Se excede el límite de ${limiteNormativo}kg. ${hallazgosLegales.join(" ")} Requiere rediseño o ayuda mecánica. `;
     }
     if (porcRiesgo > 20) {
-        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
+        recomendaciones += "RIESGO POSTURAL: Alta frecuencia de ángulos críticos. Se recomienda rotación de personal y pausas activas.";
     }
     if (recomendaciones === "") {
-        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
+        recomendaciones = "OPERACIÓN SEGURA: La tarea se ejecuta bajo parámetros aceptables. Continuar con monitoreo preventivo.";
     }
 
-    doc.setTextColor(0); doc.setFontSize(11);
-    doc.text("4. CONCLUSIONES TÉCNICAS", 15, ySemaforo + 22);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text("3. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    
     const splitText = doc.splitTextToSize(recomendaciones, 175);
-    doc.text(splitText, 15, ySemaforo + 28);
+    const boxHeight = (splitText.length * 5) + 12;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, boxHeight, 'F');
+    doc.text(splitText, 18, doc.lastAutoTable.finalY + 22);
 
-    // 6. Sección de Firmas
-    const finalY = ySemaforo + 60;
-    doc.setDrawColor(0); doc.setLineWidth(0.5);
-    doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
-    doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
+    // 4. Firmas
+    const finalY = doc.lastAutoTable.finalY + boxHeight + 40;
+    doc.setFontSize(8);
+    doc.line(30, finalY, 90, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
+    doc.line(120, finalY, 180, finalY); doc.text("Firma del Trabajador", 135, finalY + 5);
 
     // Pie de Página
     doc.setFontSize(7); doc.setTextColor(150);
-    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
-    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
+    doc.text("Generado por LYA-ERGO IA System. Basado en IA Pose Estimation.", 105, 285, { align: "center" });
 
-    // Guardar Documento
-    doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
+    // Guardar
+    doc.save(`Reporte_NOM036_${info.trab.replace(/\s+/g, '_')}.pdf`);
 }
     
     /**
@@ -884,6 +879,85 @@ function cambiarCamara() {
 function validarYAbrirArchivo() {
     document.getElementById('fileInput').click();
 }
+
+
+
+    
+
+   /* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
+
+/**
+ * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
+ * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
+ */
+
+/**
+ * Valida que los datos del trabajador estén completos antes de abrir el explorador de archivos.
+ */
+function validarYAbrirArchivo() {
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
+
+    if (incompleto) {
+        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video para la auditoría.");
+        return;
+    }
+    
+    // Si los datos están completos, dispara el input file oculto
+    document.getElementById('fileInput').click();
+}
+
+/**
+ * Configura el entorno específicamente para la reproducción y análisis de un archivo local.
+ */
+async function procesarVideoArchivo() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    // 1. Ocultar el botón de "Girar Cámara" ya que no aplica para archivos
+    const btnGirar = document.querySelector('button[onclick="cambiarCamara()"]');
+    if (btnGirar) btnGirar.style.display = 'none';
+
+    // 2. Cambiar visualización de interfaz
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+    
+    // 3. Preparar el elemento video para el archivo
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    
+    // Crear URL temporal para el video cargado
+    video.src = URL.createObjectURL(file);
+    video.loop = false; // No queremos que se cicle para no duplicar estadísticas
+
+    // 4. Iniciar el motor cuando el video esté listo
+    video.onloadedmetadata = async () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        try {
+            txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
+            await video.play();
+            activarIA(); // Reutiliza tu función principal de MediaPipe
+        } catch (e) {
+            console.error("Error al reproducir el archivo:", e);
+            alert("No se pudo reproducir el archivo de video. Asegúrese de que sea un formato compatible (MP4, WebM).");
+        }
+    };
+}
+
+// Vinculamos el cambio del input file a la función de procesamiento
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        prepararSistema('archivo');
+    }
+});
+
+/* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
 </script>
 </body>
 </html>
