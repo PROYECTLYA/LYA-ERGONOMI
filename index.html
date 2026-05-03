@@ -1,4 +1,7 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
+NO TOCAR
+
+JUE NOCH V4
+
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -11,7 +14,8 @@ SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
+    
+<style>
     /* --- CONFIGURACIÓN BASE --- */
     body { 
         background-color: #0d1117; 
@@ -113,7 +117,7 @@ SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
         box-shadow: 0 0 15px #00ff00; 
     }
 
-    /* --- HUD Y CONTROLES DE ANÁLISIS --- */
+    /* --- HUD Y CONTROLES --- */
     #contenedor-analisis { 
         display: none; 
         width: 100vw; 
@@ -138,32 +142,6 @@ SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
         z-index: 7000;
     }
 
-    /* --- NUEVOS BOTONES DE REPRODUCCIÓN (ESTILO ARCHIVO) --- */
-    .btn-player-circular {
-        width: 75px; 
-        height: 75px;
-        border-radius: 50%;
-        background: white; 
-        border: 5px solid #000; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        cursor: pointer; 
-        transition: transform 0.1s, background 0.2s;
-        box-shadow: 0 0 15px rgba(0,0,0,0.5);
-    }
-
-    .main-play {
-        width: 95px; 
-        height: 95px;
-    }
-
-    .btn-player-circular:active {
-        transform: scale(0.9);
-        background: #e0e0e0;
-    }
-
-    /* --- BARRA DE AUDITORÍA INFERIOR --- */
     .barra-controles {
         position: absolute;
         bottom: 40px;
@@ -205,19 +183,18 @@ SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
         70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
         100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
     }
-
-    .plant-tip {
-        font-size: 0.75rem;
-        color: #f1c40f; 
-        margin-top: 15px;
-        text-align: center;
-        border: 1px dashed #f1c40f;
-        padding: 10px;
-        border-radius: 8px;
-        max-width: 300px;
-    }
+    /* Aviso de recomendación de vestimenta */
+.plant-tip {
+    font-size: 0.75rem;
+    color: #f1c40f; /* Amarillo para resaltar */
+    margin-top: 15px;
+    text-align: center;
+    border: 1px dashed #f1c40f;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 300px;
+}
 </style>
-
 </head>
 <body>
 
@@ -279,49 +256,19 @@ SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
 
 <!-- Contenedor de Análisis IA -->
 <div id="contenedor-analisis">
-    <!-- Indicador de Estado Superior -->
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
+    <canvas id="output_canvas"></canvas>
+  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
-    <!-- Área Principal de Visualización -->
-    <div id="viewport-ergo" style="position: relative; width: 100vw; height: calc(100svh - 130px); background: #000; display: flex; align-items: center; justify-content: center;">
-        
-        <!-- Lienzo de IA y Video oculto -->
-        <canvas id="output_canvas" style="max-width: 100%; max-height: 100%; object-fit: contain; z-index: 5;"></canvas>
-        <video id="input_video" playsinline muted style="display:none;"></video>
-
-        <!-- Capa de Controles Estilo Imagen (Solo visibles en ARCHIVO) -->
-        <div id="controles-archivo-flotantes" style="display: none; position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%); z-index: 20; gap: 30px; align-items: center; width: 100%; justify-content: center;">
-            
-            <!-- Botón Retroceder -->
-            <button class="btn-player-circular" onclick="retrocederSegundos()">
-                <svg viewBox="0 0 24 24" fill="black" width="30"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
-            </button>
-
-            <!-- Botón Play/Pausa Principal -->
-            <button class="btn-player-circular main-play" id="btnPlayPausaFile" onclick="gestionarReproduccion()">
-                <svg id="svg-play-icon" viewBox="0 0 24 24" fill="black" width="40"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-
-            <!-- Botón Adelantar -->
-            <button class="btn-player-circular" onclick="adelantarSegundos()">
-                <svg viewBox="0 0 24 24" fill="black" width="30"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
-            </button>
-        </div>
-    </div>
-    
-    <!-- Barra Inferior de Auditoría (Se mantiene igual) -->
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button id="btn-girar-cam" class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
     </div>
 </div>
-    
-</div>
 
 <script>
-
 /**
  * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
  * Define los límites de desviación angular permitidos para evitar riesgos.
@@ -409,73 +356,47 @@ function calcAng3D(a, b, c) {
 }
 
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    // CORRECCIÓN: Bajamos el umbral de visibilidad a 0.4 para evitar parpadeos
-    // en los pies y en videos de archivo con poca luz.
-    if (vis1 < 0.4 || vis2 < 0.4) return;
+    if (vis1 < 0.5 || vis2 < 0.5) return;
 
     const buffer = angleBuffer[angKey] || [];
     if (buffer.length === 0) return;
     const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
 
-    let color = "#00ff00", thickness = 3, status = "SEGURO";
+    let color = "#00ff00", thickness = 4, status = "SEGURO";
 
     if (analizandoRiesgo && calibrado) {
-        // CORRECCIÓN: Aseguramos que la diferencia se calcule contra la base real
-        const base = baseAngles[angKey] !== undefined ? baseAngles[angKey] : avgAngle;
-        const diff = Math.abs(avgAngle - base);
-        const limit = TH[groupKey] || 20; // Valor por defecto si TH no carga
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+        const limit = TH[groupKey];
+        wbaStats.framesAnalizados++;
 
-        // Solo sumamos a estadísticas si el video NO está pausado para no inflar datos
-        if (!video.paused) {
-            wbaStats.framesAnalizados++;
-        }
-
-        // SEMAFORIZACIÓN: Ajuste de grosores para no tapar la imagen
-        if (diff > (limit * 1.5)) { 
-            color = "#ff3838"; thickness = 7; status = "CRÍTICO";
-            if (!video.paused) {
-                wbaStats.riesgoAltoTotal++;
-                wbaStats.zonasAfectadas.add(groupKey);
-            }
+        if (diff > (limit * 2)) {
+            color = "#ff3838"; thickness = 10; status = "CRÍTICO";
+            wbaStats.riesgoAltoTotal++;
+            wbaStats.zonasAfectadas.add(groupKey);
         } else if (diff > limit) {
-            color = "#f1c40f"; thickness = 5; status = "RIESGO";
+            color = "#f1c40f"; thickness = 6; status = "RIESGO";
         }
     }
 
-    // --- RENDERIZADO DEL VECTOR ---
+    // Dibujo del vector
     ctx.beginPath();
-    ctx.strokeStyle = color; 
-    ctx.lineWidth = thickness; 
-    ctx.lineCap = "round";
-    // Efecto de brillo para mejor visibilidad en plantas industriales
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = color;
-    ctx.moveTo(p1.x, p1.y); 
-    ctx.lineTo(p2.x, p2.y); 
-    ctx.stroke();
-    ctx.shadowBlur = 0; // Limpiar sombra para el texto
+    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
+    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-    // --- ETIQUETA DE DATOS ---
+    // Etiqueta de datos si está calibrado
     if (calibrado) {
         const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-        ctx.fillStyle = "rgba(0,0,0,0.8)";
-        ctx.beginPath();
-        ctx.roundRect(mx + 10, my - 25, 65, 35, 5);
-        ctx.fill();
-        
-        ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 12);
-        
-        ctx.fillStyle = color; ctx.font = "9px Arial";
-        ctx.fillText(status, mx + 15, my + 2);
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(mx + 10, my - 20, 70, 30);
+        ctx.fillStyle = color; ctx.font = "bold 10px Arial";
+        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
+        ctx.fillText(status, mx + 15, my + 5);
     }
 };
-    
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
  * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
  */
-
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
 
@@ -520,30 +441,32 @@ function onResults(res) {
         dedo_d: pt(20), dedo_i: pt(19),
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27),
-        // CORRECCIÓN: Puntos adicionales para los pies
-        pie_d: pt(32), pie_i: pt(31) 
+        t_d: pt(28), t_i: pt(27)
     };
 
-    // --- LÓGICA DE PUNTOS CENTRALES ---
+    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
+    // 1. Creamos el punto central exacto entre las orejas
     p.centro_orejas = { 
         x: (p.ore_d.x + p.ore_i.x) / 2, 
         y: (p.ore_d.y + p.ore_i.y) / 2, 
         z: (p.ore_d.z + p.ore_i.z) / 2 
     };
 
+    // 2. Punto central de los hombros (Cuello base)
     p.cue = { 
         x: (p.h_d.x + p.h_i.x) / 2, 
         y: (p.h_d.y + p.h_i.y) / 2, 
         z: (p.h_d.z + p.h_i.z) / 2 
     };
 
+    // 3. Punto central de la cadera (Espalda baja)
     p.esp_baja = { 
         x: (p.p_d.x + p.p_i.x) / 2, 
         y: (p.p_d.y + p.p_i.y) / 2, 
         z: (p.p_d.z + p.p_i.z) / 2 
     };
 
+    // Segmentos del tronco para mayor estabilidad visual
     p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
     p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
 
@@ -567,18 +490,18 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DEL ESQUEMA ---
+    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
     
-    // Cabeza y Cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
+    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
 
     // Eje Central (Columna)
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
 
-    // Conexión de Hombros
+    // Conexión de Hombros (Barra horizontal del pecho)
     drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
 
     // Brazos
@@ -587,23 +510,14 @@ function onResults(res) {
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
 
-    // CORRECCIÓN PIERNAS: Conexión de Cadera a Columna (Une el esqueleto)
-    drawV(p.esp_baja, p.p_d, 'tronco', 'piernas', 1, p.p_d.v);
-    drawV(p.esp_baja, p.p_i, 'tronco', 'piernas', 1, p.p_i.v);
-
-    // Muslos y Pantorrillas
+    // Piernas (Desde los puntos de la cadera)
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
 
-    // CORRECCIÓN PIES: Dibujo de vectores finales[cite: 1]
-    drawV(p.t_d, p.pie_d, 'r_d', 'piernas', p.t_d.v, p.pie_d.v);
-    drawV(p.t_i, p.pie_i, 'r_i', 'piernas', p.t_i.v, p.pie_i.v);
-
     ctx.restore();
 }
-    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
@@ -645,7 +559,7 @@ function toggleAuditoria() {
     }
 }
 
-    /**
+/**
  * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
  * Genera un documento técnico basado en los hallazgos de la IA y la normativa mexicana.
  */
@@ -655,7 +569,7 @@ function generarReporteWBA() {
     
     // 1. Recolección de datos del DOM
     const info = {
-        emp: document.getElementById('nombreEmpresa')?.value || "Empresa No Especificada",
+        emp: document.getElementById('nombreEmpresa')?.value.toUpperCase() || "EMPRESA NO ESPECIFICADA",
         puesto: document.getElementById('puestoTrabajo')?.value || "General",
         trab: document.getElementById('nombreTrabajador')?.value || "Sin Nombre",
         peso: parseFloat(document.getElementById('pesoCarga')?.value) || 0,
@@ -667,7 +581,6 @@ function generarReporteWBA() {
     let limiteNormativo = 0;
     let hallazgosLegales = [];
 
-    // Validación según Ley Federal del Trabajo (Menores)
     if (info.edad < 15) {
         hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
         limiteNormativo = 0;
@@ -675,7 +588,6 @@ function generarReporteWBA() {
         hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
         limiteNormativo = 7;
     } else {
-        // Límites NOM-036-1-STPS-2018
         if (info.gen === 'H') {
             limiteNormativo = (info.edad > 45) ? 20 : 25;
         } else {
@@ -687,95 +599,103 @@ function generarReporteWBA() {
     const porcRiesgo = wbaStats.framesAnalizados > 0 
         ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
         : 0;
-    const nivelRiesgo = porcRiesgo > 20 ? 'MUY ALTO' : (porcRiesgo > 5 ? 'MODERADO' : 'BAJO');
-    const colorRiesgo = porcRiesgo > 20 ? [231, 76, 60] : (porcRiesgo > 5 ? [241, 196, 15] : [46, 204, 113]);
+    
+    const cumpleNorma = (info.peso <= limiteNormativo && porcRiesgo <= 20);
+    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60]; // Verde o Rojo
 
     // --- DISEÑO DEL PDF ---
 
-    // Encabezado
+    // Encabezado Profesional
     doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(18); 
+    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold");
     doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
-    doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-    doc.text(`CUMPLIMIENTO: NOM-036-1-STPS-2018 & LFT`, 105, 25, { align: "center" });
-    doc.text(`ID Reporte: LYA-${Date.now()}`, 105, 32, { align: "center" });
+    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
+    doc.text("AUDITORÍA DE CUMPLIMIENTO: NOM-036-1-STPS-2018 & LEY FEDERAL DEL TRABAJO", 105, 25, { align: "center" });
+    doc.text(`ID Reporte: LYA-${Date.now()} | Planta: ${info.emp}`, 105, 32, { align: "center" });
 
     // 1. Datos Generales
-    doc.setTextColor(0, 0, 0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES DEL PUESTO", 15, 50);
+    doc.setTextColor(0); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text("1. DATOS GENERALES Y REFERENCIAS", 15, 50);
     doc.autoTable({
-        startY: 55,
+        startY: 53,
         body: [
-            ['Empresa/Planta:', info.emp, 'Fecha:', new Date().toLocaleDateString()],
-            ['Trabajador:', info.trab, 'Edad:', `${info.edad} años`],
-            ['Puesto de Trabajo:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
+            ['Empresa:', info.emp, 'Fecha de Evaluación:', new Date().toLocaleDateString()],
+            ['Trabajador:', info.trab, 'ID/Edad:', `${info.edad} años`],
+            ['Puesto:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
         ],
-        theme: 'grid', styles: { fontSize: 8 }
+        theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
     });
 
-    // 2. Análisis de Carga y Postura
-    doc.text("2. ANÁLISIS DE CARGA Y POSTURA (IA)", 15, doc.lastAutoTable.finalY + 10);
+    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
+    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR ANALIZADO', 'VALOR', 'LÍMITE MÁX.', 'ESTADO']],
+        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
         body: [
-            [
-                'Manejo Manual de Carga', 
-                `${info.peso} kg`, 
-                `${limiteNormativo} kg`, 
-                info.peso > limiteNormativo ? 'EXCEDE LÍMITE' : 'CUMPLE'
-            ],
-            [
-                'Exposición a Postura Crítica', 
-                `${porcRiesgo}%`, 
-                'Máx. 20%', 
-                nivelRiesgo
-            ],
-            [
-                'Zonas de Mayor Tensión', 
-                Array.from(wbaStats.zonasAfectadas).join(', ') || 'Sin anomalías', 
-                'N/A', 
-                '-'
-            ]
+            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
+            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
+            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
+            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
         ],
-        headStyles: { fillColor: colorRiesgo },
+        headStyles: { fillColor: [44, 62, 80] },
         styles: { fontSize: 8 }
     });
 
-    // 3. Conclusiones y Recomendaciones
+    // 3. Análisis de Resultados (IA)
+    doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 13,
+        head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
+        body: [
+            ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
+            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
+            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
+        ],
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        columnStyles: { 3: { fontStyle: 'bold' } }
+    });
+
+    // 4. SEMAFORIZACIÓN FINAL Y VERDICTO
+    const ySemaforo = doc.lastAutoTable.finalY + 12;
+    doc.setFillColor(colorSemaforo[0], colorSemaforo[1], colorSemaforo[2]);
+    doc.rect(15, ySemaforo, 180, 12, 'F');
+    
+    doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
+    doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
+
+    // 5. Conclusiones y Recomendaciones
     let recomendaciones = "";
     if (info.peso > limiteNormativo) {
-        recomendaciones += `ALERTA NORMATIVA: Se excede el límite de ${limiteNormativo}kg. ${hallazgosLegales.join(" ")} Requiere rediseño o ayuda mecánica. `;
+        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
     }
     if (porcRiesgo > 20) {
-        recomendaciones += "RIESGO POSTURAL: Alta frecuencia de ángulos críticos. Se recomienda rotación de personal y pausas activas.";
+        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
     }
     if (recomendaciones === "") {
-        recomendaciones = "OPERACIÓN SEGURA: La tarea se ejecuta bajo parámetros aceptables. Continuar con monitoreo preventivo.";
+        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
     }
 
-    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    doc.text("3. CONCLUSIONES Y RECOMENDACIONES", 15, doc.lastAutoTable.finalY + 12);
+    doc.setTextColor(0); doc.setFontSize(11);
+    doc.text("4. CONCLUSIONES TÉCNICAS", 15, ySemaforo + 22);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    
     const splitText = doc.splitTextToSize(recomendaciones, 175);
-    const boxHeight = (splitText.length * 5) + 12;
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, doc.lastAutoTable.finalY + 15, 180, boxHeight, 'F');
-    doc.text(splitText, 18, doc.lastAutoTable.finalY + 22);
+    doc.text(splitText, 15, ySemaforo + 28);
 
-    // 4. Firmas
-    const finalY = doc.lastAutoTable.finalY + boxHeight + 40;
-    doc.setFontSize(8);
-    doc.line(30, finalY, 90, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
-    doc.line(120, finalY, 180, finalY); doc.text("Firma del Trabajador", 135, finalY + 5);
+    // 6. Sección de Firmas
+    const finalY = ySemaforo + 60;
+    doc.setDrawColor(0); doc.setLineWidth(0.5);
+    doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
+    doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
 
     // Pie de Página
     doc.setFontSize(7); doc.setTextColor(150);
-    doc.text("Generado por LYA-ERGO IA System. Basado en IA Pose Estimation.", 105, 285, { align: "center" });
+    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
+    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
 
-    // Guardar
-    doc.save(`Reporte_NOM036_${info.trab.replace(/\s+/g, '_')}.pdf`);
+    // Guardar Documento
+    doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
 }
     
     /**
@@ -783,139 +703,158 @@ function generarReporteWBA() {
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
 async function prepararSistema(fuente) {
+    // 1. Referencias y Captura de Datos
     const edadInput = document.getElementById('edadTrabajador');
+    const pesoInput = document.getElementById('pesoCarga');
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     
     // Validación de campos vacíos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
     if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario."); 
+        alert("⚠️ Por favor, complete todos los campos del formulario antes de iniciar el análisis."); 
         return; 
     }
 
-    // Validación estricta de edad (2 dígitos)[cite: 5]
-    if (!/^\d{2}$/.test(edadInput.value.trim())) {
-        alert("❌ Error en EDAD: Debe ingresar exactamente 2 cifras.");
+    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    const edadValor = edadInput.value.trim();
+    // Verifica que sean exactamente 2 dígitos (10-99 años)
+    if (!/^\d{2}$/.test(edadValor)) {
+        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
         return;
     }
 
-    // Limpieza de estados previos
+    // Validación de peso
+    if (parseFloat(pesoInput.value) <= 0) {
+        alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
+        pesoInput.focus();
+        return;
+    }
+
+    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
+    // Asegura que el análisis ergonómico empiece de cero
     angleBuffer = {}; 
     posBuffer = {};
+    wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // Detener flujos de cámara previos si existen[cite: 5]
+    // 2. Limpieza de flujos previos (Cámara o Archivos)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
+    if (video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src);
+        video.src = "";
+    }
+
+    // 3. Transición de Interfaz
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
 
     try {
         if (fuente === 'camara') {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: currentFacingMode } 
+                video: { 
+                    facingMode: currentFacingMode, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 } 
+                } 
             });
             video.srcObject = stream;
         } else {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return;
+            if (!file) { 
+                alert("Seleccione un archivo de video para procesar."); 
+                location.reload();
+                return; 
+            }
             video.src = URL.createObjectURL(file);
-            document.getElementById('controles-archivo-flotantes').style.display = 'flex';
-            document.getElementById('btn-girar-cam').style.display = 'none';
         }
 
-        video.onloadedmetadata = () => {
+        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
+        video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
-            video.play();
-            activarIA(); // Llamada única al motor[cite: 5]
+            
+            try {
+                await video.play();
+                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
+            } catch (playError) {
+                console.error("Error al reproducir video:", playError);
+                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
+            }
         };
 
     } catch (err) {
-        alert("Error de acceso al hardware o archivo.");
+        console.error("Error de acceso al hardware:", err);
+        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
         location.reload();
     }
 }
-    
 
+    
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
-    if (loader) loader.style.display = 'flex';
+    loader.style.display = 'flex';
     
-    // 1. Margen de seguridad para carga de modelos pesados
+    // Timeout de seguridad mejorado
     const safetyTimeout = setTimeout(() => {
-        if (loader && loader.style.display !== 'none') {
+        if (loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Si el problema persiste, reduzca la resolución del video o recargue la página.");
+            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
         }
-    }, 20000);
+    }, 10000);
 
-    // 2. REINICIO PROFUNDO: Liberar memoria de GPU antes de crear nueva instancia[cite: 5]
-    if (typeof pose !== 'undefined' && pose) {
-        try { 
-            await pose.close(); 
-            pose = null; // Forzar recolección de basura para evitar fugas de memoria
-        } catch(e) { 
-            console.warn("Error liberando instancia previa"); 
-        }
+    // Reinicializar instancia de Pose si ya existía para liberar memoria
+    if (pose) {
+        try { await pose.close(); } catch(e) {}
     }
 
-    // 3. Nueva instancia de MediaPipe con optimización de recursos
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
     pose.setOptions({ 
-        modelComplexity: 1, 
+        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
         smoothLandmarks: true, 
-        enableSegmentation: false, // Desactivado para ahorrar procesamiento de GPU
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
-    // Manejador de resultados: Oculta el cargador solo cuando la IA responde realmente[cite: 5]
     pose.onResults((res) => {
         clearTimeout(safetyTimeout);
-        if (loader && loader.style.display !== 'none') {
+        if (loader.style.display !== 'none') {
             loader.style.display = 'none';
-            console.log("IA Operativa - Motor Sincronizado");
-            document.getElementById('contenedor-analisis').style.display = 'block';
+            console.log("IA Operativa - Modelo Jerárquico T Cargado");
         }
         iaActiva = true;
         onResults(res);
     });
 
-    // 4. Loop de frames optimizado para evitar congelamientos[cite: 5]
+    // Loop de frames con control de estado
     async function frameLoop() {
-        // En modo archivo, permitimos procesar incluso en pausa para la calibración inicial
-        if (video.ended) return;
+        if (video.paused || video.ended) return;
 
         try {
-            if (video.readyState >= 2) { // HAVE_CURRENT_DATA: El video tiene datos para procesar[cite: 5]
-                await pose.send({ image: video });
-            }
+            await pose.send({ image: video });
         } catch (e) {
-            console.warn("GPU Saturada o motor ocupado: Frame omitido.");
+            console.warn("Frame omitido por procesamiento pesado.");
         }
         
-        // Mantener el ciclo si el video está en reproducción[cite: 5]
-        if (!video.paused && !video.ended) {
+        if (iaActiva) {
             requestAnimationFrame(frameLoop);
-        } else if (!iaActiva) {
-            // Si la IA aún no arranca, reintento lento para no saturar el hilo principal
+        } else {
+            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
             setTimeout(frameLoop, 500);
         }
     }
     
-    // Gestión de eventos para evitar bucles duplicados[cite: 5]
-    video.removeEventListener('play', frameLoop); 
-    video.addEventListener('play', frameLoop);
-    
-    // Disparo inicial para detectar al trabajador en el frame actual (útil para archivos pausados)[cite: 5]
     frameLoop();
-}
+}   
+
+
     
 
 function descargarVideo() {
@@ -947,198 +886,6 @@ function cambiarCamara() {
 function validarYAbrirArchivo() {
     document.getElementById('fileInput').click();
 }
-
-/* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
-
-/**
- * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
- * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
- */
-
-/**
- * Valida el formulario (incluyendo regla de 2 dígitos) y dispara la selección de archivo local.
- */
-function validarYAbrirArchivo() {
-    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
-
-    if (incompleto) {
-        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video.");
-        return;
-    }
-
-    // Validación estricta de edad a 2 dígitos[cite: 5]
-    const edadVal = document.getElementById('edadTrabajador').value.trim();
-    if (!/^\d{2}$/.test(edadVal)) {
-        alert("❌ La edad debe ser de exactamente 2 dígitos.");
-        document.getElementById('edadTrabajador').focus();
-        return;
-    }
-    
-    document.getElementById('fileInput').click();
-}
-
-/**
- * Configura el entorno para video local con prevención de errores de GPU.
- */
-async function procesarVideoArchivo() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-    if (!file) return;
-
-    // 1. Limpieza de flujos previos (Cámara)[cite: 5]
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => {
-            track.stop();
-            console.log("Cámara detenida para modo archivo");
-        });
-        video.srcObject = null;
-    }
-
-    // 2. Ajustes de Interfaz
-    if (document.getElementById('btn-girar-cam')) {
-        document.getElementById('btn-girar-cam').style.display = 'none';
-    }
-    document.getElementById('menu-inicial').style.display = 'none';
-    
-    const capaControles = document.getElementById('controles-archivo-flotantes');
-    if (capaControles) capaControles.style.display = 'flex';
-
-    // 3. Carga del archivo con gestión de memoria
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src); 
-    }
-    video.src = URL.createObjectURL(file);
-    video.loop = false; 
-    video.autoplay = false; 
-
-    // Bloque de sincronización crítica para estabilizar el video antes de la IA
-    video.onloadedmetadata = async () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Forzar salto a 0.1s para despertar el buffer de la GPU y evitar pantalla negra[cite: 5]
-        video.currentTime = 0.1; 
-
-        txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
-        
-        const iconPath = document.getElementById('svg-play-icon');
-        if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
-        
-        // Iniciar motor de IA con reinicio profundo
-        activarIA(); 
-    };
-}
-
-/**
- * Motor de IA con protección contra saturación de GPU y manejo de frames pausados.
- */
-async function activarIA() {
-    const loader = document.getElementById('loader-ia');
-    if (loader) loader.style.display = 'flex';
-    
-    // Margen de seguridad para carga de modelos[cite: 5]
-    const safetyTimeout = setTimeout(() => {
-        if (loader && loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Intente recargar la página o use un video de menor resolución.");
-        }
-    }, 20000);
-
-    // Hard Reset de la instancia Pose para liberar recursos de GPU[cite: 5]
-    if (typeof pose !== 'undefined' && pose) {
-        try { 
-            await pose.close(); 
-            pose = null; 
-        } catch(e) { console.warn("Reinicio de instancia fallido"); }
-    }
-
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
-
-    pose.setOptions({ 
-        modelComplexity: 1, 
-        smoothLandmarks: true, 
-        enableSegmentation: false, // Optimización para ahorrar GPU
-        minDetectionConfidence: 0.5, 
-        minTrackingConfidence: 0.5 
-    });
-
-    pose.onResults((res) => {
-        clearTimeout(safetyTimeout);
-        if (loader && loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            document.getElementById('contenedor-analisis').style.display = 'block';
-        }
-        iaActiva = true;
-        onResults(res);
-    });
-
-    // Bucle optimizado para frames estáticos (pausa) y dinámicos (play)[cite: 5]
-    async function loopIA() {
-        if (video.ended) return;
-
-        try {
-            if (video.readyState >= 2) { // HAVE_CURRENT_DATA
-                await pose.send({ image: video });
-            }
-        } catch (e) {
-            console.warn("GPU ocupada, saltando frame...");
-        }
-
-        // Si el video se está moviendo, seguimos el ciclo de animación
-        if (!video.paused && !video.ended) {
-            requestAnimationFrame(loopIA);
-        }
-    }
-    
-    // Escuchar eventos de reproducción para reactivar el loop[cite: 5]
-    video.removeEventListener('play', loopIA);
-    video.addEventListener('play', loopIA);
-    
-    // Primer escaneo para permitir calibración inmediata aunque esté en pausa[cite: 5]
-    loopIA();
-}
-
-function gestionarReproduccion() {
-    const iconPath = document.getElementById('svg-play-icon');
-    if (video.paused) {
-        video.play();
-        if (iconPath) iconPath.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-        txtStatus.innerText = "▶️ ANALIZANDO...";
-    } else {
-        video.pause();
-        if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
-        txtStatus.innerText = "⏸️ PAUSADO";
-    }
-}
-
-function retrocederSegundos() {
-    video.currentTime = Math.max(0, video.currentTime - 5);
-    // Forzar a la IA a procesar el frame estático después del salto[cite: 5]
-    if (video.paused && iaActiva) {
-        pose.send({ image: video });
-    }
-}
-
-function adelantarSegundos() {
-    video.currentTime = Math.min(video.duration, video.currentTime + 5);
-    // Forzar a la IA a procesar el frame estático después del salto[cite: 5]
-    if (video.paused && iaActiva) {
-        pose.send({ image: video });
-    }
-}
-
-// Listener para el input de archivo
-document.getElementById('fileInput').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) procesarVideoArchivo(); 
-});
-
-    
-
- 
-/* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
 </script>
 </body>
 </html>
