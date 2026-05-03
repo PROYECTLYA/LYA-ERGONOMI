@@ -1,6 +1,5 @@
 NO TOCAR
-
-JUE NOCH V4
+sin traba
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -721,8 +720,8 @@ function generarReporteWBA() {
     doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
 }
     
-    /**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
+/**
+ * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN OPTIMIZADA ANDROID
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
 async function prepararSistema(fuente) {
@@ -730,6 +729,8 @@ async function prepararSistema(fuente) {
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    const videoControls = document.getElementById('video-controls');
+    const btnGirar = document.getElementById('btn-girar');
     
     // Validación de campos vacíos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
@@ -738,9 +739,8 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    // Validación de EDAD (Estrictamente 2 cifras)
     const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
@@ -755,14 +755,14 @@ async function prepararSistema(fuente) {
     }
 
     // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
+    iaActiva = false; // Detener bucles previos
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
+    // Limpieza de flujos previos (Cámara o Archivos)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
@@ -772,50 +772,108 @@ async function prepararSistema(fuente) {
         video.src = "";
     }
 
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
+    // 2. Configuración según Fuente
     try {
         if (fuente === 'camara') {
+            videoControls.classList.add('d-none');
+            btnGirar.classList.remove('d-none');
+
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: currentFacingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
+                    width: { ideal: 640 }, // Resolución reducida para mayor fluidez en Android
+                    height: { ideal: 480 } 
                 } 
             });
             video.srcObject = stream;
         } else {
+            videoControls.classList.remove('d-none');
+            btnGirar.classList.add('d-none');
+
             const file = document.getElementById('fileInput').files[0];
             if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
+                alert("Seleccione un archivo de video."); 
                 return; 
             }
             video.src = URL.createObjectURL(file);
+            video.loop = true;
         }
 
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
+        // 3. Transición de Interfaz
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
-            
             try {
                 await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
+                activarIA(); 
             } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
+                console.error("Error play:", playError);
             }
         };
 
     } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
+        console.error("Error hardware:", err);
+        alert("Error: Verifique permisos de cámara.");
         location.reload();
     }
 }
+
+async function activarIA() {
+    const loader = document.getElementById('loader-ia');
+    loader.style.display = 'flex';
+    
+    const safetyTimeout = setTimeout(() => {
+        if (loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            alert("⚠️ El motor de IA tarda en responder. Verifique su conexión o GPU.");
+        }
+    }, 12000);
+
+    if (pose) {
+        try { await pose.close(); } catch(e) {}
+    }
+
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
+
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.5, 
+        minTrackingConfidence: 0.5 
+    });
+
+    pose.onResults((res) => {
+        clearTimeout(safetyTimeout);
+        if (loader.style.display !== 'none') loader.style.display = 'none';
+        iaActiva = true;
+        onResults(res);
+    });
+
+    // Bucle de frames controlado (Evita saturación en Android)
+    async function frameLoop() {
+        if (video.paused || video.ended) return;
+
+        try {
+            // CRÍTICO: Esperamos a que la IA procese el frame antes de pedir el siguiente
+            await pose.send({ image: video });
+        } catch (e) {
+            console.warn("Frame drop");
+        }
+        
+        // Solo solicita el siguiente frame si el sistema sigue activo
+        if (document.getElementById('contenedor-analisis').style.display !== 'none') {
+            requestAnimationFrame(frameLoop);
+        }
+    }
+    
+    frameLoop();
+}
+
 // --- GESTIÓN DE VIDEO ---
 function togglePlay() {
     const playIcon = document.getElementById('playIcon');
@@ -828,108 +886,11 @@ function togglePlay() {
     }
 }
 
-function rewindVideo() {
-    video.currentTime = Math.max(0, video.currentTime - 5);
-}
-
-function forwardVideo() {
-    video.currentTime = Math.min(video.duration, video.currentTime + 5);
-}
-
-// --- ACTUALIZACIÓN DE PREPARAR SISTEMA ---
-async function prepararSistema(fuente) {
-    // ... (Mantén tus validaciones de formulario actuales)
-
-    const videoControls = document.getElementById('video-controls');
-    const btnGirar = document.getElementById('btn-girar');
-
-    if (fuente === 'archivo') {
-        videoControls.classList.remove('d-none'); // Muestra Play/Pause
-        btnGirar.classList.add('d-none');        // Oculta Girar Cámara
-        
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return;
-        video.src = URL.createObjectURL(file);
-        video.loop = true; // Permite análisis continuo
-    } else {
-        videoControls.classList.add('d-none');
-        btnGirar.classList.remove('d-none');
-        // ... (Lógica de getUserMedia actual)
-    }
-
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
-    video.onloadedmetadata = async () => {
-        canvas.width = video.videoWidth; 
-        canvas.height = video.videoHeight;
-        await video.play();
-        activarIA();
-    };
-}
-    
-async function activarIA() {
-    const loader = document.getElementById('loader-ia');
-    loader.style.display = 'flex';
-    
-    // Timeout de seguridad mejorado
-    const safetyTimeout = setTimeout(() => {
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
-        }
-    }, 10000);
-
-    // Reinicializar instancia de Pose si ya existía para liberar memoria
-    if (pose) {
-        try { await pose.close(); } catch(e) {}
-    }
-
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
-
-    pose.setOptions({ 
-        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
-        smoothLandmarks: true, 
-        minDetectionConfidence: 0.5, 
-        minTrackingConfidence: 0.5 
-    });
-
-    pose.onResults((res) => {
-        clearTimeout(safetyTimeout);
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            console.log("IA Operativa - Modelo Jerárquico T Cargado");
-        }
-        iaActiva = true;
-        onResults(res);
-    });
-
-    // Loop de frames con control de estado
-    async function frameLoop() {
-        if (video.paused || video.ended) return;
-
-        try {
-            await pose.send({ image: video });
-        } catch (e) {
-            console.warn("Frame omitido por procesamiento pesado.");
-        }
-        
-        if (iaActiva) {
-            requestAnimationFrame(frameLoop);
-        } else {
-            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
-            setTimeout(frameLoop, 500);
-        }
-    }
-    
-    frameLoop();
-}   
+function rewindVideo() { video.currentTime = Math.max(0, video.currentTime - 5); }
+function forwardVideo() { video.currentTime = Math.min(video.duration, video.currentTime + 5); }
 
 
     
-
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
 
