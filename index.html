@@ -1,4 +1,4 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA
+SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA V1
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -783,101 +783,68 @@ function generarReporteWBA() {
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
 async function prepararSistema(fuente) {
-    // 1. Referencias y Captura de Datos
     const edadInput = document.getElementById('edadTrabajador');
-    const pesoInput = document.getElementById('pesoCarga');
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     
     // Validación de campos vacíos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
     if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario antes de iniciar el análisis."); 
+        alert("⚠️ Por favor, complete todos los campos del formulario."); 
         return; 
     }
 
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
-    const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
-    if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
+    // Validación estricta de edad (2 dígitos)[cite: 5]
+    if (!/^\d{2}$/.test(edadInput.value.trim())) {
+        alert("❌ Error en EDAD: Debe ingresar exactamente 2 cifras.");
         edadInput.focus();
         return;
     }
 
-    // Validación de peso
-    if (parseFloat(pesoInput.value) <= 0) {
-        alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
-        pesoInput.focus();
-        return;
-    }
-
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
+    // Limpieza de estados previos
     angleBuffer = {}; 
     posBuffer = {};
-    wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
+    // Detener flujos de cámara previos si existen[cite: 5]
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src);
-        video.src = "";
-    }
-
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
 
     try {
         if (fuente === 'camara') {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                } 
+                video: { facingMode: currentFacingMode } 
             });
             video.srcObject = stream;
         } else {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
-                return; 
-            }
+            if (!file) return;
             video.src = URL.createObjectURL(file);
+            document.getElementById('controles-archivo-flotantes').style.display = 'flex';
+            document.getElementById('btn-girar-cam').style.display = 'none';
         }
 
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
-        video.onloadedmetadata = async () => {
+        video.onloadedmetadata = () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
-            
-            try {
-                await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
-            } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
-            }
+            video.play();
+            activarIA(); // Llamada única al motor[cite: 5]
         };
 
     } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
+        alert("Error de acceso al hardware o archivo.");
         location.reload();
     }
 }
+    
+
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
-    // 1. Aumentamos el margen de espera a 20s para videos locales pesados
+    // 1. Margen de seguridad para carga de modelos pesados
     const safetyTimeout = setTimeout(() => {
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
@@ -885,15 +852,17 @@ async function activarIA() {
         }
     }, 20000);
 
-    // 2. REINICIO PROFUNDO: Liberar memoria de GPU antes de crear nueva instancia
+    // 2. REINICIO PROFUNDO: Liberar memoria de GPU antes de crear nueva instancia[cite: 5]
     if (typeof pose !== 'undefined' && pose) {
         try { 
             await pose.close(); 
-            pose = null; // Forzar recolección de basura
-        } catch(e) { console.warn("Error liberando instancia previa"); }
+            pose = null; // Forzar recolección de basura para evitar fugas de memoria
+        } catch(e) { 
+            console.warn("Error liberando instancia previa"); 
+        }
     }
 
-    // 3. Nueva instancia de MediaPipe
+    // 3. Nueva instancia de MediaPipe con optimización de recursos
     pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
@@ -901,52 +870,52 @@ async function activarIA() {
     pose.setOptions({ 
         modelComplexity: 1, 
         smoothLandmarks: true, 
-        enableSegmentation: false, // Desactivar si no se usa para ahorrar GPU
+        enableSegmentation: false, // Desactivado para ahorrar procesamiento de GPU
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
+    // Manejador de resultados: Oculta el cargador solo cuando la IA responde realmente[cite: 5]
     pose.onResults((res) => {
         clearTimeout(safetyTimeout);
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
             console.log("IA Operativa - Motor Sincronizado");
+            document.getElementById('contenedor-analisis').style.display = 'block';
         }
         iaActiva = true;
         onResults(res);
     });
 
-    // 4. Loop de frames optimizado para ARCHIVO y VIVO
+    // 4. Loop de frames optimizado para evitar congelamientos[cite: 5]
     async function frameLoop() {
-        // En modo archivo, permitimos un frame inicial incluso en pausa para calibrar
-        if (video.ended || (!iaActiva && video.paused)) return;
+        // En modo archivo, permitimos procesar incluso en pausa para la calibración inicial
+        if (video.ended) return;
 
         try {
-            if (video.readyState >= 2) { // Verificar que el video tiene datos suficientes
+            if (video.readyState >= 2) { // HAVE_CURRENT_DATA: El video tiene datos para procesar[cite: 5]
                 await pose.send({ image: video });
             }
         } catch (e) {
-            console.warn("GPU Saturada: Frame omitido.");
+            console.warn("GPU Saturada o motor ocupado: Frame omitido.");
         }
         
-        // Si el video está reproduciéndose, seguimos el loop[cite: 4]
+        // Mantener el ciclo si el video está en reproducción[cite: 5]
         if (!video.paused && !video.ended) {
             requestAnimationFrame(frameLoop);
         } else if (!iaActiva) {
-            // Reintento lento inicial si la IA aún no responde
+            // Si la IA aún no arranca, reintento lento para no saturar el hilo principal
             setTimeout(frameLoop, 500);
         }
     }
     
-    // Iniciar loop cuando el video empiece a reproducirse[cite: 4]
-    video.removeEventListener('play', frameLoop); // Evitar duplicados
+    // Gestión de eventos para evitar bucles duplicados[cite: 5]
+    video.removeEventListener('play', frameLoop); 
     video.addEventListener('play', frameLoop);
     
-    // Ejecución inicial para detectar al trabajador en el frame estático[cite: 4]
+    // Disparo inicial para detectar al trabajador en el frame actual (útil para archivos pausados)[cite: 5]
     frameLoop();
 }
-
-
     
 
 function descargarVideo() {
@@ -979,25 +948,30 @@ function validarYAbrirArchivo() {
     document.getElementById('fileInput').click();
 }
 
-
-
-    
-
-   /* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
+/* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
 
 /**
  * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
  * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
  */
+
 /**
- * Valida el formulario y dispara la selección de archivo local.
+ * Valida el formulario (incluyendo regla de 2 dígitos) y dispara la selección de archivo local.
  */
-    function validarYAbrirArchivo() {
+function validarYAbrirArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
 
     if (incompleto) {
-        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video para la auditoría.");
+        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video.");
+        return;
+    }
+
+    // Validación estricta de edad a 2 dígitos[cite: 5]
+    const edadVal = document.getElementById('edadTrabajador').value.trim();
+    if (!/^\d{2}$/.test(edadVal)) {
+        alert("❌ La edad debe ser de exactamente 2 dígitos.");
+        document.getElementById('edadTrabajador').focus();
         return;
     }
     
@@ -1012,7 +986,7 @@ async function procesarVideoArchivo() {
     const file = fileInput.files[0];
     if (!file) return;
 
-    // 1. Limpieza de flujos previos (Cámara)
+    // 1. Limpieza de flujos previos (Cámara)[cite: 5]
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => {
             track.stop();
@@ -1026,7 +1000,6 @@ async function procesarVideoArchivo() {
         document.getElementById('btn-girar-cam').style.display = 'none';
     }
     document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
     
     const capaControles = document.getElementById('controles-archivo-flotantes');
     if (capaControles) capaControles.style.display = 'flex';
@@ -1039,12 +1012,12 @@ async function procesarVideoArchivo() {
     video.loop = false; 
     video.autoplay = false; 
 
-    // Bloque de sincronización crítica
+    // Bloque de sincronización crítica para estabilizar el video antes de la IA
     video.onloadedmetadata = async () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        // Forzar salto a 0.1s para despertar el buffer de la GPU
+        // Forzar salto a 0.1s para despertar el buffer de la GPU y evitar pantalla negra[cite: 5]
         video.currentTime = 0.1; 
 
         txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
@@ -1052,26 +1025,27 @@ async function procesarVideoArchivo() {
         const iconPath = document.getElementById('svg-play-icon');
         if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
         
-        // Iniciar motor de IA después de estabilizar el video
+        // Iniciar motor de IA con reinicio profundo
         activarIA(); 
     };
 }
 
 /**
- * Motor de IA con protección contra saturación de GPU.
+ * Motor de IA con protección contra saturación de GPU y manejo de frames pausados.
  */
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
+    // Margen de seguridad para carga de modelos[cite: 5]
     const safetyTimeout = setTimeout(() => {
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Intente recargar la página.");
+            alert("⚠️ El motor de IA está tardando en responder. Intente recargar la página o use un video de menor resolución.");
         }
     }, 20000);
 
-    // Hard Reset de la instancia Pose para liberar recursos
+    // Hard Reset de la instancia Pose para liberar recursos de GPU[cite: 5]
     if (typeof pose !== 'undefined' && pose) {
         try { 
             await pose.close(); 
@@ -1086,39 +1060,44 @@ async function activarIA() {
     pose.setOptions({ 
         modelComplexity: 1, 
         smoothLandmarks: true, 
+        enableSegmentation: false, // Optimización para ahorrar GPU
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
     pose.onResults((res) => {
         clearTimeout(safetyTimeout);
-        if (loader) loader.style.display = 'none';
+        if (loader && loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            document.getElementById('contenedor-analisis').style.display = 'block';
+        }
         iaActiva = true;
         onResults(res);
     });
 
-    // Bucle optimizado para frames estáticos y dinámicos
+    // Bucle optimizado para frames estáticos (pausa) y dinámicos (play)[cite: 5]
     async function loopIA() {
         if (video.ended) return;
 
         try {
-            if (video.readyState >= 2) { // Asegurar que hay datos de imagen
+            if (video.readyState >= 2) { // HAVE_CURRENT_DATA
                 await pose.send({ image: video });
             }
         } catch (e) {
             console.warn("GPU ocupada, saltando frame...");
         }
 
+        // Si el video se está moviendo, seguimos el ciclo de animación
         if (!video.paused && !video.ended) {
             requestAnimationFrame(loopIA);
         }
     }
     
-    // Escuchar cambios de reproducción
+    // Escuchar eventos de reproducción para reactivar el loop[cite: 5]
     video.removeEventListener('play', loopIA);
     video.addEventListener('play', loopIA);
     
-    // Primer escaneo para calibración en pausa
+    // Primer escaneo para permitir calibración inmediata aunque esté en pausa[cite: 5]
     loopIA();
 }
 
@@ -1134,10 +1113,10 @@ function gestionarReproduccion() {
         txtStatus.innerText = "⏸️ PAUSADO";
     }
 }
-// REEMPLAZA ESTAS FUNCIONES EN EL BLOQUE DE ARCHIVO
+
 function retrocederSegundos() {
     video.currentTime = Math.max(0, video.currentTime - 5);
-    // Forzar a la IA a procesar el frame estático después del salto
+    // Forzar a la IA a procesar el frame estático después del salto[cite: 5]
     if (video.paused && iaActiva) {
         pose.send({ image: video });
     }
@@ -1145,16 +1124,20 @@ function retrocederSegundos() {
 
 function adelantarSegundos() {
     video.currentTime = Math.min(video.duration, video.currentTime + 5);
-    // Forzar a la IA a procesar el frame estático después del salto[cite: 4]
+    // Forzar a la IA a procesar el frame estático después del salto[cite: 5]
     if (video.paused && iaActiva) {
         pose.send({ image: video });
     }
 }
 
+// Listener para el input de archivo
 document.getElementById('fileInput').addEventListener('change', (e) => {
     if (e.target.files.length > 0) procesarVideoArchivo(); 
 });
 
+    
+
+ 
 /* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
 </script>
 </body>
