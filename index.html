@@ -177,7 +177,22 @@ JUE NOCH V4
         animation: pulse-red 1.5s infinite;
         transform: scale(1.1);
     }
+.btn-video {
+    background: black;
+    border: 4px solid white;
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
 
+.btn-video:active { transform: scale(0.9); }
+
+.d-none { display: none !important; }
     @keyframes pulse-red {
         0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
         70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
@@ -209,7 +224,26 @@ JUE NOCH V4
         ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
     </div>
 </div>
+<div id="contenedor-analisis">
+    <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
+    
+    <!-- Controles de Video (Solo visibles en modo ARCHIVO) -->
+    <div id="video-controls" class="d-none" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 7000;">
+        <button class="btn-video" onclick="rewindVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/rewind.png" width="30"></button>
+        <button id="playBtn" class="btn-video" onclick="togglePlay()"><img id="playIcon" src="https://img.icons8.com/ios-filled/50/ffffff/pause.png" width="40"></button>
+        <button class="btn-video" onclick="forwardVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/fast-forward.png" width="30"></button>
+    </div>
 
+    <!-- Barra de Controles Inferior -->
+    <div class="barra-controles">
+        <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
+        <button id="btn-girar" class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
+        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
+    </div>
+</div>
 <!-- Menú de Captura de Datos -->
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
@@ -782,7 +816,57 @@ async function prepararSistema(fuente) {
         location.reload();
     }
 }
+// --- GESTIÓN DE VIDEO ---
+function togglePlay() {
+    const playIcon = document.getElementById('playIcon');
+    if (video.paused) {
+        video.play();
+        playIcon.src = "https://img.icons8.com/ios-filled/50/ffffff/pause.png";
+    } else {
+        video.pause();
+        playIcon.src = "https://img.icons8.com/ios-filled/50/ffffff/play.png";
+    }
+}
 
+function rewindVideo() {
+    video.currentTime = Math.max(0, video.currentTime - 5);
+}
+
+function forwardVideo() {
+    video.currentTime = Math.min(video.duration, video.currentTime + 5);
+}
+
+// --- ACTUALIZACIÓN DE PREPARAR SISTEMA ---
+async function prepararSistema(fuente) {
+    // ... (Mantén tus validaciones de formulario actuales)
+
+    const videoControls = document.getElementById('video-controls');
+    const btnGirar = document.getElementById('btn-girar');
+
+    if (fuente === 'archivo') {
+        videoControls.classList.remove('d-none'); // Muestra Play/Pause
+        btnGirar.classList.add('d-none');        // Oculta Girar Cámara
+        
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return;
+        video.src = URL.createObjectURL(file);
+        video.loop = true; // Permite análisis continuo
+    } else {
+        videoControls.classList.add('d-none');
+        btnGirar.classList.remove('d-none');
+        // ... (Lógica de getUserMedia actual)
+    }
+
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+
+    video.onloadedmetadata = async () => {
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        await video.play();
+        activarIA();
+    };
+}
     
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
