@@ -1,4 +1,4 @@
-PRUEVA DOM V5
+PRUEVA DOM V7
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -386,7 +386,10 @@ const NIOSH = {
         return C === "bueno" ? 1 : (C === "regular" ? 0.95 : 0.90);
     }
 };
-
+// Solo resetea valores, no oculta el menú
+function limpiarFormulario() {
+    document.querySelectorAll('.form-control-custom').forEach(input => input.value = '');
+}
 // 🔴 RWL (Recommended Weight Limit)
 function calcularRWL(params) {
     const { H, V, D, A, F, C } = params;
