@@ -421,7 +421,6 @@ function onResults(res) {
 
     const lm = res.poseLandmarks;
 
-    // Helper de suavizado
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
@@ -432,50 +431,35 @@ function onResults(res) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS CLAVE ---
+    // --- MAPEO DE PUNTOS CLAVE EXTENDIDO ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11), 
         c_d: pt(14), c_i: pt(13), 
         m_d: pt(16), m_i: pt(15), 
-        dedo_d: pt(20), dedo_i: pt(19),
+        dedo_d: pt(20), dedo_i: pt(19), // Puntos para muñecas
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27)
+        t_d: pt(28), t_i: pt(27),
+        pie_d: pt(32), pie_i: pt(31)   // Puntos para pies
     };
 
-    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
-    // 1. Creamos el punto central exacto entre las orejas
-    p.centro_orejas = { 
-        x: (p.ore_d.x + p.ore_i.x) / 2, 
-        y: (p.ore_d.y + p.ore_i.y) / 2, 
-        z: (p.ore_d.z + p.ore_i.z) / 2 
-    };
+    // --- PUNTOS DE CONEXIÓN ESTRUCTURAL ---
+    p.centro_orejas = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
+    p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
+    
+    // Punto Sacro: Conecta la columna con el centro de las piernas
+    p.sacro = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
 
-    // 2. Punto central de los hombros (Cuello base)
-    p.cue = { 
-        x: (p.h_d.x + p.h_i.x) / 2, 
-        y: (p.h_d.y + p.h_i.y) / 2, 
-        z: (p.h_d.z + p.h_i.z) / 2 
-    };
-
-    // 3. Punto central de la cadera (Espalda baja)
-    p.esp_baja = { 
-        x: (p.p_d.x + p.p_i.x) / 2, 
-        y: (p.p_d.y + p.p_i.y) / 2, 
-        z: (p.p_d.z + p.p_i.z) / 2 
-    };
-
-    // Segmentos del tronco para mayor estabilidad visual
-    p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
-    p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
+    p.torax = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.3, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.3, z: p.cue.z };
+    p.abdomen = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.6, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.6, z: p.cue.z };
 
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
     // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
         cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
-        tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
+        tronco: calcAng3D(p.cue, p.sacro, verticalRef),
         h_d: calcAng3D(p.cue, p.h_d, p.c_d),
         h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
@@ -490,31 +474,36 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
+    // --- RENDERIZADO ---
     
-    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
+    // Cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v);
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
 
-    // Eje Central (Columna)
+    // Eje Central (Columna conectada hasta el sacro)
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
-    drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
+    drawV(p.abdomen, p.sacro, 'tronco', 'tronco', 1, 1);
 
-    // Conexión de Hombros (Barra horizontal del pecho)
+    // Hombros y Pelvis (Cierre de estructura)
     drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
+    drawV(p.p_d, p.p_i, 'tronco', 'piernas', p.p_d.v, p.p_i.v);
 
-    // Brazos
+    // Brazos y Muñecas
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+    drawV(p.m_d, p.dedo_d, 'c_d', 'munecas', p.m_d.v, p.dedo_d.v); // Vector de muñeca
+    drawV(p.m_i, p.dedo_i, 'c_i', 'munecas', p.m_i.v, p.dedo_i.v);
 
-    // Piernas (Desde los puntos de la cadera)
+    // Piernas y Pies[cite: 5]
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
+    drawV(p.t_d, p.pie_d, 'r_d', 'piernas', p.t_d.v, p.pie_d.v); // Vector de pie
+    drawV(p.t_i, p.pie_i, 'r_i', 'piernas', p.t_i.v, p.pie_i.v);
 
     ctx.restore();
 }
