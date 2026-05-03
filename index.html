@@ -1,4 +1,4 @@
-PRUEVA DOM V2
+PRUEVA DOM V3
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -301,7 +301,11 @@ PRUEVA DOM V2
 </div>
 
 <script>
-
+// Referencias globales al DOM
+const video = document.getElementById('input_video');
+const canvas = document.getElementById('output_canvas');
+const ctx = canvas.getContext('2d');
+const txtStatus = document.getElementById('txt-status');
 /**
  * 🏷️ BLOQUE 1: CONFIGURACIÓN AVANZADA NOM-036 + NIOSH (VERSIÓN CRÍTICA VALIDADA)
  */
@@ -1094,12 +1098,16 @@ function generarReporteWBA() {
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
 async function prepararSistema(fuente) {
-    // 1. Referencias y Captura de Datos
+    // 1. Captura de Referencias Locales
+    const video = document.getElementById('input_video'); // Referencia necesaria
+    const canvas = document.getElementById('output_canvas'); // Referencia necesaria
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
-    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     const videoControls = document.getElementById('video-controls');
     const btnGirar = document.getElementById('btn-girar');
+    
+    // IDs para validación de campos obligatorios
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     
     // Validación de campos vacíos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
@@ -1108,7 +1116,7 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // Validación de EDAD (Estrictamente 2 cifras)
+    // Validación de EDAD (Estrictamente 2 cifras según requerimiento)
     const edadValor = edadInput.value.trim();
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
@@ -1116,50 +1124,54 @@ async function prepararSistema(fuente) {
         return;
     }
 
-    // Validación de peso
-    if (parseFloat(pesoInput.value) <= 0) {
+    // Validación de peso (Debe ser numérico y positivo)
+    if (parseFloat(pesoInput.value) <= 0 || isNaN(parseFloat(pesoInput.value))) {
         alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
         pesoInput.focus();
         return;
     }
 
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    iaActiva = false; // Detener bucles previos
+    // --- LIMPIEZA DE MEMORIA Y ESTADOS GLOBALES ---
+    // Asegúrate de que estas variables estén declaradas fuera de la función (let o var)[cite: 1]
+    iaActiva = false; 
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // Limpieza de flujos previos (Cámara o Archivos)
+    // Detener flujos de cámara previos para liberar hardware en Android[cite: 1]
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    if (video.src.startsWith('blob:')) {
+    // Liberar memoria si se usó un archivo anteriormente
+    if (video.src && video.src.startsWith('blob:')) {
         URL.revokeObjectURL(video.src);
         video.src = "";
     }
 
-    // 2. Configuración según Fuente
+    // 2. Configuración según Fuente (Cámara o Archivo Local)
     try {
         if (fuente === 'camara') {
             videoControls.classList.add('d-none');
-            btnGirar.classList.remove('d-none');
+            if (btnGirar) btnGirar.classList.remove('d-none');
 
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 640 }, // Resolución reducida para mayor fluidez en Android
+                    facingMode: typeof currentFacingMode !== 'undefined' ? currentFacingMode : "environment", 
+                    width: { ideal: 640 }, 
                     height: { ideal: 480 } 
                 } 
             });
             video.srcObject = stream;
         } else {
             videoControls.classList.remove('d-none');
-            btnGirar.classList.add('d-none');
+            if (btnGirar) btnGirar.classList.add('d-none');
 
-            const file = document.getElementById('fileInput').files[0];
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput ? fileInput.files[0] : null;
+            
             if (!file) { 
                 alert("Seleccione un archivo de video."); 
                 return; 
@@ -1168,24 +1180,25 @@ async function prepararSistema(fuente) {
             video.loop = true;
         }
 
-        // 3. Transición de Interfaz
+        // 3. Transición Visual de Interfaz
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('contenedor-analisis').style.display = 'block';
 
+        // Inicialización del Canvas y el Motor de IA al cargar el video
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
             try {
                 await video.play();
-                activarIA(); 
+                activarIA(); // Inicia el procesamiento de MediaPipe Pose[cite: 1]
             } catch (playError) {
-                console.error("Error play:", playError);
+                console.error("Error al reproducir video:", playError);
             }
         };
 
     } catch (err) {
-        console.error("Error hardware:", err);
-        alert("Error: Verifique permisos de cámara.");
+        console.error("Error crítico de hardware:", err);
+        alert("Error: Verifique permisos de cámara o compatibilidad del navegador.");
         location.reload();
     }
 }
