@@ -1,4 +1,4 @@
-PRUEVA DOM V6
+PRUEVA DOM V5
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -490,9 +490,8 @@ function calcAng3D(a, b, c) {
 /**
  * 🎨 BLOQUE CORREGIDO: drawV (RENDERIZADO ERGONÓMICO)
  */
-
-   const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    // 🛡️ Abortar si los puntos no son válidos
+const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
+    // 🛡️ Abortar si los puntos no son válidos (coordenadas en 0)
     if (p1.x === 0 || p2.x === 0) return;
 
     // 🌊 Suavizado del ángulo mediante el promedio del historial
@@ -554,7 +553,7 @@ function calcAng3D(a, b, c) {
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
 
-    // 🏷️ Etiqueta de ángulo (solo si el riesgo no es seguro)
+    // 🏷️ Etiqueta de ángulo (opcional: solo si el riesgo es alto)
     if (status !== "SEGURO" && !esSimulado) {
         ctx.fillStyle = "white";
         ctx.font = "bold 10px Arial";
@@ -563,9 +562,11 @@ function calcAng3D(a, b, c) {
     }
 
     ctx.restore();
-
-
-       function onResults(res) {
+};
+    /**
+ * 🏷️ BLOQUE CORREGIDO: onResults (IA & LÓGICA NIOSH)
+ */
+function onResults(res) {
     const w = canvas.width, h = canvas.height;
     wbaStats._frameContado = false; 
 
@@ -585,6 +586,7 @@ function calcAng3D(a, b, c) {
         return; 
     }
 
+    // Ocultar loader una vez detectado el trabajador
     const loader = document.getElementById('loader-ia');
     if (loader && loader.style.display !== 'none') loader.style.display = 'none';
 
@@ -612,26 +614,26 @@ function calcAng3D(a, b, c) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: currentVis };
     };
 
-    // --- MAPEO DE PUNTOS ---
+    // --- MAPEO DE PUNTOS (INCLUYE MUÑECAS Y PIES) ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11),
         c_d: pt(14), c_i: pt(13), 
-        m_d: pt(16), m_i: pt(15),   // Muñecas
-        d_d: pt(20), d_i: pt(19),   // Dedos (Índice)
-        p_d: pt(24), p_i: pt(23),   // Pelvis
-        r_d: pt(26), r_i: pt(25),   // Rodillas
-        t_d: pt(28), t_i: pt(27),   // Tobillos
-        pie_d: pt(32), pie_i: pt(31) // Puntas de los pies
+        m_d: pt(16), m_i: pt(15),  // Muñecas
+        d_d: pt(20), d_i: pt(19),  // Dedos (para ángulo de muñeca)
+        p_d: pt(24), p_i: pt(23),  // Pelvis/Cadera
+        r_d: pt(26), r_i: pt(25),  // Rodillas
+        t_d: pt(28), t_i: pt(27),  // Tobillos
+        pie_d: pt(32), pie_i: pt(31) // Pies
     };
 
-    // --- ESTRUCTURA CENTRAL ---
+    // --- ESTRUCTURA EN "T" Y COLUMNA ---
     p.cabeza_t = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2 };
     p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2 };
     p.sacro = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2 };
     const verticalRef = { x: p.cuello.x, y: p.cuello.y + 100, z: 0 };
 
-    // --- CÁLCULO DE ÁNGULOS (EXTENDIDO) ---
+    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
         cuello: calcAng3D(p.cabeza_t, p.cuello, verticalRef),
         tronco: calcAng3D(p.cuello, p.sacro, verticalRef),
@@ -639,13 +641,11 @@ function calcAng3D(a, b, c) {
         h_i: calcAng3D(p.cuello, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
         c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        m_d: calcAng3D(p.c_d, p.m_d, p.d_d),   // Ángulo Muñeca Derecha
-        m_i: calcAng3D(p.c_i, p.m_i, p.d_i),   // Ángulo Muñeca Izquierda
-        pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d), // Ángulo Pie Derecho
-        pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)  // Ángulo Pie Izquierdo
+        m_d: calcAng3D(p.c_d, p.m_d, p.d_d),
+        m_i: calcAng3D(p.c_i, p.m_i, p.d_i)
     };
 
-    // Actualizar historial
+    // Actualizar historial de ángulos
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
@@ -653,30 +653,26 @@ function calcAng3D(a, b, c) {
     });
 
     // --- RENDERIZADO DE VECTORES ---
-    // Torso y Cuello
+    // Estructura T
     drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
     drawV(p.cabeza_t, p.cuello, 'cuello', 'cuello', 1, 1);
     drawV(p.cuello, p.sacro, 'tronco', 'tronco', 1, 1);
 
-    // Brazos y Muñecas
+    // Extremidades Superiores (Incluye conexión a muñecas)
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.m_d, p.d_d, 'm_d', 'muñecas', p.m_d.v, p.d_d.v);
-
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_i, p.d_i, 'm_i', 'muñecas', p.m_i.v, p.d_i.v);
 
-    // Piernas y Pies
+    // Extremidades Inferiores (Incluye conexión a pies)
     drawV(p.p_d, p.r_d, 'tronco', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
     drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);
-
     drawV(p.p_i, p.r_i, 'tronco', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
     drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);
 
-    // --- LÓGICA NIOSH ---
+    // --- LÓGICA NIOSH & RIESGO ---
     if (analizandoRiesgo && calibrado) {
         const manosVisibles = (p.m_d.v >= 0.4 && p.m_i.v >= 0.4);
         if (!manosVisibles) {
@@ -701,6 +697,7 @@ function calcAng3D(a, b, c) {
             }
         }
 
+        // Cálculos NIOSH en tiempo real
         if (levantandoAhora) {
             const peso = parseFloat(document.getElementById('pesoCarga').value) || 0;
             const H = Math.abs((p.m_d.x + p.m_i.x)/2 - p.cuello.x) * 0.1;
@@ -717,14 +714,13 @@ function calcAng3D(a, b, c) {
             ctx.font = "bold 16px Arial";
             ctx.fillText(`LI: ${li.toFixed(2)}`, 35, 45);
             ctx.font = "12px Arial";
-            ctx.fillText(`RWL: ${RWL.toFixed(1)}kg`, 35, 65);
+            ctx.fillText(`Límite (RWL): ${RWL.toFixed(1)}kg`, 35, 65);
             ctx.fillText(`Estado: ${nivel}`, 35, 85);
         }
     }
 
     ctx.restore();
 }
-};
 
     
     
