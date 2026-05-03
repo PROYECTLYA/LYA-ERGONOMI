@@ -1,4 +1,4 @@
-PRUEVA DOM V3
+PRUEVA DOM V4
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -209,40 +209,21 @@ PRUEVA DOM V3
 }
 </style>
 </head>
+
 <body>
 
-<!-- Pantalla de carga de IA -->
-<div id="loader-ia">
+<!-- 1. PANTALLA DE CARGA (Oculta por defecto, se activa al iniciar IA) -->
+<div id="loader-ia" style="display: none;">
     <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
     <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
         <div id="bar-id" class="progress-bar" style="width: 100%;"></div>
     </div>
-    <!-- Sugerencia para el Auditor -->
     <div class="plant-tip">
         ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
     </div>
 </div>
-<div id="contenedor-analisis">
-    <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
-    <canvas id="output_canvas"></canvas>
-    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
-    
-    <!-- Controles de Video (Solo visibles en modo ARCHIVO) -->
-    <div id="video-controls" class="d-none" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 7000;">
-        <button class="btn-video" onclick="rewindVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/rewind.png" width="30"></button>
-        <button id="playBtn" class="btn-video" onclick="togglePlay()"><img id="playIcon" src="https://img.icons8.com/ios-filled/50/ffffff/pause.png" width="40"></button>
-        <button class="btn-video" onclick="forwardVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/fast-forward.png" width="30"></button>
-    </div>
 
-    <!-- Barra de Controles Inferior -->
-    <div class="barra-controles">
-        <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button id="btn-girar" class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
-        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
-        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
-    </div>
-</div>
-<!-- Menú de Captura de Datos -->
+<!-- 2. MENÚ DE CAPTURA DE DATOS (Se muestra al inicio) -->
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría Ergonómica NOM-036-STPS</p>
@@ -279,6 +260,7 @@ PRUEVA DOM V3
         </div>
     </div>
 
+    <!-- Botones de Acceso: No se habilitan si faltan campos -->
     <div class="d-flex gap-2">
         <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
         <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
@@ -286,19 +268,30 @@ PRUEVA DOM V3
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
 
-<!-- Contenedor de Análisis IA -->
-<div id="contenedor-analisis">
+<!-- 3. CONTENEDOR DE ANÁLISIS IA (Único y centralizado) -->
+<div id="contenedor-analisis" style="display: none;">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
-    <canvas id="output_canvas"></canvas>
-  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
+    <canvas id="output_canvas"></canvas>
+    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
+    
+    <!-- Controles de Video (Solo modo ARCHIVO) -->
+    <div id="video-controls" class="d-none" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 7000;">
+        <button class="btn-video" onclick="rewindVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/rewind.png" width="30"></button>
+        <button id="playBtn" class="btn-video" onclick="togglePlay()"><img id="playIcon" src="https://img.icons8.com/ios-filled/50/ffffff/pause.png" width="40"></button>
+        <button class="btn-video" onclick="forwardVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/fast-forward.png" width="30"></button>
+    </div>
+
+    <!-- Barra de Controles Inferior -->
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
+        <button id="btn-girar" class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
     </div>
 </div>
+
+</body>
 
 <script>
 // Referencias globales al DOM
@@ -1099,8 +1092,8 @@ function generarReporteWBA() {
  */
 async function prepararSistema(fuente) {
     // 1. Captura de Referencias Locales
-    const video = document.getElementById('input_video'); // Referencia necesaria
-    const canvas = document.getElementById('output_canvas'); // Referencia necesaria
+    const video = document.getElementById('input_video'); 
+    const canvas = document.getElementById('output_canvas'); 
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
     const videoControls = document.getElementById('video-controls');
@@ -1116,7 +1109,7 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // Validación de EDAD (Estrictamente 2 cifras según requerimiento)
+    // Validación de EDAD (Estrictamente 2 cifras según requerimiento)[cite: 2]
     const edadValor = edadInput.value.trim();
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
@@ -1124,28 +1117,35 @@ async function prepararSistema(fuente) {
         return;
     }
 
-    // Validación de peso (Debe ser numérico y positivo)
-    if (parseFloat(pesoInput.value) <= 0 || isNaN(parseFloat(pesoInput.value))) {
+    // Validación de peso (Numérico y positivo)[cite: 2]
+    const pesoValor = parseFloat(pesoInput.value);
+    if (isNaN(pesoValor) || pesoValor <= 0) {
         alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
         pesoInput.focus();
         return;
     }
 
     // --- LIMPIEZA DE MEMORIA Y ESTADOS GLOBALES ---
-    // Asegúrate de que estas variables estén declaradas fuera de la función (let o var)[cite: 1]
     iaActiva = false; 
     angleBuffer = {}; 
     posBuffer = {};
-    wbaStats.zonasAfectadas.clear();
-    wbaStats.framesAnalizados = 0;
-    wbaStats.riesgoAltoTotal = 0;
+    
+    // Reinicio de estadísticas de auditoría
+    if (typeof wbaStats !== 'undefined') {
+        wbaStats.zonasAfectadas.clear();
+        wbaStats.framesAnalizados = 0;
+        wbaStats.riesgoAltoTotal = 0;
+        wbaStats.inicioAuditoria = null;
+        wbaStats.ciclos = 0;
+    }
 
-    // Detener flujos de cámara previos para liberar hardware en Android[cite: 1]
+    // Detener flujos de cámara previos para liberar hardware en Android
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    // Liberar memoria si se usó un archivo anteriormente
+    
+    // Liberar memoria de blobs de video anteriores
     if (video.src && video.src.startsWith('blob:')) {
         URL.revokeObjectURL(video.src);
         video.src = "";
@@ -1154,7 +1154,7 @@ async function prepararSistema(fuente) {
     // 2. Configuración según Fuente (Cámara o Archivo Local)
     try {
         if (fuente === 'camara') {
-            videoControls.classList.add('d-none');
+            if (videoControls) videoControls.classList.add('d-none');
             if (btnGirar) btnGirar.classList.remove('d-none');
 
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -1166,7 +1166,7 @@ async function prepararSistema(fuente) {
             });
             video.srcObject = stream;
         } else {
-            videoControls.classList.remove('d-none');
+            if (videoControls) videoControls.classList.remove('d-none');
             if (btnGirar) btnGirar.classList.add('d-none');
 
             const fileInput = document.getElementById('fileInput');
@@ -1180,17 +1180,17 @@ async function prepararSistema(fuente) {
             video.loop = true;
         }
 
-        // 3. Transición Visual de Interfaz
+        // 3. Transición Visual de Interfaz[cite: 2]
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('contenedor-analisis').style.display = 'block';
 
-        // Inicialización del Canvas y el Motor de IA al cargar el video
+        // Inicialización del Canvas y el Motor de IA al cargar metadatos
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
             try {
                 await video.play();
-                activarIA(); // Inicia el procesamiento de MediaPipe Pose[cite: 1]
+                activarIA(); // Dispara el motor de MediaPipe Pose
             } catch (playError) {
                 console.error("Error al reproducir video:", playError);
             }
@@ -1300,6 +1300,13 @@ function cambiarCamara() {
 }
 
 function validarYAbrirArchivo() {
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
+    
+    if (incompleto) {
+        alert("⚠️ Complete todos los campos antes de cargar el archivo.");
+        return;
+    }
     document.getElementById('fileInput').click();
 }
 </script>
