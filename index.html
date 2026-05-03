@@ -1,4 +1,4 @@
-PRUEVA DOM V1
+PRUEVA DOM V2
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -504,58 +504,42 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
     // DETECCIÓN DE SIMULACIÓN: Si la visibilidad es baja, marcamos como simulado
     const esSimulado = (vis1 < 0.5 || vis2 < 0.5);
 
-    // Lógica de evaluación de Riesgo Ergonómico (NOM-036)[cite: 1]
-    if (analizandoRiesgo && calibrado) {
-        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const limit = TH[groupKey] || 20; // Default si el grupo no existe
-        wbaStats.framesAnalizados++;
+    // =========================
+// 🔴 EVALUACIÓN ERGONÓMICA
+// =========================
+if (analizandoRiesgo && calibrado && isFinite(avgAngle)) {
+
+    const base = baseAngles[angKey];
+
+    // 🔴 Validar que exista calibración real
+    if (typeof base === "number") {
+
+        const diff = Math.abs(avgAngle - base);
+        const limit = TH[groupKey] || 20;
+
+        // ⚠️ IMPORTANTE: contar frames SOLO UNA VEZ por ciclo (no por vector)
+        if (!wbaStats._frameContado) {
+            wbaStats.framesAnalizados++;
+            wbaStats._frameContado = true;
+        }
 
         if (diff > (limit * 2)) {
-            color = "#ff3838"; thickness = 10; status = "CRÍTICO";
+            color = "#ff3838";
+            thickness = 10;
+            status = "CRÍTICO";
+
             wbaStats.riesgoAltoTotal++;
             wbaStats.zonasAfectadas.add(groupKey);
+
         } else if (diff > limit) {
-            color = "#f1c40f"; thickness = 6; status = "RIESGO";
+            color = "#f1c40f";
+            thickness = 6;
+            status = "RIESGO";
         }
     }
+}
 
-    // --- DIBUJO DEL VECTOR ---
-    ctx.save();
-    ctx.beginPath();
     
-    // Si es simulado (puntos ocultos), usamos línea punteada y transparencia[cite: 1]
-    if (esSimulado) {
-        ctx.setLineDash([5, 5]); 
-        ctx.strokeStyle = "rgba(150, 150, 150, 0.6)"; // Gris tenue para lo que la IA "imagina"[cite: 1]
-    } else {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = color;
-    }
-
-    ctx.lineWidth = thickness;
-    ctx.lineCap = "round";
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-    ctx.restore();
-
-    // --- ETIQUETA DE DATOS (Solo si está calibrado) ---
-    if (calibrado && (vis1 > 0.1 && vis2 > 0.1)) {
-        const mx = (p1.x + p2.x) / 2;
-        const my = (p1.y + p2.y) / 2;
-        
-        // Fondo de la etiqueta[cite: 1]
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(mx + 10, my - 20, 75, 32);
-        
-        // Texto de ángulo y estado[cite: 1]
-        ctx.fillStyle = esSimulado ? "#bdc3c7" : color;
-        ctx.font = "bold 11px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 7);
-        ctx.font = "8px Arial";
-        ctx.fillText(esSimulado ? "SIMULADO" : status, mx + 15, my + 6);
-    }
-};
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
  */
@@ -824,22 +808,67 @@ if (analizandoRiesgo && calibrado) {
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
 function iniciarCalibracion() {
-    if (!iaActiva) return;
+
+    if (!iaActiva) {
+        txtStatus.innerText = "⚠️ IA no activa";
+        return;
+    }
+
+    const btnCalib = document.getElementById('btn-calib');
+    const btnRecord = document.getElementById('recordBtn');
+
+    // 🔒 Bloquear botón durante calibración
+    btnCalib.disabled = true;
+    btnCalib.style.opacity = "0.6";
+
     txtStatus.innerText = "⚖️ CALIBRANDO... MANTENGA POSTURA NEUTRA";
-    
+
     setTimeout(() => {
+
+        let calibracionValida = false;
+
         Object.keys(angleBuffer).forEach(k => {
-            const avg = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length;
-            baseAngles[k] = avg;
+
+            const arr = angleBuffer[k];
+
+            // 🔴 Validar datos reales
+            if (!arr || arr.length === 0) return;
+
+            const suma = arr.reduce((a, b) => a + b, 0);
+            const avg = suma / arr.length;
+
+            if (isFinite(avg)) {
+                baseAngles[k] = avg;
+                calibracionValida = true;
+            }
         });
+
+        // 🔴 Validación final
+        if (!calibracionValida) {
+            txtStatus.innerText = "❌ Error: sin datos para calibrar";
+            
+            // 🔓 Reactivar botón para reintento
+            btnCalib.disabled = false;
+            btnCalib.style.opacity = "1";
+            return;
+        }
+
         calibrado = true;
-        document.getElementById('btn-calib').style.background = "#2ecc71";
-        document.getElementById('recordBtn').disabled = false;
-        document.getElementById('recordBtn').style.opacity = "1";
+
+        // ✅ UI OK
+        btnCalib.style.background = "#2ecc71";
+
+        if (btnRecord) {
+            btnRecord.disabled = false;
+            btnRecord.style.opacity = "1";
+        }
+
         txtStatus.innerText = "✅ CALIBRADO COMPLETADO";
+
     }, 2000);
 }
 
+    
 function toggleAuditoria() {
     if (!calibrado) return;
     analizandoRiesgo = !analizandoRiesgo;
