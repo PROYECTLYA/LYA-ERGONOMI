@@ -1,4 +1,4 @@
-DOM V1.5
+DOM V1.6
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -986,73 +986,108 @@ function cambiarCamara() {
 function validarYAbrirArchivo() {
     document.getElementById('fileInput').click();
 }
-
 /**
  * 📁 GESTIÓN DE ARCHIVOS Y REDIRECCIÓN DE IA
- * Este bloque unifica el motor para que detecte automáticamente si la fuente es Cámara o Archivo.
+ * Este bloque integra la validación de formulario, carga de video y salto a la interfaz.
  */
+
 /**
- * 1. Procesamiento de Resultados (Redirección Inteligente)
- * Integra vectorización completa para pies y muñecas.
+ * 1. Disparador del Botón Archivo (Validación)
+ * Este método se debe asignar al botón "ARCHIVO" en el HTML.
  */
+async function iniciarSeleccionArchivo() {
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    const edadInput = document.getElementById('edadTrabajador');
+
+    // Validar que todos los campos del formulario estén llenos
+    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
+    
+    if (incompleto) { 
+        alert("⚠️ Por favor, complete todos los campos del formulario antes de cargar el video."); 
+        return; 
+    }
+
+    // Validación de formato para la edad (NOM-036)
+    if (!/^\d{2}$/.test(edadInput.value.trim())) {
+        alert("❌ Error: La edad debe ser de 2 dígitos (Ejemplo: 25).");
+        return;
+    }
+
+    // Almacenar datos globalmente para el reporte PDF posterior
+    window.datosTrabajador = {
+        empresa: document.getElementById('nombreEmpresa').value,
+        puesto: document.getElementById('puestoTrabajo').value,
+        nombre: document.getElementById('nombreTrabajador').value,
+        edad: parseInt(edadInput.value),
+        pesoCarga: parseFloat(document.getElementById('pesoCarga').value)
+    };
+
+    // Disparar el selector de archivos oculto
+    document.getElementById('fileInput').click();
+}
+
 /**
- * 3. Procesamiento de Video de Archivo
- * Corregido para asegurar la transición inmediata a la interfaz de trabajo.
+ * 2. Procesamiento de Video de Archivo
+ * Ejecuta la transición de la interfaz y prepara el canvas para la IA.
  */
 async function procesarVideoArchivo() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
 
-    // 1. Limpieza total de estados previos para evitar "saltos" en el esqueleto
+    // Reset de estados previos para asegurar limpieza en el nuevo análisis[cite: 4]
     angleBuffer = {}; 
     posBuffer = {}; 
-    calibrado = false;
-    analizandoRiesgo = true; // Evaluación directa bajo NOM-036
+    calibrado = false; 
+    analizandoRiesgo = true; // Inicia analizando automáticamente en modo archivo[cite: 3]
 
-    // 2. Preparación de la interfaz de trabajo
-    // Ocultamos elementos de cámara y mostramos controles de archivo
-    if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'none';
-    document.getElementById('btn-calib').style.display = 'none'; 
-    
-    const recordBtn = document.getElementById('recordBtn');
-    if (recordBtn) {
-        recordBtn.disabled = false;
-        recordBtn.style.opacity = "1";
-    }
-
-    // 3. Gestión del flujo de video
-    // Revocamos el URL anterior para liberar memoria
+    // Gestión del flujo de video
     if (video.src.startsWith('blob:')) URL.revokeObjectURL(video.src); 
     
-    video.srcObject = null; // Desconectamos la cámara si estaba activa
+    video.srcObject = null; // Desconectar cámara activa si existe[cite: 5]
     video.src = URL.createObjectURL(file);
-    video.load(); // Forzamos la carga del nuevo recurso
+    video.load();
 
-    // 4. Activación de la interfaz tras la carga de metadatos
+    // Configuración del entorno de trabajo tras cargar el video
     video.onloadedmetadata = async () => {
-        // Ajustamos el lienzo a las dimensiones reales del video cargado
+        // Ajustar el lienzo a las dimensiones reales del video cargado
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        // Cambiamos a la interfaz de análisis
+        // --- TRANSICIÓN A LA INTERFAZ DE TRABAJO ---
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('contenedor-analisis').style.display = 'block';
         document.getElementById('controles-archivo-flotantes').style.display = 'flex';
 
-        video.currentTime = 0.1; // Posicionamos en el primer frame para la IA
+        // Ocultar controles exclusivos de cámara en vivo
+        if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'none';
+        document.getElementById('btn-calib').style.display = 'none'; 
+        
+        // Habilitar botón de grabación/reporte
+        const recordBtn = document.getElementById('recordBtn');
+        if (recordBtn) {
+            recordBtn.disabled = false;
+            recordBtn.style.opacity = "1";
+        }
+
+        video.currentTime = 0.1; // Posicionar para que la IA detecte el primer frame
         txtStatus.innerText = "📁 MODO ARCHIVO: EVALUACIÓN NOM-036";
         
-        // Reiniciamos el motor de IA con el nuevo video
+        // Reiniciar el motor de IA con la nueva fuente de video[cite: 5]
         await activarIA(); 
     };
 
     video.onerror = () => {
-        alert("Error al cargar el archivo de video. Por favor, intente con otro formato (MP4 recomendado).");
+        alert("Error crítico: El archivo de video no es compatible.");
     };
 }
 
-/* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
+/**
+ * Nota: Asegúrate de tener en tu HTML:
+ * <button onclick="iniciarSeleccionArchivo()">ARCHIVO</button>
+ * <input type="file" id="fileInput" style="display:none" onchange="procesarVideoArchivo()">
+ */
+
 </script>
 </body>
 </html>
