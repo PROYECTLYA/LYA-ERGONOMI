@@ -727,94 +727,98 @@ p.espalda_baja = {
     // =========================
     // 🔴 NIOSH PRO
     // =========================
-
 if (analizandoRiesgo && calibrado) {
 
-    // 🔹 Validación de visibilidad (SIN romper render)
     const manosVisibles = (p.muneca_d.v >= 0.4 && p.muneca_i.v >= 0.4);
 
+    // 🔴 CORTE DURO SI NO HAY MANOS
     if (!manosVisibles) {
-        // 🔸 No calcular NIOSH si no hay datos confiables
         txtStatus.innerText = "Manos no visibles";
-    } else {
+        return; // 🔥 CLAVE: evita que el bloque continúe con datos inválidos
+    }
 
-        const manosY = (p.muneca_d.y + p.muneca_i.y) / 2;
-        const manosX = (p.muneca_d.x + p.muneca_i.x) / 2;
+    const manosY = (p.muneca_d.y + p.muneca_i.y) / 2;
+    const manosX = (p.muneca_d.x + p.muneca_i.x) / 2;
 
-        const levantandoAhora = manosY < (p.abdomen.y - 30);
+    const levantandoAhora = manosY < (p.abdomen.y - 30);
 
-        // 🔁 INICIO DE CICLO
-        if (levantandoAhora && !liftState.levantando) {
-            liftState.levantando = true;
-            liftState.inicioY = manosY;
-        }
+    // 🔁 INICIO DE CICLO
+    if (levantandoAhora && !liftState.levantando) {
+        liftState.levantando = true;
+        liftState.inicioY = manosY;
+    }
 
-        // 🔁 FIN DE CICLO
-        if (!levantandoAhora && liftState.levantando) {
-            liftState.levantando = false;
-            liftState.finY = manosY;
+    // 🔁 FIN DE CICLO
+    if (!levantandoAhora && liftState.levantando) {
+        liftState.levantando = false;
+        liftState.finY = manosY;
 
-            const delta = Math.abs(liftState.finY - liftState.inicioY);
+        const delta = Math.abs(liftState.finY - liftState.inicioY);
 
-            if (delta > 50) {
-                liftState.ciclosValidos++;
-                wbaStats.ciclos++;
-                liftState.lastD = delta * 0.1;
-            }
-        }
-
-        // 🔴 SOLO CALCULAR SI ESTÁ LEVANTANDO
-        if (levantandoAhora) {
-
-            if (!wbaStats.inicioAuditoria) {
-                wbaStats.inicioAuditoria = Date.now();
-            }
-
-            const tiempo = (Date.now() - wbaStats.inicioAuditoria) / 1000;
-
-            const F = tiempo > 5
-                ? (liftState.ciclosValidos / tiempo) * 60
-                : 0;
-
-            const H = Math.abs(manosX - p.cuello.x) * 0.1;
-            const V = (h - manosY) * 0.1;
-            const D = liftState.lastD || 25;
-            const A = Math.abs(p.h_d.x - p.h_i.x) * 0.1;
-
-            const RWL = calcularRWL({ H, V, D, A, F, C: "regular" });
-
-            const peso = parseFloat(document.getElementById('pesoCarga').value) || 0;
-            const { li, nivel } = calcularLI(peso, RWL);
-
-            // 📊 STATS
-            nioshStats.muestras++;
-            nioshStats.avgRWL += RWL;
-            nioshStats.liAcumulado += li;
-            if (li > nioshStats.maxLI) nioshStats.maxLI = li;
-
-            // 🎨 UI
-            let color = nivel === "CRÍTICO" ? "#ff0000" :
-                        nivel === "RIESGO" ? "#f1c40f" : "#00ff00";
-
-            ctx.save();
-            ctx.fillStyle = "rgba(0,0,0,0.7)";
-            ctx.fillRect(20, 20, 240, 100);
-
-            ctx.fillStyle = color;
-            ctx.font = "bold 12px Arial";
-            ctx.fillText(`LI: ${isFinite(li) ? li.toFixed(2) : '∞'}`, 30, 40);
-
-            ctx.font = "10px Arial";
-            ctx.fillText(`RWL: ${RWL.toFixed(1)} kg`, 30, 55);
-            ctx.fillText(`F: ${F.toFixed(1)} lev/min`, 30, 70);
-            ctx.fillText(`Estado: ${nivel}`, 30, 85);
-
-            ctx.restore();
-
-            txtStatus.innerText = `NIOSH PRO: ${nivel} | LI ${isFinite(li) ? li.toFixed(2) : '∞'}`;
+        if (delta > 50) {
+            liftState.ciclosValidos++;
+            wbaStats.ciclos++;
+            liftState.lastD = delta * 0.1;
         }
     }
+
+    // 🔴 SOLO SI ESTÁ LEVANTANDO
+    if (!levantandoAhora) return; // 🔥 evita cálculos innecesarios
+
+    // 🔹 INICIO AUDITORÍA
+    if (!wbaStats.inicioAuditoria) {
+        wbaStats.inicioAuditoria = Date.now();
+    }
+
+    const tiempo = (Date.now() - wbaStats.inicioAuditoria) / 1000;
+
+    const F = tiempo > 5
+        ? (liftState.ciclosValidos / tiempo) * 60
+        : 0;
+
+    const H = Math.abs(manosX - p.cuello.x) * 0.1;
+    const V = (h - manosY) * 0.1;
+    const D = liftState.lastD || 25;
+    const A = Math.abs(p.h_d.x - p.h_i.x) * 0.1;
+
+    const RWL = calcularRWL({ H, V, D, A, F, C: "regular" });
+
+    const peso = parseFloat(document.getElementById('pesoCarga').value) || 0;
+    const { li, nivel } = calcularLI(peso, RWL);
+
+    // 📊 STATS (PROTEGIDOS)
+    if (isFinite(RWL)) {
+        nioshStats.muestras++;
+        nioshStats.avgRWL += RWL;
+    }
+
+    if (isFinite(li)) {
+        nioshStats.liAcumulado += li;
+        if (li > nioshStats.maxLI) nioshStats.maxLI = li;
+    }
+
+    // 🎨 UI
+    const color = nivel === "CRÍTICO" ? "#ff0000" :
+                  nivel === "RIESGO" ? "#f1c40f" : "#00ff00";
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(20, 20, 240, 100);
+
+    ctx.fillStyle = color;
+    ctx.font = "bold 12px Arial";
+    ctx.fillText(`LI: ${isFinite(li) ? li.toFixed(2) : '∞'}`, 30, 40);
+
+    ctx.font = "10px Arial";
+    ctx.fillText(`RWL: ${RWL.toFixed(1)} kg`, 30, 55);
+    ctx.fillText(`F: ${F.toFixed(1)} lev/min`, 30, 70);
+    ctx.fillText(`Estado: ${nivel}`, 30, 85);
+
+    ctx.restore();
+
+    txtStatus.innerText = `NIOSH PRO: ${nivel} | LI ${isFinite(li) ? li.toFixed(2) : '∞'}`;
 }
+
     
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
