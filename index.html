@@ -852,9 +852,8 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    // Validación de Edad (Estrictamente 2 cifras)
     const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
@@ -869,7 +868,6 @@ async function prepararSistema(fuente) {
     }
 
     // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
@@ -886,12 +884,13 @@ async function prepararSistema(fuente) {
         video.src = "";
     }
 
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
-    try {
-        if (fuente === 'camara') {
+    // 3. Gestión de la Fuente (Redirección Corregida)
+    if (fuente === 'camara') {
+        // Modo VIVO: Ocultar controles de reproductor y abrir cámara
+        document.getElementById('controles-archivo-flotantes').style.display = 'none';
+        if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'flex';
+        
+        try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: currentFacingMode, 
@@ -900,35 +899,32 @@ async function prepararSistema(fuente) {
                 } 
             });
             video.srcObject = stream;
-        } else {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
-                return; 
-            }
-            video.src = URL.createObjectURL(file);
+        } catch (err) {
+            console.error("Error de acceso al hardware:", err);
+            alert("No se pudo acceder a la cámara. Verifique los permisos.");
+            return;
         }
-
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
-        video.onloadedmetadata = async () => {
-            canvas.width = video.videoWidth; 
-            canvas.height = video.videoHeight;
-            
-            try {
-                await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
-            } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
-            }
-        };
-
-    } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
-        location.reload();
+    } else {
+        // Modo ARCHIVO: Disparar el input file y detener este flujo (continuará al seleccionar archivo)
+        document.getElementById('fileInput').click();[cite: 3]
+        return; 
     }
+
+    // 4. Transición de Interfaz y Arranque del Motor
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+
+    video.onloadedmetadata = async () => {
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        
+        try {
+            await video.play();
+            activarIA(); // Motor único con lógica de detección de fuente
+        } catch (playError) {
+            console.error("Error al reproducir:", playError);
+        }
+    };
 }
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
@@ -1162,48 +1158,76 @@ async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
+    // 1. Tiempo de seguridad para evitar bloqueos en la carga
     const safetyTimeout = setTimeout(() => {
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder.");
+            alert("⚠️ El motor de IA está tardando en responder. Intente reducir la resolución del video.");
         }
     }, 20000);
 
-    if (typeof pose !== 'undefined' && pose) {
-        try { await pose.close(); pose = null; } catch(e) { console.warn("Reinicio fallido"); }
+    // 2. Reinicio Limpio: Liberar la instancia previa de MediaPipe para no saturar la GPU
+    if (window.pose) {
+        try { 
+            await window.pose.close(); 
+            window.pose = null; 
+        } catch(e) { console.warn("Error liberando memoria de IA:", e); }
     }
 
-    pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    // 3. Inicialización del Motor (Instancia Única)
+    window.pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
+    });
 
-    pose.onResults((res) => {
+    window.pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.5, 
+        minTrackingConfidence: 0.5 
+    });
+
+    // 4. Redirección Inteligente de Resultados
+    window.pose.onResults((res) => {
         clearTimeout(safetyTimeout);
         if (loader) loader.style.display = 'none';
         iaActiva = true;
 
         /**
-         * IMPLEMENTACIÓN DE SEGURIDAD:
-         * Si no hay stream de cámara (video.srcObject es nulo), se trata de un ARCHIVO.
-         * En este caso, usamos onResults_Archivo para aplicar ángulos absolutos NOM-036.
-         * Si hay cámara, usamos onResults para mantener la calibración del modo VIVO.
+         * LÓGICA DE DETECCIÓN DE FUENTE:
+         * Si no hay srcObject (stream de cámara), el sistema procesa como ARCHIVO.
+         * De lo contrario, procesa como VIVO para respetar la calibración inicial.
          */
         if (!video.srcObject) {
-            onResults_Archivo(res);[cite: 1]
+            onResults_Archivo(res); 
         } else {
-            onResults(res);[cite: 1]
+            onResults(res); 
         }
     });
 
+    // 5. Bucle de procesamiento optimizado para Pausa/Reproducción
     async function loopIA() {
         if (video.ended) return;
+
         try {
-            if (video.readyState >= 2) await pose.send({ image: video });
-        } catch (e) { console.warn("GPU ocupada..."); }
-        if (!video.paused && !video.ended) requestAnimationFrame(loopIA);
+            // Solo envía frames a la IA si el video tiene datos cargados
+            if (video.readyState >= 2) {
+                await window.pose.send({ image: video });
+            }
+        } catch (e) { 
+            console.warn("GPU Saturada: Saltando frame..."); 
+        }
+        
+        // Continúa el bucle solo si el video está en reproducción
+        if (!video.paused && !video.ended) {
+            requestAnimationFrame(loopIA);
+        }
     }
     
+    // Sincronización de eventos para el control de reproducción
     video.removeEventListener('play', loopIA);
     video.addEventListener('play', loopIA);
+    
+    // Ejecución inicial (necesaria para procesar el primer frame de un archivo en pausa)
     loopIA();
 }
 function gestionarReproduccion() {
