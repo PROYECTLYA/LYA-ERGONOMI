@@ -1,4 +1,4 @@
-PRUEVA DOM V4
+PRUEVA DOM V5
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -487,67 +487,88 @@ function calcAng3D(a, b, c) {
  * 🏷️ FUNCIÓN DE DIBUJO DE VECTORES
  * Corregida con cierre de llave y lógica de alertas.
  */
+/**
+ * 🎨 BLOQUE CORREGIDO: drawV (RENDERIZADO ERGONÓMICO)
+ */
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    // Si el punto no existe en absoluto (coordenadas 0), abortar dibujo
+    // 🛡️ Abortar si los puntos no son válidos (coordenadas en 0)
     if (p1.x === 0 || p2.x === 0) return;
 
-    // Obtener promedio del buffer para suavizar el movimiento del ángulo
+    // 🌊 Suavizado del ángulo mediante el promedio del historial
     const buffer = angleBuffer[angKey] || [];
     const avgAngle = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
 
-    // Configuración base de alertas
-    let color = "#00ff00", thickness = 4, status = "SEGURO";
-    
-    // DETECCIÓN DE SIMULACIÓN: Si la visibilidad es baja, marcamos como simulado
+    // Configuración base de estilo
+    let color = "#00ff00", thickness = 3, status = "SEGURO";
     const esSimulado = (vis1 < 0.5 || vis2 < 0.5);
 
-    // =========================
-    // 🔴 EVALUACIÓN ERGONÓMICA
-    // =========================
+    // ==========================================
+    // 🔴 EVALUACIÓN NOM-036-1-STPS-2018
+    // ==========================================
     if (analizandoRiesgo && calibrado && isFinite(avgAngle)) {
         const base = baseAngles[angKey];
 
-        // 🔴 Validar que exista calibración real
         if (typeof base === "number") {
             const diff = Math.abs(avgAngle - base);
             const limit = TH[groupKey] || 20;
 
-            // ⚠️ IMPORTANTE: contar frames SOLO UNA VEZ por ciclo
+            // 📊 Registro estadístico único por frame
             if (!wbaStats._frameContado) {
                 wbaStats.framesAnalizados++;
                 wbaStats._frameContado = true;
             }
 
             if (diff > (limit * 2)) {
-                color = "#ff3838";
-                thickness = 10;
+                color = "#ff3838"; // Rojo Crítico
+                thickness = 8;
                 status = "CRÍTICO";
                 wbaStats.riesgoAltoTotal++;
                 wbaStats.zonasAfectadas.add(groupKey);
             } else if (diff > limit) {
-                color = "#f1c40f";
-                thickness = 6;
+                color = "#f1c40f"; // Amarillo Riesgo
+                thickness = 5;
                 status = "RIESGO";
             }
         }
     }
 
-    // Dibujo en el Canvas
+    // ✨ RENDERIZADO AVANZADO EN CANVAS
+    ctx.save();
+    
+    // Si es simulado, aplicamos transparencia (Ghost Mode)
+    ctx.globalAlpha = esSimulado ? 0.3 : 1.0;
+    
+    // Efecto de resplandor (Glow) para mejorar contraste
+    ctx.shadowBlur = esSimulado ? 0 : 10;
+    ctx.shadowColor = color;
+
     ctx.beginPath();
     ctx.lineWidth = thickness;
     ctx.strokeStyle = color;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    // Dibujo del vector
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
-}; // <--- LLAVE DE CIERRE CORREGIDA AQUÍ
 
-/**
- * 🏷️ PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
- * Procesa cada frame de video.
+    // 🏷️ Etiqueta de ángulo (opcional: solo si el riesgo es alto)
+    if (status !== "SEGURO" && !esSimulado) {
+        ctx.fillStyle = "white";
+        ctx.font = "bold 10px Arial";
+        ctx.shadowBlur = 0;
+        ctx.fillText(`${Math.round(avgAngle)}°`, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+
+    ctx.restore();
+};
+    /**
+ * 🏷️ BLOQUE CORREGIDO: onResults (IA & LÓGICA NIOSH)
  */
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
-    wbaStats._frameContado = false; // Reiniciar flag de conteo por frame
+    wbaStats._frameContado = false; 
 
     ctx.save();
     ctx.clearRect(0, 0, w, h);
@@ -565,12 +586,13 @@ function onResults(res) {
         return; 
     }
 
+    // Ocultar loader una vez detectado el trabajador
     const loader = document.getElementById('loader-ia');
     if (loader && loader.style.display !== 'none') loader.style.display = 'none';
 
     const lm = res.poseLandmarks;
 
-    // 🔹 FUNCIÓN DE PUNTO (Con suavizado de posición)
+    // --- FUNCIÓN DE PUNTO CON SUAVIZADO ---
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [], lastValid: null };
@@ -586,82 +608,81 @@ function onResults(res) {
 
         posBuffer[i].h.push(currentPos);
         if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-
         const len = posBuffer[i].h.length || 1;
-        const avg = posBuffer[i].h.reduce((a, b) => ({
-            x: a.x + b.x, y: a.y + b.y, z: a.z + b.z
-        }), { x: 0, y: 0, z: 0 });
+        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
 
-        return {
-            x: avg.x / len, y: avg.y / len, z: avg.z / len, v: currentVis
-        };
+        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: currentVis };
     };
 
-    // 🔹 MAPEO DE PUNTOS
+    // --- MAPEO DE PUNTOS (INCLUYE MUÑECAS Y PIES) ---
     const p = {
-        ore_d: pt(8), ore_i: pt(7), h_d: pt(12), h_i: pt(11),
-        codo_d: pt(14), codo_i: pt(13), muneca_d: pt(16), muneca_i: pt(15),
-        mano_d: pt(20), mano_i: pt(19), cadera_d: pt(24), cadera_i: pt(23),
-        rodilla_d: pt(26), rodilla_i: pt(25), tobillo_d: pt(28), tobillo_i: pt(27),
-        pie_d: pt(32), pie_i: pt(31)
+        ore_d: pt(8), ore_i: pt(7), 
+        h_d: pt(12), h_i: pt(11),
+        c_d: pt(14), c_i: pt(13), 
+        m_d: pt(16), m_i: pt(15),  // Muñecas
+        d_d: pt(20), d_i: pt(19),  // Dedos (para ángulo de muñeca)
+        p_d: pt(24), p_i: pt(23),  // Pelvis/Cadera
+        r_d: pt(26), r_i: pt(25),  // Rodillas
+        t_d: pt(28), t_i: pt(27),  // Tobillos
+        pie_d: pt(32), pie_i: pt(31) // Pies
     };
 
-    // 🔹 ESTRUCTURA JERÁRQUICA "T" Y COLUMNA[cite: 3]
-    p.cabeza = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2 };
+    // --- ESTRUCTURA EN "T" Y COLUMNA ---
+    p.cabeza_t = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2 };
     p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2 };
-    p.abdomen = { x: (p.cadera_d.x + p.cadera_i.x) / 2, y: (p.cadera_d.y + p.cadera_i.y) / 2 };
-    p.torax = { x: (p.cuello.x + p.abdomen.x) / 2, y: (p.cuello.y + p.abdomen.y) / 2 };
-    p.espalda_baja = { x: p.abdomen.x, y: p.abdomen.y + (h * 0.05) };
-    
-    const verticalRef = { x: p.cuello.x, y: p.cuello.y + 100 };
+    p.sacro = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2 };
+    const verticalRef = { x: p.cuello.x, y: p.cuello.y + 100, z: 0 };
 
-    // 🔹 CÁLCULO DE ÁNGULOS
+    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
-        cuello: calcAng3D(p.cabeza, p.cuello, verticalRef),
-        tronco: calcAng3D(p.cuello, p.abdomen, verticalRef),
-        torax: calcAng3D(p.cuello, p.torax, verticalRef),
-        abdomen: calcAng3D(p.torax, p.abdomen, verticalRef),
-        lumbar: calcAng3D(p.abdomen, p.espalda_baja, verticalRef)
+        cuello: calcAng3D(p.cabeza_t, p.cuello, verticalRef),
+        tronco: calcAng3D(p.cuello, p.sacro, verticalRef),
+        h_d: calcAng3D(p.cuello, p.h_d, p.c_d),
+        h_i: calcAng3D(p.cuello, p.h_i, p.c_i),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
+        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        m_d: calcAng3D(p.c_d, p.m_d, p.d_d),
+        m_i: calcAng3D(p.c_i, p.m_i, p.d_i)
     };
 
+    // Actualizar historial de ángulos
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // 🔹 DIBUJO DE LA "T" Y CUERPO COMPLETO
-    drawV(p.ore_d, p.ore_i, 'cabeza_t', 'cuello', 1, 1); // Travesaño de la T
-    drawV(p.cabeza, p.cuello, 'cuello', 'cuello', 1, 1); // Poste de la T
-    drawV(p.cuello, p.torax, 'torax', 'tronco', 1, 1);
-    drawV(p.torax, p.abdomen, 'abdomen', 'tronco', 1, 1);
-    drawV(p.abdomen, p.espalda_baja, 'lumbar', 'tronco', 1, 1);
-    drawV(p.h_d, p.h_i, 'hombros', 'hombros', p.h_d.v, p.h_i.v);
-    
-    // Brazos y Piernas
-    drawV(p.h_d, p.codo_d, 'brazo_d', 'hombros', p.h_d.v, p.codo_d.v);
-    drawV(p.codo_d, p.muneca_d, 'antebrazo_d', 'codos', p.codo_d.v, p.muneca_d.v);
-    drawV(p.h_i, p.codo_i, 'brazo_i', 'hombros', p.h_i.v, p.codo_i.v);
-    drawV(p.codo_i, p.muneca_i, 'antebrazo_i', 'codos', p.codo_i.v, p.muneca_i.v);
-    drawV(p.cadera_d, p.rodilla_d, 'pierna_d', 'piernas', p.cadera_d.v, p.rodilla_d.v);
-    drawV(p.rodilla_d, p.tobillo_d, 'rodilla_d', 'piernas', p.rodilla_d.v, p.tobillo_d.v);
-    drawV(p.cadera_i, p.rodilla_i, 'pierna_i', 'piernas', p.cadera_i.v, p.rodilla_i.v);
-    drawV(p.rodilla_i, p.tobillo_i, 'rodilla_i', 'piernas', p.rodilla_i.v, p.tobillo_i.v);
+    // --- RENDERIZADO DE VECTORES ---
+    // Estructura T
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
+    drawV(p.cabeza_t, p.cuello, 'cuello', 'cuello', 1, 1);
+    drawV(p.cuello, p.sacro, 'tronco', 'tronco', 1, 1);
 
-    // =========================
-    // 🔴 LÓGICA NIOSH PRO
-    // =========================
+    // Extremidades Superiores (Incluye conexión a muñecas)
+    drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
+    drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+
+    // Extremidades Inferiores (Incluye conexión a pies)
+    drawV(p.p_d, p.r_d, 'tronco', 'piernas', p.p_d.v, p.r_d.v);
+    drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
+    drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);
+    drawV(p.p_i, p.r_i, 'tronco', 'piernas', p.p_i.v, p.r_i.v);
+    drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
+    drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);
+
+    // --- LÓGICA NIOSH & RIESGO ---
     if (analizandoRiesgo && calibrado) {
-        const manosVisibles = (p.muneca_d.v >= 0.4 && p.muneca_i.v >= 0.4);
+        const manosVisibles = (p.m_d.v >= 0.4 && p.m_i.v >= 0.4);
         if (!manosVisibles) {
-            txtStatus.innerText = "Manos no visibles";
+            txtStatus.innerText = "ESPERANDO VISIBILIDAD DE MANOS...";
             ctx.restore();
             return;
         }
 
-        const manosY = (p.muneca_d.y + p.muneca_i.y) / 2;
-        const manosX = (p.muneca_d.x + p.muneca_i.x) / 2;
-        const levantandoAhora = manosY < (p.abdomen.y - 30);
+        const manosY = (p.m_d.y + p.m_i.y) / 2;
+        const levantandoAhora = manosY < (p.sacro.y - 40);
 
         if (levantandoAhora && !liftState.levantando) {
             liftState.levantando = true;
@@ -670,37 +691,36 @@ function onResults(res) {
 
         if (!levantandoAhora && liftState.levantando) {
             liftState.levantando = false;
-            const delta = Math.abs(manosY - liftState.inicioY);
-            if (delta > 50) {
-                liftState.ciclosValidos++;
+            if (Math.abs(manosY - liftState.inicioY) > 50) {
                 wbaStats.ciclos++;
-                liftState.lastD = delta * 0.1;
+                liftState.ciclosValidos++;
             }
         }
 
+        // Cálculos NIOSH en tiempo real
         if (levantandoAhora) {
-            if (!wbaStats.inicioAuditoria) wbaStats.inicioAuditoria = Date.now();
-            const tiempo = (Date.now() - wbaStats.inicioAuditoria) / 1000;
-            const F = tiempo > 5 ? (liftState.ciclosValidos / tiempo) * 60 : 0;
-            const H = Math.abs(manosX - p.cuello.x) * 0.1;
-            const V = (h - manosY) * 0.1;
-
-            const RWL = NIOSH.LC * NIOSH.calcularHM(H) * NIOSH.calcularVM(V); // Simplificado para el ejemplo
             const peso = parseFloat(document.getElementById('pesoCarga').value) || 0;
-            const li = peso / RWL;
+            const H = Math.abs((p.m_d.x + p.m_i.x)/2 - p.cuello.x) * 0.1;
+            const V = (h - manosY) * 0.1;
+            
+            const RWL = NIOSH.LC * NIOSH.calcularHM(H) * NIOSH.calcularVM(V);
+            const li = peso / (RWL || 1);
             const nivel = li > 1.0 ? "CRÍTICO" : li > 0.85 ? "RIESGO" : "SEGURO";
 
-            // UI NIOSH en Canvas
-            ctx.fillStyle = "rgba(0,0,0,0.7)";
-            ctx.fillRect(20, 20, 240, 100);
-            ctx.fillStyle = nivel === "CRÍTICO" ? "#ff0000" : "#00ff00";
-            ctx.fillText(`LI: ${li.toFixed(2)} | RWL: ${RWL.toFixed(1)}kg`, 30, 45);
-            txtStatus.innerText = `NIOSH: ${nivel} | LI ${li.toFixed(2)}`;
+            // Dashboard NIOSH
+            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillRect(20, 20, 200, 80);
+            ctx.fillStyle = (nivel === "CRÍTICO") ? "#ff3838" : "#00ff00";
+            ctx.font = "bold 16px Arial";
+            ctx.fillText(`LI: ${li.toFixed(2)}`, 35, 45);
+            ctx.font = "12px Arial";
+            ctx.fillText(`Límite (RWL): ${RWL.toFixed(1)}kg`, 35, 65);
+            ctx.fillText(`Estado: ${nivel}`, 35, 85);
         }
     }
+
     ctx.restore();
 }
-
 
     
     
@@ -788,6 +808,51 @@ function toggleAuditoria() {
         if (mediaRecorder) mediaRecorder.stop();
         setTimeout(generarReporteWBA, 800);
     }
+}
+    /**
+ * ⚖️ BLOQUE LEGAL: VALIDACIÓN DE NORMATIVA MEXICANA
+ * Analiza el cumplimiento según LFT y NOM-036-1-STPS-2018[cite: 1, 2]
+ */
+function validarNormativa() {
+    const info = {
+        edad: parseInt(document.getElementById('edadTrabajador').value) || 0,
+        genero: document.getElementById('generoTrabajador').value,
+        peso: parseFloat(document.getElementById('pesoCarga').value) || 0
+    };
+
+    let limites = { max: 0, mensaje: "", legal: true };
+
+    // 1. Validación LFT (Menores de edad)
+    if (info.edad < 15) {
+        limites.mensaje = "⚠️ PROHIBICIÓN LFT: Trabajo infantil detectado.";
+        limites.legal = false;
+        limites.max = 0;
+    } else if (info.edad < 18) {
+        limites.mensaje = "⚠️ RESTRICCIÓN LFT: Menor en formación (Máx 7kg).";
+        limites.max = 7;
+        limites.legal = info.peso <= 7;
+    } 
+    // 2. Validación NOM-036 (Adultos)[cite: 1]
+    else {
+        if (info.genero === 'H') {
+            limites.max = (info.edad > 45) ? 20 : 25;
+        } else {
+            limites.max = (info.edad > 45) ? 10 : 15;
+        }
+        limites.legal = info.peso <= limites.max;
+        limites.mensaje = limites.legal ? "✅ Peso dentro de límite normativo" : "❌ EXCESO DE CARGA DETECTADO";
+    }
+
+    // 3. Registro de Hallazgo para el Reporte PDF
+    hallazgosNormativos = [{
+        categoria: "Carga Legal",
+        valor: `${info.peso}kg`,
+        limite: `${limites.max}kg`,
+        estado: limites.legal ? "CUMPLE" : "FALLO",
+        nota: limites.mensaje
+    }];
+
+    return limites;
 }
 
 /**
