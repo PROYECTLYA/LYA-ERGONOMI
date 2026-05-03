@@ -321,18 +321,26 @@ DOM V1.1
 </div>
 
 <script>
-
 /**
  * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
  * Define los límites de desviación angular permitidos para evitar riesgos.
  */
-const video = document.getElementById('input_video');
+// Referencias Core (Asegúrate de que los IDs coincidan con tu HTML)
+const video = document.getElementById('input_video'); 
 const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
+const fileInput = document.getElementById('fileInput'); // Necesario para el modo ARCHIVO
 
 // Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
-const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
+const TH = { 
+    tronco: 18, 
+    cuello: 12, 
+    hombros: 15, 
+    codos: 25, 
+    munecas: 20, 
+    piernas: 25 
+};
 
 /**
  * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
@@ -346,21 +354,33 @@ let wbaStats = {
     ciclos: 0 
 };
 
+// Buffers de Suavizado y Calibración[cite: 4]
 let baseAngles = {};        // Ángulos capturados en la calibración (postura neutra)
 let angleBuffer = {};       // Búfer para media móvil de ángulos
 let posBuffer = {};         // Búfer para suavizar el jitter de los puntos
 const HISTORIAL_MAX = 15;   // Cuadros para suavizar ángulos
 const SUAVIZADO_POS = 5;    // Cuadros para suavizar coordenadas
 
+// Estados del Sistema
 let iaActiva = false;
 let calibrado = false;
 let analizandoRiesgo = false;
-let currentFacingMode = "environment";
-let pose;
+let currentFacingMode = "environment"; // Control de cámara trasera/frontal
+
+// Instancias de Motores y Grabación
+let pose;                   // Instancia única de MediaPipe Pose[cite: 1]
 let mediaRecorder;
 let recordedChunks = [];
-// Objeto para almacenar incumplimientos
+
+// Persistencia de Hallazgos y Datos del Formulario
 let hallazgosNormativos = [];
+let datosTrabajador = {
+    empresa: "",
+    puesto: "",
+    nombre: "",
+    edad: 0,
+    pesoCarga: 0
+};
 
 function validarNormativa() {
     hallazgosNormativos = []; 
@@ -852,7 +872,7 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // Validación de Edad (Estrictamente 2 cifras)
+    // --- VALIDACIONES ESTRICTAS ---
     const edadValor = edadInput.value.trim();
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
@@ -860,21 +880,32 @@ async function prepararSistema(fuente) {
         return;
     }
 
-    // Validación de peso
-    if (parseFloat(pesoInput.value) <= 0) {
+    const pesoValor = parseFloat(pesoInput.value);
+    if (isNaN(pesoValor) || pesoValor <= 0) {
         alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
         pesoInput.focus();
         return;
     }
 
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
+    // Guardar datos en el objeto global antes de limpiar buffers
+    datosTrabajador = {
+        empresa: document.getElementById('nombreEmpresa').value,
+        puesto: document.getElementById('puestoTrabajo').value,
+        nombre: document.getElementById('nombreTrabajador').value,
+        edad: parseInt(edadValor),
+        pesoCarga: pesoValor
+    };
+
+    // --- LIMPIEZA DE MEMORIA ---
     angleBuffer = {}; 
     posBuffer = {};
-    wbaStats.zonasAfectadas.clear();
-    wbaStats.framesAnalizados = 0;
-    wbaStats.riesgoAltoTotal = 0;
+    if (wbaStats) {
+        wbaStats.zonasAfectadas.clear();
+        wbaStats.framesAnalizados = 0;
+        wbaStats.riesgoAltoTotal = 0;
+    }
 
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
+    // 2. Limpieza de flujos previos
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
@@ -884,124 +915,43 @@ async function prepararSistema(fuente) {
         video.src = "";
     }
 
-    // 3. Gestión de la Fuente (Redirección Corregida)
+    // 3. Gestión de la Fuente
     if (fuente === 'camara') {
-        // Modo VIVO: Ocultar controles de reproductor y abrir cámara
         document.getElementById('controles-archivo-flotantes').style.display = 'none';
-        if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'flex';
+        if (document.getElementById('btn-girar-cam')) {
+            document.getElementById('btn-girar-cam').style.display = 'flex';
+        }
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                } 
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } 
             });
             video.srcObject = stream;
         } catch (err) {
-            console.error("Error de acceso al hardware:", err);
             alert("No se pudo acceder a la cámara. Verifique los permisos.");
             return;
         }
     } else {
-        // Modo ARCHIVO: Disparar el input file y detener este flujo (continuará al seleccionar archivo)
-        document.getElementById('fileInput').click();[cite: 3]
+        // Modo ARCHIVO: Disparar input y salir (el listener global hará el resto)
+        document.getElementById('fileInput').click();
         return; 
     }
 
-    // 4. Transición de Interfaz y Arranque del Motor
+    // 4. Transición de Interfaz (Solo para cámara)
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
     video.onloadedmetadata = async () => {
         canvas.width = video.videoWidth; 
         canvas.height = video.videoHeight;
-        
         try {
             await video.play();
-            activarIA(); // Motor único con lógica de detección de fuente
+            activarIA(); // Inicia el motor único
         } catch (playError) {
-            console.error("Error al reproducir:", playError);
+            console.error("Error al iniciar video:", playError);
         }
     };
 }
-async function activarIA() {
-    const loader = document.getElementById('loader-ia');
-    if (loader) loader.style.display = 'flex';
-    
-    // 1. Aumentamos el margen de espera a 20s para videos locales pesados
-    const safetyTimeout = setTimeout(() => {
-        if (loader && loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Si el problema persiste, reduzca la resolución del video o recargue la página.");
-        }
-    }, 20000);
-
-    // 2. REINICIO PROFUNDO: Liberar memoria de GPU antes de crear nueva instancia
-    if (typeof pose !== 'undefined' && pose) {
-        try { 
-            await pose.close(); 
-            pose = null; // Forzar recolección de basura
-        } catch(e) { console.warn("Error liberando instancia previa"); }
-    }
-
-    // 3. Nueva instancia de MediaPipe
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
-
-    pose.setOptions({ 
-        modelComplexity: 1, 
-        smoothLandmarks: true, 
-        enableSegmentation: false, // Desactivar si no se usa para ahorrar GPU
-        minDetectionConfidence: 0.5, 
-        minTrackingConfidence: 0.5 
-    });
-
-    pose.onResults((res) => {
-        clearTimeout(safetyTimeout);
-        if (loader && loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            console.log("IA Operativa - Motor Sincronizado");
-        }
-        iaActiva = true;
-        onResults(res);
-    });
-
-    // 4. Loop de frames optimizado para ARCHIVO y VIVO
-    async function frameLoop() {
-        // En modo archivo, permitimos un frame inicial incluso en pausa para calibrar
-        if (video.ended || (!iaActiva && video.paused)) return;
-
-        try {
-            if (video.readyState >= 2) { // Verificar que el video tiene datos suficientes
-                await pose.send({ image: video });
-            }
-        } catch (e) {
-            console.warn("GPU Saturada: Frame omitido.");
-        }
-        
-        // Si el video está reproduciéndose, seguimos el loop[cite: 4]
-        if (!video.paused && !video.ended) {
-            requestAnimationFrame(frameLoop);
-        } else if (!iaActiva) {
-            // Reintento lento inicial si la IA aún no responde
-            setTimeout(frameLoop, 500);
-        }
-    }
-    
-    // Iniciar loop cuando el video empiece a reproducirse[cite: 4]
-    video.removeEventListener('play', frameLoop); // Evitar duplicados
-    video.addEventListener('play', frameLoop);
-    
-    // Ejecución inicial para detectar al trabajador en el frame estático[cite: 4]
-    frameLoop();
-}
-
-
-    
-
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
 
