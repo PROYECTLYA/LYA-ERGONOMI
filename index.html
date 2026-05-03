@@ -1,4 +1,4 @@
-SEPARAR BOTONES VIVO Y ARCHIVO V6 PRUEBA
+DOM V1.1
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -470,6 +470,63 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         ctx.fillText(status, mx + 15, my + 2);
     }
 };
+
+    /**
+ * 🆕 FUNCIÓN ADICIONAL: Renderizado exclusivo para ARCHIVO (Ángulos Absolutos)
+ * Basado en rangos fijos de la NOM-036-1-STPS-2018.
+ */
+const drawV_Archivo = (p1, p2, angKey, groupKey, vis1, vis2) => {
+    if (vis1 < 0.4 || vis2 < 0.4) return;
+
+    const buffer = angleBuffer[angKey] || [];
+    if (buffer.length === 0) return;
+    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+
+    // Umbrales Absolutos NOM-036 / REBA / RULA
+    const RANGOS = {
+        tronco: { riesgo: 20, critico: 60 },
+        cuello: { riesgo: 15, critico: 45 },
+        hombros: { riesgo: 45, critico: 90 },
+        codos: { riesgo: 40, critico: 100 }, // Desviación desde posición neutral
+        piernas: { riesgo: 30, critico: 60 }
+    };
+
+    let color = "#00ff00", thickness = 3, status = "SEGURO";
+
+    if (analizandoRiesgo) {
+        const rango = RANGOS[groupKey] || { riesgo: 25, critico: 50 };
+        
+        if (avgAngle > rango.critico) {
+            color = "#ff3838"; thickness = 7; status = "CRÍTICO";
+        } else if (avgAngle > rango.riesgo) {
+            color = "#f1c40f"; thickness = 5; status = "RIESGO";
+        }
+
+        if (!video.paused) {
+            wbaStats.framesAnalizados++;
+            if (color !== "#00ff00") {
+                wbaStats.riesgoAltoTotal++;
+                wbaStats.zonasAfectadas.add(groupKey);
+            }
+        }
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = color; 
+    ctx.lineWidth = thickness; 
+    ctx.moveTo(p1.x, p1.y); 
+    ctx.lineTo(p2.x, p2.y); 
+    ctx.stroke();
+
+    // Mostrar siempre los grados en el modo archivo
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.beginPath(); ctx.roundRect(mx + 10, my - 25, 65, 35, 5); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Arial";
+    ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 12);
+    ctx.fillStyle = color; ctx.font = "9px Arial";
+    ctx.fillText(status, mx + 15, my + 2);
+};
     
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
@@ -795,9 +852,8 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    // Validación de Edad (Estrictamente 2 cifras)
     const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
@@ -812,7 +868,6 @@ async function prepararSistema(fuente) {
     }
 
     // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
@@ -829,12 +884,13 @@ async function prepararSistema(fuente) {
         video.src = "";
     }
 
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
-    try {
-        if (fuente === 'camara') {
+    // 3. Gestión de la Fuente (Redirección Corregida)
+    if (fuente === 'camara') {
+        // Modo VIVO: Ocultar controles de reproductor y abrir cámara
+        document.getElementById('controles-archivo-flotantes').style.display = 'none';
+        if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'flex';
+        
+        try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: currentFacingMode, 
@@ -843,35 +899,32 @@ async function prepararSistema(fuente) {
                 } 
             });
             video.srcObject = stream;
-        } else {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
-                return; 
-            }
-            video.src = URL.createObjectURL(file);
+        } catch (err) {
+            console.error("Error de acceso al hardware:", err);
+            alert("No se pudo acceder a la cámara. Verifique los permisos.");
+            return;
         }
-
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
-        video.onloadedmetadata = async () => {
-            canvas.width = video.videoWidth; 
-            canvas.height = video.videoHeight;
-            
-            try {
-                await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
-            } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
-            }
-        };
-
-    } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
-        location.reload();
+    } else {
+        // Modo ARCHIVO: Disparar el input file y detener este flujo (continuará al seleccionar archivo)
+        document.getElementById('fileInput').click();[cite: 3]
+        return; 
     }
+
+    // 4. Transición de Interfaz y Arranque del Motor
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+
+    video.onloadedmetadata = async () => {
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        
+        try {
+            await video.play();
+            activarIA(); // Motor único con lógica de detección de fuente
+        } catch (playError) {
+            console.error("Error al reproducir:", playError);
+        }
+    };
 }
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
@@ -979,28 +1032,84 @@ function validarYAbrirArchivo() {
     document.getElementById('fileInput').click();
 }
 
-
-
-    
-
-   /* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
+/* --- INICIA EL CODIGO DEL BOTON ARCHIVO --- */
 
 /**
  * 📁 GESTIÓN DE ARCHIVOS EXTERNOS
- * Permite procesar videos pregrabados reutilizando el motor de análisis LYA-ERGO.
+ * Permite procesar videos pregrabados con lógica de ángulos absolutos.
+ * Independiente del sistema de calibración del modo VIVO.
  */
+
+/**
+ * Procesa los resultados de MediaPipe exclusivamente para ARCHIVO.
+ * Llama a drawV_Archivo para usar rangos normativos fijos.
+ */
+function onResults_Archivo(res) {
+    const w = canvas.width, h = canvas.height;
+    ctx.save();
+    ctx.clearRect(0, 0, w, h);
+    if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
+    if (!res.poseLandmarks) { 
+        txtStatus.innerText = "📁 BUSCANDO TRABAJADOR EN VIDEO..."; 
+        ctx.restore(); 
+        return; 
+    }
+
+    const lm = res.poseLandmarks;
+    const pt = (i) => {
+        if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
+        if (!posBuffer[i]) posBuffer[i] = { h: [] };
+        posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
+        if (posBuffer[i].h.length > 5) posBuffer[i].h.shift();
+        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
+        return { x: avg.x / posBuffer[i].h.length, y: avg.y / posBuffer[i].h.length, z: avg.z / posBuffer[i].h.length, v: lm[i].visibility };
+    };
+
+    const p = {
+        ore_d: pt(8), ore_i: pt(7), h_d: pt(12), h_i: pt(11), 
+        c_d: pt(14), c_i: pt(13), m_d: pt(16), m_i: pt(15),
+        p_d: pt(24), p_i: pt(23), r_d: pt(26), r_i: pt(25), t_d: pt(28), t_i: pt(27)
+    };
+    p.centro_orejas = { x: (p.ore_d.x+p.ore_i.x)/2, y: (p.ore_d.y+p.ore_i.y)/2, z: (p.ore_d.z+p.ore_i.z)/2 };
+    p.cue = { x: (p.h_d.x+p.h_i.x)/2, y: (p.h_d.y+p.h_i.y)/2, z: (p.h_d.z+p.h_i.z)/2 };
+    p.esp_baja = { x: (p.p_d.x+p.p_i.x)/2, y: (p.p_d.y+p.p_i.y)/2, z: (p.p_d.z+p.p_i.z)/2 };
+    const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
+
+    const curAng = {
+        cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
+        tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
+        h_d: calcAng3D(p.cue, p.h_d, p.c_d), h_i: calcAng3D(p.cue, p.h_i, p.c_i),
+        c_d: calcAng3D(p.h_d, p.c_d, p.m_d), c_i: calcAng3D(p.h_i, p.c_i, p.m_i)
+    };
+    
+    Object.keys(curAng).forEach(k => {
+        if (!angleBuffer[k]) angleBuffer[k] = [];
+        angleBuffer[k].push(curAng[k]);
+        if (angleBuffer[k].length > 15) angleBuffer[k].shift();
+    });
+
+    // RENDERIZADO INDEPENDIENTE (Asegúrate de haber sumado drawV_Archivo en el Bloque 4)
+    drawV_Archivo(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
+    drawV_Archivo(p.cue, p.esp_baja, 'tronco', 'tronco', 1, 1);
+    drawV_Archivo(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
+    drawV_Archivo(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+    drawV_Archivo(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
+    drawV_Archivo(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+
+    ctx.restore();
+}
+
 /**
  * Valida el formulario y dispara la selección de archivo local.
  */
-    function validarYAbrirArchivo() {
+function validarYAbrirArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
 
     if (incompleto) {
-        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video para la auditoría.");
+        alert("⚠️ Por favor, complete los datos del formulario antes de cargar un archivo de video.");
         return;
     }
-    
     document.getElementById('fileInput').click();
 }
 
@@ -1012,116 +1121,115 @@ async function procesarVideoArchivo() {
     const file = fileInput.files[0];
     if (!file) return;
 
-    // 1. Limpieza de flujos previos (Cámara)
     if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => {
-            track.stop();
-            console.log("Cámara detenida para modo archivo");
-        });
+        video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
 
-    // 2. Ajustes de Interfaz
-    if (document.getElementById('btn-girar-cam')) {
-        document.getElementById('btn-girar-cam').style.display = 'none';
-    }
+    if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'none';
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
     
     const capaControles = document.getElementById('controles-archivo-flotantes');
     if (capaControles) capaControles.style.display = 'flex';
 
-    // 3. Carga del archivo con gestión de memoria
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src); 
-    }
+    if (video.src.startsWith('blob:')) URL.revokeObjectURL(video.src); 
+    
     video.src = URL.createObjectURL(file);
     video.loop = false; 
     video.autoplay = false; 
 
-    // Bloque de sincronización crítica
     video.onloadedmetadata = async () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
-        // Forzar salto a 0.1s para despertar el buffer de la GPU
         video.currentTime = 0.1; 
-
-        txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA CALIBRAR";
-        
+        txtStatus.innerText = "📁 ARCHIVO CARGADO: MODO NOM-036 ACTIVO";
         const iconPath = document.getElementById('svg-play-icon');
         if (iconPath) iconPath.innerHTML = '<path d="M8 5v14l11-7z"/>';
-        
-        // Iniciar motor de IA después de estabilizar el video
         activarIA(); 
     };
 }
 
 /**
- * Motor de IA con protección contra saturación de GPU.
+ * Motor de IA para Archivo (Con redirección inteligente)
+ * Mantiene la independencia total entre el modo VIVO y ARCHIVO.
  */
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     if (loader) loader.style.display = 'flex';
     
+    // 1. Tiempo de seguridad para evitar bloqueos en la carga
     const safetyTimeout = setTimeout(() => {
         if (loader && loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Intente recargar la página.");
+            alert("⚠️ El motor de IA está tardando en responder. Intente reducir la resolución del video.");
         }
     }, 20000);
 
-    // Hard Reset de la instancia Pose para liberar recursos
-    if (typeof pose !== 'undefined' && pose) {
+    // 2. Reinicio Limpio: Liberar la instancia previa de MediaPipe para no saturar la GPU
+    if (window.pose) {
         try { 
-            await pose.close(); 
-            pose = null; 
-        } catch(e) { console.warn("Reinicio de instancia fallido"); }
+            await window.pose.close(); 
+            window.pose = null; 
+        } catch(e) { console.warn("Error liberando memoria de IA:", e); }
     }
 
-    pose = new Pose({ 
+    // 3. Inicialización del Motor (Instancia Única)
+    window.pose = new Pose({ 
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
-    pose.setOptions({ 
+    window.pose.setOptions({ 
         modelComplexity: 1, 
         smoothLandmarks: true, 
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
     });
 
-    pose.onResults((res) => {
+    // 4. Redirección Inteligente de Resultados
+    window.pose.onResults((res) => {
         clearTimeout(safetyTimeout);
         if (loader) loader.style.display = 'none';
         iaActiva = true;
-        onResults(res);
+
+        /**
+         * LÓGICA DE DETECCIÓN DE FUENTE:
+         * Si no hay srcObject (stream de cámara), el sistema procesa como ARCHIVO.
+         * De lo contrario, procesa como VIVO para respetar la calibración inicial.
+         */
+        if (!video.srcObject) {
+            onResults_Archivo(res); 
+        } else {
+            onResults(res); 
+        }
     });
 
-    // Bucle optimizado para frames estáticos y dinámicos
+    // 5. Bucle de procesamiento optimizado para Pausa/Reproducción
     async function loopIA() {
         if (video.ended) return;
 
         try {
-            if (video.readyState >= 2) { // Asegurar que hay datos de imagen
-                await pose.send({ image: video });
+            // Solo envía frames a la IA si el video tiene datos cargados
+            if (video.readyState >= 2) {
+                await window.pose.send({ image: video });
             }
-        } catch (e) {
-            console.warn("GPU ocupada, saltando frame...");
+        } catch (e) { 
+            console.warn("GPU Saturada: Saltando frame..."); 
         }
-
+        
+        // Continúa el bucle solo si el video está en reproducción
         if (!video.paused && !video.ended) {
             requestAnimationFrame(loopIA);
         }
     }
     
-    // Escuchar cambios de reproducción
+    // Sincronización de eventos para el control de reproducción
     video.removeEventListener('play', loopIA);
     video.addEventListener('play', loopIA);
     
-    // Primer escaneo para calibración en pausa
+    // Ejecución inicial (necesaria para procesar el primer frame de un archivo en pausa)
     loopIA();
 }
-
 function gestionarReproduccion() {
     const iconPath = document.getElementById('svg-play-icon');
     if (video.paused) {
@@ -1134,26 +1242,23 @@ function gestionarReproduccion() {
         txtStatus.innerText = "⏸️ PAUSADO";
     }
 }
-// REEMPLAZA ESTAS FUNCIONES EN EL BLOQUE DE ARCHIVO
+
 function retrocederSegundos() {
     video.currentTime = Math.max(0, video.currentTime - 5);
-    // Forzar a la IA a procesar el frame estático después del salto
-    if (video.paused && iaActiva) {
-        pose.send({ image: video });
-    }
+    if (video.paused && iaActiva) pose.send({ image: video });
 }
 
 function adelantarSegundos() {
     video.currentTime = Math.min(video.duration, video.currentTime + 5);
-    // Forzar a la IA a procesar el frame estático después del salto[cite: 4]
-    if (video.paused && iaActiva) {
-        pose.send({ image: video });
-    }
+    if (video.paused && iaActiva) pose.send({ image: video });
 }
 
 document.getElementById('fileInput').addEventListener('change', (e) => {
     if (e.target.files.length > 0) procesarVideoArchivo(); 
 });
+
+    
+
 
 /* --- TERMINA EL CODIGO DEL BOTON ARCHIVO --- */
 </script>
