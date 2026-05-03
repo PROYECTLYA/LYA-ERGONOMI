@@ -270,16 +270,15 @@ DOM V1.6
         </div>
     </div>
 <div class="d-flex gap-2">
-    <!-- Botón VIVO: Llama correctamente a prepararSistema -->
+    <!-- Botón VIVO: Llama a prepararSistema para usar la cámara -->
     <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
     
-    <!-- Botón ARCHIVO: Ahora solo abre el selector de archivos -->
-    <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="document.getElementById('fileInput').click()">📁 ARCHIVO</button>
+    <!-- Botón ARCHIVO: Ahora llama a la validación antes de abrir el selector -->
+    <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="iniciarSeleccionArchivo()">📁 ARCHIVO</button>
 </div>
 
-<!-- Input oculto: Ahora llama a procesarVideoArchivo cuando cambia -->
+<!-- Input oculto: Mantiene su listener para procesar el video elegido -->
 <input type="file" id="fileInput" hidden accept="video/*" onchange="procesarVideoArchivo()">
-
 <!-- Contenedor de Análisis IA -->
 <div id="contenedor-analisis">
     <!-- Indicador de Estado Superior -->
@@ -995,98 +994,94 @@ function validarYAbrirArchivo() {
  * 1. Disparador del Botón Archivo (Validación)
  * Este método se debe asignar al botón "ARCHIVO" en el HTML.
  */
+/**
+ * 📁 GESTIÓN DE ARCHIVOS Y REDIRECCIÓN DE IA
+ * Integra la validación, limpieza de hardware y el salto a la interfaz de análisis.
+ */
+
+/**
+ * 1. Valida el formulario antes de permitir la auditoría de archivo.
+ */
 async function iniciarSeleccionArchivo() {
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    const edadInput = document.getElementById('edadTrabajador');
-
-    // Validar que todos los campos del formulario estén llenos
     const incompleto = ids.some(id => !document.getElementById(id).value.trim());
-    
+
     if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario antes de cargar el video."); 
+        alert("⚠️ Por favor, complete todos los campos del formulario antes de cargar el video para la auditoría."); 
         return; 
     }
 
-    // Validación de formato para la edad (NOM-036)
-    if (!/^\d{2}$/.test(edadInput.value.trim())) {
-        alert("❌ Error: La edad debe ser de 2 dígitos (Ejemplo: 25).");
+    // Validación de formato para edad
+    if (!/^\d{2}$/.test(document.getElementById('edadTrabajador').value.trim())) {
+        alert("❌ Error: La edad debe ser de exactamente 2 dígitos.");
         return;
     }
 
-    // Almacenar datos globalmente para el reporte PDF posterior
-    window.datosTrabajador = {
-        empresa: document.getElementById('nombreEmpresa').value,
-        puesto: document.getElementById('puestoTrabajo').value,
-        nombre: document.getElementById('nombreTrabajador').value,
-        edad: parseInt(edadInput.value),
-        pesoCarga: parseFloat(document.getElementById('pesoCarga').value)
-    };
-
-    // Disparar el selector de archivos oculto
+    // Disparar el selector de archivos local
     document.getElementById('fileInput').click();
 }
 
 /**
- * 2. Procesamiento de Video de Archivo
- * Ejecuta la transición de la interfaz y prepara el canvas para la IA.
+ * 2. Configura el entorno para video local con prevención de errores de GPU.
  */
 async function procesarVideoArchivo() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
 
-    // Reset de estados previos para asegurar limpieza en el nuevo análisis[cite: 4]
-    angleBuffer = {}; 
-    posBuffer = {}; 
-    calibrado = false; 
-    analizandoRiesgo = true; // Inicia analizando automáticamente en modo archivo[cite: 3]
+    // A. Limpieza de flujos previos (Cámara) - RECUPERADO DE TU REFERENCIA
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => {
+            track.stop();
+            console.log("Cámara detenida para modo archivo");
+        });
+        video.srcObject = null;
+    }
 
-    // Gestión del flujo de video
-    if (video.src.startsWith('blob:')) URL.revokeObjectURL(video.src); 
+    // B. Ajustes Inmediatos de Interfaz (El "Salto")
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
     
-    video.srcObject = null; // Desconectar cámara activa si existe[cite: 5]
-    video.src = URL.createObjectURL(file);
-    video.load();
+    if (document.getElementById('btn-girar-cam')) {
+        document.getElementById('btn-girar-cam').style.display = 'none';
+    }
+    document.getElementById('btn-calib').style.display = 'none'; // No se calibra en archivo
+    
+    const capaControles = document.getElementById('controles-archivo-flotantes');
+    if (capaControles) capaControles.style.display = 'flex';
 
-    // Configuración del entorno de trabajo tras cargar el video
+    // C. Carga del archivo con gestión de memoria
+    if (video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src); 
+    }
+    video.src = URL.createObjectURL(file);
+    video.loop = false; 
+    video.autoplay = false; 
+
+    // D. Sincronización crítica tras carga de metadatos
     video.onloadedmetadata = async () => {
-        // Ajustar el lienzo a las dimensiones reales del video cargado
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        // --- TRANSICIÓN A LA INTERFAZ DE TRABAJO ---
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('contenedor-analisis').style.display = 'block';
-        document.getElementById('controles-archivo-flotantes').style.display = 'flex';
-
-        // Ocultar controles exclusivos de cámara en vivo
-        if (document.getElementById('btn-girar-cam')) document.getElementById('btn-girar-cam').style.display = 'none';
-        document.getElementById('btn-calib').style.display = 'none'; 
+        // Despertar buffer de GPU y preparar IA
+        video.currentTime = 0.1; 
+        txtStatus.innerText = "📁 ARCHIVO CARGADO: LISTO PARA ANALIZAR";
         
-        // Habilitar botón de grabación/reporte
+        // Habilitar botón de auditoría/reporte
         const recordBtn = document.getElementById('recordBtn');
         if (recordBtn) {
             recordBtn.disabled = false;
             recordBtn.style.opacity = "1";
         }
 
-        video.currentTime = 0.1; // Posicionar para que la IA detecte el primer frame
-        txtStatus.innerText = "📁 MODO ARCHIVO: EVALUACIÓN NOM-036";
-        
-        // Reiniciar el motor de IA con la nueva fuente de video[cite: 5]
-        await activarIA(); 
+        // Iniciar motor de IA
+        activarIA(); 
     };
 
     video.onerror = () => {
-        alert("Error crítico: El archivo de video no es compatible.");
+        alert("Error al cargar el archivo de video. Intente con formato MP4.");
     };
 }
-
-/**
- * Nota: Asegúrate de tener en tu HTML:
- * <button onclick="iniciarSeleccionArchivo()">ARCHIVO</button>
- * <input type="file" id="fileInput" style="display:none" onchange="procesarVideoArchivo()">
- */
 
 </script>
 </body>
