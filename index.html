@@ -1,5 +1,5 @@
 NO TOCAR
-sin traba
+sin traba V2
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -311,8 +311,16 @@ const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
 
-// Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
-const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
+// Actualiza el objeto TH en el Bloque 1
+const TH = { 
+    tronco: 18, 
+    cuello: 12, 
+    hombros: 15, 
+    codos: 25, 
+    munecas: 20, // Umbral para desviación de muñeca
+    piernas: 25, 
+    pies: 20     // Umbral para flexión/extensión del tobillo
+};
 
 /**
  * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
@@ -388,18 +396,28 @@ function calcAng3D(a, b, c) {
     return isNaN(angle) ? 0 : angle;
 }
 
+/**
+ * 🏷️ RENDERIZADO DE VECTORES CON ESTABILIZACIÓN Y PERSISTENCIA
+ * Dibuja los segmentos del cuerpo, simulando trazos si hay oclusión (objetos tapando al sujeto).
+ */
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    if (vis1 < 0.5 || vis2 < 0.5) return;
+    // Si el punto no existe en absoluto (coordenadas 0), abortar dibujo
+    if (p1.x === 0 || p2.x === 0) return;
 
+    // Obtener promedio del buffer para suavizar el movimiento del ángulo
     const buffer = angleBuffer[angKey] || [];
-    if (buffer.length === 0) return;
-    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+    const avgAngle = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
 
+    // Configuración base de alertas
     let color = "#00ff00", thickness = 4, status = "SEGURO";
+    
+    // DETECCIÓN DE SIMULACIÓN: Si la visibilidad es baja, marcamos como simulado
+    const esSimulado = (vis1 < 0.5 || vis2 < 0.5);
 
+    // Lógica de evaluación de Riesgo Ergonómico (NOM-036)[cite: 1]
     if (analizandoRiesgo && calibrado) {
         const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-        const limit = TH[groupKey];
+        const limit = TH[groupKey] || 20; // Default si el grupo no existe
         wbaStats.framesAnalizados++;
 
         if (diff > (limit * 2)) {
@@ -411,31 +429,57 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         }
     }
 
-    // Dibujo del vector
+    // --- DIBUJO DEL VECTOR ---
+    ctx.save();
     ctx.beginPath();
-    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
-    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    
+    // Si es simulado (puntos ocultos), usamos línea punteada y transparencia[cite: 1]
+    if (esSimulado) {
+        ctx.setLineDash([5, 5]); 
+        ctx.strokeStyle = "rgba(150, 150, 150, 0.6)"; // Gris tenue para lo que la IA "imagina"[cite: 1]
+    } else {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = color;
+    }
 
-    // Etiqueta de datos si está calibrado
-    if (calibrado) {
-        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    ctx.lineWidth = thickness;
+    ctx.lineCap = "round";
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // --- ETIQUETA DE DATOS (Solo si está calibrado) ---
+    if (calibrado && (vis1 > 0.1 && vis2 > 0.1)) {
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        
+        // Fondo de la etiqueta[cite: 1]
         ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(mx + 10, my - 20, 70, 30);
-        ctx.fillStyle = color; ctx.font = "bold 10px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
-        ctx.fillText(status, mx + 15, my + 5);
+        ctx.fillRect(mx + 10, my - 20, 75, 32);
+        
+        // Texto de ángulo y estado[cite: 1]
+        ctx.fillStyle = esSimulado ? "#bdc3c7" : color;
+        ctx.font = "bold 11px Arial";
+        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 7);
+        ctx.font = "8px Arial";
+        ctx.fillText(esSimulado ? "SIMULADO" : status, mx + 15, my + 6);
     }
 };
+
+    
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
  * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
  */
+
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
 
     ctx.save();
     ctx.clearRect(0, 0, w, h);
     
+    // Gestión de modo espejo para cámara frontal
     if (currentFacingMode === "user") { 
         ctx.translate(w, 0); 
         ctx.scale(-1, 1); 
@@ -443,6 +487,7 @@ function onResults(res) {
     
     if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
 
+    // Validación de presencia de trabajador
     if (!res.poseLandmarks) { 
         txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
         ctx.restore(); 
@@ -454,42 +499,70 @@ function onResults(res) {
 
     const lm = res.poseLandmarks;
 
+    // --- 1. FUNCIÓN DE PUNTO CON PERSISTENCIA (ESTABILIZACIÓN DE VECTORES) ---
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
-        if (!posBuffer[i]) posBuffer[i] = { h: [] };
-        posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
+        
+        // Inicializar almacén persistente para el punto si no existe
+        if (!posBuffer[i]) posBuffer[i] = { h: [], lastValid: null };
+
+        let currentPos = { x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z };
+        const currentVis = lm[i].visibility;
+
+        // Lógica de Persistencia: Si la visibilidad es baja (< 0.5), usamos el último punto válido[cite: 1]
+        if (currentVis < 0.5 && posBuffer[i].lastValid) {
+            currentPos = posBuffer[i].lastValid;
+        } else if (currentVis >= 0.5) {
+            posBuffer[i].lastValid = currentPos; // Actualizar último punto confiable
+        }
+
+        // Suavizado por media móvil
+        posBuffer[i].h.push(currentPos);
         if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
+        
         const len = posBuffer[i].h.length;
-        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
-        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
+        const avg = posBuffer[i].h.reduce((a, b) => ({ 
+            x: a.x + b.x, y: a.y + b.y, z: a.z + b.z 
+        }), { x: 0, y: 0, z: 0 });
+
+        return { 
+            x: avg.x / len, y: avg.y / len, z: avg.z / len, 
+            v: currentVis // v permite que drawV decida si usar línea punteada[cite: 1]
+        };
     };
 
-    // --- MAPEO DE PUNTOS CLAVE EXTENDIDO ---
+    // --- 2. MAPEO DE PUNTOS CLAVE (EXTENDIDO PARA MUÑECAS Y PIES) ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
         h_d: pt(12), h_i: pt(11), 
         c_d: pt(14), c_i: pt(13), 
         m_d: pt(16), m_i: pt(15), 
-        dedo_d: pt(20), dedo_i: pt(19), // Puntos para muñecas
+        dedo_d: pt(20), dedo_i: pt(19), // Puntas de las manos
         p_d: pt(24), p_i: pt(23),
         r_d: pt(26), r_i: pt(25),
         t_d: pt(28), t_i: pt(27),
-        pie_d: pt(32), pie_i: pt(31)   // Puntos para pies
+        pie_d: pt(32), pie_i: pt(31)   // Puntas de los pies
     };
 
-    // --- PUNTOS DE CONEXIÓN ESTRUCTURAL ---
+    // --- 3. LÓGICA ESPECIAL PARA PERSONA SENTADA (ESTABILIZACIÓN BAJO MESA) ---
+    // Si la rodilla se oculta pero la cadera y tobillo son visibles, proyectamos su posición[cite: 1]
+    if (p.r_d.v < 0.3 && p.p_d.v > 0.6 && p.t_d.v > 0.6) {
+        p.r_d.x = (p.p_d.x + p.t_d.x) / 1.8; 
+        p.r_d.y = p.p_d.y + 25; // Altura estimada para posición sentada
+    }
+
+    // --- 4. PUNTOS DE CONEXIÓN ESTRUCTURAL ---
     p.centro_orejas = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
     p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
-    
-    // Punto Sacro: Conecta la columna con el centro de las piernas
     p.sacro = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
 
+    // Segmentación de columna
     p.torax = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.3, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.3, z: p.cue.z };
     p.abdomen = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.6, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.6, z: p.cue.z };
 
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    // --- CÁLCULO DE ÁNGULOS ---
+    // --- 5. CÁLCULO DE ÁNGULOS (INCLUYE MIEMBROS DISTALES) ---
     const currentAngles = {
         cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
         tronco: calcAng3D(p.cue, p.sacro, verticalRef),
@@ -497,49 +570,51 @@ function onResults(res) {
         h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
         c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        mun_d: calcAng3D(p.c_d, p.m_d, p.dedo_d), // Ángulo de muñeca[cite: 1]
+        mun_i: calcAng3D(p.c_i, p.m_i, p.dedo_i),
         r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d),  // Ángulo de pie[cite: 1]
+        pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
     };
 
+    // Actualizar buffers de ángulos para suavizado en drawV
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO ---
+    // --- 6. RENDERIZADO DE VECTORES ---
     
-    // Cuello
+    // Tronco y Cuello
     drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v);
     drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
-
-    // Eje Central (Columna conectada hasta el sacro)
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.sacro, 'tronco', 'tronco', 1, 1);
 
-    // Hombros y Pelvis (Cierre de estructura)
-    drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
-    drawV(p.p_d, p.p_i, 'tronco', 'piernas', p.p_d.v, p.p_i.v);
-
-    // Brazos y Muñecas
+    // Extremidades Superiores y Muñecas
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_d, p.dedo_d, 'c_d', 'munecas', p.m_d.v, p.dedo_d.v); // Vector de muñeca
-    drawV(p.m_i, p.dedo_i, 'c_i', 'munecas', p.m_i.v, p.dedo_i.v);
+    drawV(p.m_d, p.dedo_d, 'mun_d', 'munecas', p.m_d.v, p.dedo_d.v); 
 
-    // Piernas y Pies[cite: 5]
+    drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+    drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+    drawV(p.m_i, p.dedo_i, 'mun_i', 'munecas', p.m_i.v, p.dedo_i.v);
+
+    // Extremidades Inferiores y Pies
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
-    drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
+    drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v); 
+
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_d, p.pie_d, 'r_d', 'piernas', p.t_d.v, p.pie_d.v); // Vector de pie
-    drawV(p.t_i, p.pie_i, 'r_i', 'piernas', p.t_i.v, p.pie_i.v);
+    drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);
 
     ctx.restore();
 }
+    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
