@@ -1,4 +1,7 @@
-PRUEVA DOM V8
+PERFECTO VIVO
+
+
+JUE NOCH V4
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -175,22 +178,7 @@ PRUEVA DOM V8
         animation: pulse-red 1.5s infinite;
         transform: scale(1.1);
     }
-.btn-video {
-    background: black;
-    border: 4px solid white;
-    border-radius: 50%;
-    width: 70px;
-    height: 70px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
 
-.btn-video:active { transform: scale(0.9); }
-
-.d-none { display: none !important; }
     @keyframes pulse-red {
         0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
         70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
@@ -209,21 +197,21 @@ PRUEVA DOM V8
 }
 </style>
 </head>
-
 <body>
 
-<!-- 1. PANTALLA DE CARGA (Oculta por defecto, se activa al iniciar IA) -->
-<div id="loader-ia" style="display: none;">
+<!-- Pantalla de carga de IA -->
+<div id="loader-ia">
     <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
     <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
         <div id="bar-id" class="progress-bar" style="width: 100%;"></div>
     </div>
+    <!-- Sugerencia para el Auditor -->
     <div class="plant-tip">
         ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
     </div>
 </div>
 
-<!-- 2. MENÚ DE CAPTURA DE DATOS (Se muestra al inicio) -->
+<!-- Menú de Captura de Datos -->
 <div id="menu-inicial">
     <h1 class="logo-text">LYA-ERGO</h1>
     <p class="sub-text">Auditoría Ergonómica NOM-036-STPS</p>
@@ -260,170 +248,44 @@ PRUEVA DOM V8
         </div>
     </div>
 
-    <!-- Botones de Acceso: No se habilitan si faltan campos -->
     <div class="d-flex gap-2">
-<button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-<button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>        
+        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
+        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
     </div>
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
 
-<!-- 3. CONTENEDOR DE ANÁLISIS IA (Único y centralizado) -->
-<div id="contenedor-analisis" style="display: none;">
+<!-- Contenedor de Análisis IA -->
+<div id="contenedor-analisis">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
-    
     <canvas id="output_canvas"></canvas>
-    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
+  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
-    <!-- Controles de Video (Solo modo ARCHIVO) -->
-    <div id="video-controls" class="d-none" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 7000;">
-        <button class="btn-video" onclick="rewindVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/rewind.png" width="30"></button>
-        <button id="playBtn" class="btn-video" onclick="togglePlay()"><img id="playIcon" src="https://img.icons8.com/ios-filled/50/ffffff/pause.png" width="40"></button>
-        <button class="btn-video" onclick="forwardVideo()"><img src="https://img.icons8.com/ios-filled/50/ffffff/fast-forward.png" width="30"></button>
-    </div>
-
-    <!-- Barra de Controles Inferior -->
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button id="btn-girar" class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
         <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
     </div>
 </div>
 
-</body>
-
 <script>
-
-    btnVivo.addEventListener('click', () => {
-    const datos = validarDatosYLimites();
-    if (!datos) return; // Si los datos no son válidos, no hace nada
-
-    console.log("Iniciando análisis en VIVO...");
-    analizandoRiesgo = true;
-    activarCamara(); 
-});
-    btnArchivo.addEventListener('click', () => {
-    const datos = validarDatosYLimites();
-    if (!datos) return; // Bloquea el acceso si los campos están incompletos
-
-    console.log("Iniciando análisis de ARCHIVO...");
-    // Aquí disparas tu lógica para cargar y procesar el archivo local
-    inputFile.click(); 
-});
-// Referencias globales al DOM
+/**
+ * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
+ * Define los límites de desviación angular permitidos para evitar riesgos.
+ */
 const video = document.getElementById('input_video');
 const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
-/**
- * 🏷️ BLOQUE 1: CONFIGURACIÓN AVANZADA NOM-036 + NIOSH (VERSIÓN CRÍTICA VALIDADA)
- */
 
-// 🔹 Umbrales biomecánicos base (más estrictos)
+// Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
+const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
 
 /**
- * 🏷️ BLOQUE 1: CONFIGURACIÓN AVANZADA NOM-036 + NIOSH (VERSIÓN CRÍTICA VALIDADA)
+ * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
+ * Maneja el suavizado de la imagen y los acumuladores de riesgo.
  */
-
-// 🔹 Umbrales biomecánicos base (más estrictos)
-const TH = { 
-    tronco: 15,
-    cuello: 10,
-    hombros: 15,
-    codos: 20,
-    munecas: 15,
-    piernas: 20,
-    pies: 15
-};
-
-// 🔴 FACTOR DE RIESGO GLOBAL
-const FACTOR_RIESGO = {
-    tronco: 1.5,
-    cuello: 1.3,
-    hombros: 1.2,
-    codos: 1.0,
-    munecas: 1.1,
-    piernas: 1.3,
-    pies: 1.1
-};
-
-// 🔵 CONFIGURACIÓN NIOSH VALIDADA
-const NIOSH = {
-    LC: 23, // kg
-
-    calcularHM: (H) => {
-        if (H < 25) H = 25;
-        if (H > 63) return 0;
-        return 25 / H;
-    },
-
-    calcularVM: (V) => {
-        if (V < 0 || V > 175) return 0;
-        return Math.max(0, 1 - (0.003 * Math.abs(V - 75)));
-    },
-
-    calcularDM: (D) => {
-        if (D < 25) D = 25;
-        if (D > 175) return 0;
-        return Math.min(1, 0.82 + (4.5 / D));
-    },
-
-    calcularAM: (A) => {
-        if (A > 135) return 0;
-        return Math.max(0, 1 - (0.0032 * A));
-    },
-
-    calcularFM: (F) => {
-        if (F < 0.2) return 1;
-        if (F < 1) return 0.95;
-        if (F < 4) return 0.85;
-        if (F < 8) return 0.75;
-        return 0.65;
-    },
-
-    calcularCM: (C) => {
-        return C === "bueno" ? 1 : (C === "regular" ? 0.95 : 0.90);
-    }
-};
-// Solo resetea valores, no oculta el menú
-function limpiarFormulario() {
-    document.querySelectorAll('.form-control-custom').forEach(input => input.value = '');
-}
-// 🔴 RWL (Recommended Weight Limit)
-function calcularRWL(params) {
-    const { H, V, D, A, F, C } = params;
-
-    const HM = NIOSH.calcularHM(H);
-    const VM = NIOSH.calcularVM(V);
-    const DM = NIOSH.calcularDM(D);
-    const AM = NIOSH.calcularAM(A);
-    const FM = NIOSH.calcularFM(F);
-    const CM = NIOSH.calcularCM(C);
-
-    const RWL = NIOSH.LC * HM * VM * DM * AM * FM * CM;
-
-    return Math.max(0, RWL);
-}
-
-// 🔴 ÍNDICE DE LEVANTAMIENTO (LI) + CLASIFICACIÓN
-function calcularLI(pesoReal, RWL) {
-    if (RWL === 0) return { li: Infinity, nivel: "CRÍTICO" };
-
-    const li = pesoReal / RWL;
-
-    let nivel = "SEGURO";
-    if (li > 3) nivel = "CRÍTICO";
-    else if (li > 1) nivel = "RIESGO";
-
-    return { li, nivel };
-}
-
-/**
- * 🏷️ VARIABLES GLOBALES DEL SISTEMA (🔥 AQUÍ VA LO QUE TE FALTABA)
- */
-
-// 📊 Estadísticas de evaluación
 let wbaStats = { 
     riesgoAltoTotal: 0, 
     framesAnalizados: 0, 
@@ -432,220 +294,119 @@ let wbaStats = {
     ciclos: 0 
 };
 
+let baseAngles = {};        // Ángulos capturados en la calibración (postura neutra)
+let angleBuffer = {};       // Búfer para media móvil de ángulos
+let posBuffer = {};         // Búfer para suavizar el jitter de los puntos
+const HISTORIAL_MAX = 15;   // Cuadros para suavizar ángulos
+const SUAVIZADO_POS = 5;    // Cuadros para suavizar coordenadas
 
-// 🎯 Buffers de IA
-let baseAngles = {};      
-let angleBuffer = {};     
-let posBuffer = {};       
-
-const HISTORIAL_MAX = 15;
-const SUAVIZADO_POS = 5;
-
-// ⚙️ Estado del sistema
 let iaActiva = false;
 let calibrado = false;
 let analizandoRiesgo = false;
 let currentFacingMode = "environment";
-
-// 📹 MediaPipe / video
 let pose;
 let mediaRecorder;
 let recordedChunks = [];
-
-// ⚖️ Normativa
+// Objeto para almacenar incumplimientos
 let hallazgosNormativos = [];
-    let liftState = {
-    levantando: false,
-    inicioY: null,
-    finY: null,
-    ciclosValidos: 0
-};
 
-let nioshStats = {
-    muestras: 0,
-    avgRWL: 0,
-    maxLI: 0,
-    liAcumulado: 0
-};
-const validarEntradasNormativas = () => {
-    const campos = {
-        empresa: document.getElementById('nombreEmpresa').value.trim(),
-        puesto: document.getElementById('puestoTrabajo').value.trim(),
-        nombre: document.getElementById('nombreTrabajador').value.trim(),
-        edad: document.getElementById('edadTrabajador').value.trim(),
-        peso: parseFloat(document.getElementById('pesoCarga').value)
-    };
+function validarNormativa() {
+    hallazgosNormativos = []; 
+    const edad = parseInt(document.getElementById('edadTrabajador').value);
+    const genero = document.getElementById('generoTrabajador').value; 
+    const peso = parseFloat(document.getElementById('pesoCarga').value);
 
-    // Validar que ningún campo esté vacío
-    if (Object.values(campos).some(v => v === "" || (typeof v === 'number' && isNaN(v)))) {
-        alert("⚠️ Por favor, complete todos los campos del formulario.");
-        return null;
+    // --- Validación LFT (Edad) ---
+    if (edad < 15) {
+        hallazgosNormativos.push("INCUMPLIMIENTO CRÍTICO LFT: Trabajador menor de edad legal (menor a 15 años).");
+    } else if (edad < 18) {
+        hallazgosNormativos.push("OBSERVACIÓN LFT: Menor en edad de aprendizaje (15-17 años). Carga restringida.");
     }
 
-    // Restricción: Exactamente 2 números para la edad
-    if (!/^\d{2}$/.test(campos.edad)) {
-        alert("❌ Error: La EDAD debe tener exactamente 2 números (ej: 25).");
-        return null;
-    }
-
-    const edadNum = parseInt(campos.edad);
-    const genero = document.getElementById('generoTrabajador').value;
-    
-    // Lógica de límites legales (NOM-036 y LFT)[cite: 1, 2]
+    // --- Validación NOM-036 (Peso vs Género/Edad) ---
     let limiteMax = 0;
-    if (edadNum < 15) {
-        alert("⚠️ PROHIBICIÓN LFT: No se permite el trabajo de menores de 15 años.");
-        return null;
-    } else if (edadNum < 18) {
-        limiteMax = 7; // Límite legal LFT para menores de edad
-    } else {
-        // Límites NOM-036 según género y edad[cite: 1]
-        limiteMax = (genero === 'H') ? (edadNum > 45 ? 20 : 25) : (edadNum > 45 ? 10 : 15);
+    if (genero === "M") { // 'M' de Mujer en tu select
+        if (edad < 18) limiteMax = 7;
+        else if (edad <= 45) limiteMax = 15;
+        else limiteMax = 10;
+    } else { // Hombre
+        if (edad < 18) limiteMax = 7;
+        else if (edad <= 45) limiteMax = 25;
+        else limiteMax = 20;
     }
 
-    if (campos.peso > limiteMax) {
-        alert(`⚠️ ADVERTENCIA: El peso (${campos.peso}kg) excede el límite normativo de ${limiteMax}kg.`);
+    if (peso > limiteMax) {
+        hallazgosNormativos.push(`INCUMPLIMIENTO NOM-036: Peso de ${peso}kg excede el límite de ${limiteMax}kg para este perfil.`);
     }
-
-    return campos;
-};
+    
+    return { hallazgos: hallazgosNormativos, limite: limiteMax };
+}
 /**
  * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS
  * Funciones para cálculo de ángulos 3D y dibujo de vectores.
  */
 function calcAng3D(a, b, c) {
-    if (!a || !b || !c) return 0;
-
+    if(!a || !b || !c) return 0;
     const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
     const v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
-
     const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-
-    const m1 = Math.sqrt(v1.x ** 2 + v1.y ** 2 + v1.z ** 2);
-    const m2 = Math.sqrt(v2.x ** 2 + v2.y ** 2 + v2.z ** 2);
-
-    // 🔴 Evita vectores degenerados (ruido / puntos colapsados)
-    if (m1 < 0.001 || m2 < 0.001) return 0;
-
-    const denom = m1 * m2;
-
-    // 🔴 Protección extra (por seguridad numérica)
-    if (denom === 0) return 0;
-
-    // 🔵 Clamp para estabilidad numérica
-    let cosTheta = dot / denom;
-    cosTheta = Math.max(-1, Math.min(1, cosTheta));
-
-    const angle = Math.acos(cosTheta) * (180 / Math.PI);
-
-    // 🔴 Evita NaN o Infinity
-    if (!isFinite(angle)) return 0;
-
-    return angle;
+    const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
+    const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
+    const angle = Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
+    return isNaN(angle) ? 0 : angle;
 }
 
-/**
- * 🏷️ FUNCIÓN DE DIBUJO DE VECTORES
- * Corregida con cierre de llave y lógica de alertas.
- */
-/**
- * 🎨 BLOQUE CORREGIDO: drawV (RENDERIZADO ERGONÓMICO)
- */
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    // 🛡️ Abortar si los puntos no son válidos (coordenadas en 0)
-    if (p1.x === 0 || p2.x === 0) return;
+    if (vis1 < 0.5 || vis2 < 0.5) return;
 
-    // 🌊 Suavizado del ángulo mediante el promedio del historial
     const buffer = angleBuffer[angKey] || [];
-    const avgAngle = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
+    if (buffer.length === 0) return;
+    const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
 
-    // Configuración base de estilo
-    let color = "#00ff00", thickness = 3, status = "SEGURO";
-    const esSimulado = (vis1 < 0.5 || vis2 < 0.5); // "Ghost Mode" si la visibilidad es baja
+    let color = "#00ff00", thickness = 4, status = "SEGURO";
 
-    // ==========================================
-    // 🔴 EVALUACIÓN NOM-036-1-STPS-2018
-    // ==========================================
-    if (analizandoRiesgo && calibrado && isFinite(avgAngle)) {
-        const base = baseAngles[angKey];
+    if (analizandoRiesgo && calibrado) {
+        const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
+        const limit = TH[groupKey];
+        wbaStats.framesAnalizados++;
 
-        if (typeof base === "number") {
-            const diff = Math.abs(avgAngle - base);
-            const limit = TH[groupKey] || 20; // Umbrales definidos para cada grupo articular[cite: 1]
-
-            // 📊 Registro estadístico único por frame
-            if (!wbaStats._frameContado) {
-                wbaStats.framesAnalizados++;
-                wbaStats._frameContado = true;
-            }
-
-            // Lógica de Semaforización
-            if (diff > (limit * 2)) {
-                color = "#ff3838"; // Rojo Crítico
-                thickness = 8;
-                status = "CRÍTICO";
-                wbaStats.riesgoAltoTotal++;
-                wbaStats.zonasAfectadas.add(groupKey);
-            } else if (diff > limit) {
-                color = "#f1c40f"; // Amarillo Riesgo
-                thickness = 5;
-                status = "RIESGO";
-            }
+        if (diff > (limit * 2)) {
+            color = "#ff3838"; thickness = 10; status = "CRÍTICO";
+            wbaStats.riesgoAltoTotal++;
+            wbaStats.zonasAfectadas.add(groupKey);
+        } else if (diff > limit) {
+            color = "#f1c40f"; thickness = 6; status = "RIESGO";
         }
     }
 
-    // ✨ RENDERIZADO AVANZADO EN CANVAS
-    ctx.save();
-    
-    // Aplicar transparencia si el punto es persistencia/simulado[cite: 2]
-    ctx.globalAlpha = esSimulado ? 0.3 : 1.0;
-    
-    // Efecto de resplandor para resaltar el riesgo en el operario
-    ctx.shadowBlur = esSimulado ? 0 : 12;
-    ctx.shadowColor = color;
-
+    // Dibujo del vector
     ctx.beginPath();
-    ctx.lineWidth = thickness;
-    ctx.strokeStyle = color;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    
-    // Dibujo del vector conectando las articulaciones
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
+    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-    // 🏷️ Etiqueta de ángulo y estado
-    // Se muestra solo si hay riesgo detectado para no saturar la vista[cite: 2]
-    if (status !== "SEGURO" && !esSimulado) {
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-        ctx.fillRect(midX - 20, midY - 15, 40, 20); // Fondo para legibilidad
-
-        ctx.fillStyle = "white";
-        ctx.font = "bold 12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(`${Math.round(avgAngle)}°`, midX, midY);
+    // Etiqueta de datos si está calibrado
+    if (calibrado) {
+        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(mx + 10, my - 20, 70, 30);
+        ctx.fillStyle = color; ctx.font = "bold 10px Arial";
+        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
+        ctx.fillText(status, mx + 15, my + 5);
     }
-
-    ctx.restore();
 };
-
-    
+/**
+ * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
+ * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
+ */
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
-    wbaStats._frameContado = false; 
 
     ctx.save();
     ctx.clearRect(0, 0, w, h);
     
-    // Espejo si se usa cámara frontal
     if (currentFacingMode === "user") { 
         ctx.translate(w, 0); 
-        ctx.scale(-1, 1);
+        ctx.scale(-1, 1); 
     }
     
     if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
@@ -656,227 +417,128 @@ function onResults(res) {
         return; 
     }
 
-    // Gestión del Loader IA
     const loader = document.getElementById('loader-ia');
     if (loader && loader.style.display !== 'none') loader.style.display = 'none';
 
     const lm = res.poseLandmarks;
 
-    // --- FUNCIÓN DE PUNTO CON SUAVIZADO Y PERSISTENCIA ---
+    // Helper de suavizado
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
-        if (!posBuffer[i]) posBuffer[i] = { h: [], lastValid: null };
-
-        let currentPos = { x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z };
-        const currentVis = lm[i].visibility ?? 0;
-
-        // Persistencia: Si se pierde visibilidad, usar la última posición válida conocida
-        if (currentVis < 0.5 && posBuffer[i].lastValid) {
-            currentPos = posBuffer[i].lastValid;
-        } else if (currentVis >= 0.5) {
-            posBuffer[i].lastValid = currentPos;
-        }
-
-        posBuffer[i].h.push(currentPos);
+        if (!posBuffer[i]) posBuffer[i] = { h: [] };
+        posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
         if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-        
-        const len = posBuffer[i].h.length || 1;
-        const avg = posBuffer[i].h.reduce((a, b) => ({ 
-            x: a.x + b.x, y: a.y + b.y, z: a.z + b.z 
-        }), { x: 0, y: 0, z: 0 });
-
-        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: currentVis };
+        const len = posBuffer[i].h.length;
+        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
+        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS (EXTREMIDADES COMPLETAS) ---
+    // --- MAPEO DE PUNTOS CLAVE ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), 
-        h_d: pt(12), h_i: pt(11),
+        h_d: pt(12), h_i: pt(11), 
         c_d: pt(14), c_i: pt(13), 
-        m_d: pt(16), m_i: pt(15),   // Muñecas
-        d_d: pt(20), d_i: pt(19),   // Dedos
-        p_d: pt(24), p_i: pt(23),   // Pelvis
-        r_d: pt(26), r_i: pt(25),   // Rodillas
-        t_d: pt(28), t_i: pt(27),   // Tobillos
-        pie_d: pt(32), pie_i: pt(31) // Puntas pies
+        m_d: pt(16), m_i: pt(15), 
+        dedo_d: pt(20), dedo_i: pt(19),
+        p_d: pt(24), p_i: pt(23),
+        r_d: pt(26), r_i: pt(25),
+        t_d: pt(28), t_i: pt(27)
     };
 
-    // --- ESTRUCTURA ÓSEA Y CENTRALIZACIÓN ---
-    p.cabeza_t = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2 };
-    p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2 };
-    p.sacro = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2 };
-    const verticalRef = { x: p.cuello.x, y: p.cuello.y + 100, z: 0 };
+    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
+    // 1. Creamos el punto central exacto entre las orejas
+    p.centro_orejas = { 
+        x: (p.ore_d.x + p.ore_i.x) / 2, 
+        y: (p.ore_d.y + p.ore_i.y) / 2, 
+        z: (p.ore_d.z + p.ore_i.z) / 2 
+    };
 
-    // --- CÁLCULO DE ÁNGULOS ERGONÓMICOS ---
+    // 2. Punto central de los hombros (Cuello base)
+    p.cue = { 
+        x: (p.h_d.x + p.h_i.x) / 2, 
+        y: (p.h_d.y + p.h_i.y) / 2, 
+        z: (p.h_d.z + p.h_i.z) / 2 
+    };
+
+    // 3. Punto central de la cadera (Espalda baja)
+    p.esp_baja = { 
+        x: (p.p_d.x + p.p_i.x) / 2, 
+        y: (p.p_d.y + p.p_i.y) / 2, 
+        z: (p.p_d.z + p.p_i.z) / 2 
+    };
+
+    // Segmentos del tronco para mayor estabilidad visual
+    p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
+    p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
+
+    const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
+
+    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
-        cuello: calcAng3D(p.cabeza_t, p.cuello, verticalRef),
-        tronco: calcAng3D(p.cuello, p.sacro, verticalRef),
-        h_d: calcAng3D(p.cuello, p.h_d, p.c_d),
-        h_i: calcAng3D(p.cuello, p.h_i, p.c_i),
+        cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
+        tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
+        h_d: calcAng3D(p.cue, p.h_d, p.c_d),
+        h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
         c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        m_d: calcAng3D(p.c_d, p.m_d, p.d_d),   // Muñeca Derecha
-        m_i: calcAng3D(p.c_i, p.m_i, p.d_i),   // Muñeca Izquierda
-        pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d), 
-        pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+        r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
-    // Registro en buffer para suavizado de gráficas
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE ESQUELETO (VECTORES) ---
-    // Columna y Cabeza (Estructura T)
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
-    drawV(p.cabeza_t, p.cuello, 'cuello', 'cuello', 1, 1);
-    drawV(p.cuello, p.sacro, 'tronco', 'tronco', 1, 1);
+    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
+    
+    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
 
-    // Miembros Superiores
+    // Eje Central (Columna)
+    drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
+    drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
+    drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
+
+    // Conexión de Hombros (Barra horizontal del pecho)
+    drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
+
+    // Brazos
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.m_d, p.d_d, 'm_d', 'munecas', p.m_d.v, p.d_d.v);
-
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_i, p.d_i, 'm_i', 'munecas', p.m_i.v, p.d_i.v);
 
-    // Miembros Inferiores
-    drawV(p.p_d, p.r_d, 'tronco', 'piernas', p.p_d.v, p.r_d.v);
+    // Piernas (Desde los puntos de la cadera)
+    drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
+    drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
-    drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);
-
-    drawV(p.p_i, p.r_i, 'tronco', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);
-
-    // --- ANÁLISIS DE RIESGO BIOMECÁNICO (NIOSH / NOM-036) ---
-    if (analizandoRiesgo && calibrado) {
-        // Verificar visibilidad mínima para análisis legalmente válido
-        const manosVisibles = (p.m_d.v >= 0.4 && p.m_i.v >= 0.4);
-        if (!manosVisibles) {
-            txtStatus.innerText = "⚠️ ERROR: MANOS NO VISIBLES PARA ANÁLISIS";
-            ctx.restore();
-            return;
-        }
-
-        const manosY = (p.m_d.y + p.m_i.y) / 2;
-        const levantandoAhora = manosY < (p.sacro.y - 40);
-
-        // Lógica de detección de ciclo de levantamiento
-        if (levantandoAhora && !liftState.levantando) {
-            liftState.levantando = true;
-            liftState.inicioY = manosY;
-        }
-
-        if (!levantandoAhora && liftState.levantando) {
-            liftState.levantando = false;
-            // Solo contar si el desplazamiento es significativo (>50px)
-            if (Math.abs(manosY - liftState.inicioY) > 50) {
-                wbaStats.ciclos++;
-                liftState.ciclosValidos++;
-            }
-        }
-
-        // Cálculos dinámicos si hay carga activa
-        if (levantandoAhora) {
-            const peso = parseFloat(document.getElementById('pesoCarga').value) || 0;
-            // Distancia horizontal H (Manos a Centro de Gravedad/Cuello)
-            const H = Math.abs((p.m_d.x + p.m_i.x)/2 - p.cuello.x) * 0.1;
-            // Distancia vertical V (Desde el suelo al punto de agarre)
-            const V = (canvas.height - manosY) * 0.1; 
-            
-            const RWL = NIOSH.LC * NIOSH.calcularHM(H) * NIOSH.calcularVM(V);
-            const li = peso / (RWL || 1);
-            const nivel = li > 1.0 ? "CRÍTICO" : li > 0.85 ? "RIESGO" : "SEGURO";
-
-            // Dashboard NIOSH en Pantalla
-            ctx.fillStyle = "rgba(13, 17, 23, 0.9)";
-            ctx.fillRect(20, 20, 220, 90);
-            ctx.strokeStyle = (nivel === "CRÍTICO") ? "#ff3838" : "#00ff00";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(20, 20, 220, 90);
-
-            ctx.fillStyle = (nivel === "CRÍTICO") ? "#ff3838" : "#00ff00";
-            ctx.font = "bold 18px Arial";
-            ctx.fillText(`ÍNDICE LI: ${li.toFixed(2)}`, 35, 45);
-            ctx.fillStyle = "white";
-            ctx.font = "12px Arial";
-            ctx.fillText(`Límite (RWL): ${RWL.toFixed(1)}kg`, 35, 70);
-            ctx.fillText(`Estado: ${nivel}`, 35, 88);
-        }
-    }
 
     ctx.restore();
 }
-    
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
 function iniciarCalibracion() {
-
-    if (!iaActiva) {
-        txtStatus.innerText = "⚠️ IA no activa";
-        return;
-    }
-
-    const btnCalib = document.getElementById('btn-calib');
-    const btnRecord = document.getElementById('recordBtn');
-
-    // 🔒 Bloquear botón durante calibración
-    btnCalib.disabled = true;
-    btnCalib.style.opacity = "0.6";
-
+    if (!iaActiva) return;
     txtStatus.innerText = "⚖️ CALIBRANDO... MANTENGA POSTURA NEUTRA";
-
+    
     setTimeout(() => {
-
-        let calibracionValida = false;
-
         Object.keys(angleBuffer).forEach(k => {
-
-            const arr = angleBuffer[k];
-
-            // 🔴 Validar datos reales
-            if (!arr || arr.length === 0) return;
-
-            const suma = arr.reduce((a, b) => a + b, 0);
-            const avg = suma / arr.length;
-
-            if (isFinite(avg)) {
-                baseAngles[k] = avg;
-                calibracionValida = true;
-            }
+            const avg = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length;
+            baseAngles[k] = avg;
         });
-
-        // 🔴 Validación final
-        if (!calibracionValida) {
-            txtStatus.innerText = "❌ Error: sin datos para calibrar";
-            
-            // 🔓 Reactivar botón para reintento
-            btnCalib.disabled = false;
-            btnCalib.style.opacity = "1";
-            return;
-        }
-
         calibrado = true;
-
-        // ✅ UI OK
-        btnCalib.style.background = "#2ecc71";
-
-        if (btnRecord) {
-            btnRecord.disabled = false;
-            btnRecord.style.opacity = "1";
-        }
-
+        document.getElementById('btn-calib').style.background = "#2ecc71";
+        document.getElementById('recordBtn').disabled = false;
+        document.getElementById('recordBtn').style.opacity = "1";
         txtStatus.innerText = "✅ CALIBRADO COMPLETADO";
-
     }, 2000);
 }
 
-    
 function toggleAuditoria() {
     if (!calibrado) return;
     analizandoRiesgo = !analizandoRiesgo;
@@ -897,51 +559,6 @@ function toggleAuditoria() {
         setTimeout(generarReporteWBA, 800);
     }
 }
-    /**
- * ⚖️ BLOQUE LEGAL: VALIDACIÓN DE NORMATIVA MEXICANA
- * Analiza el cumplimiento según LFT y NOM-036-1-STPS-2018[cite: 1, 2]
- */
-function validarNormativa() {
-    const info = {
-        edad: parseInt(document.getElementById('edadTrabajador').value) || 0,
-        genero: document.getElementById('generoTrabajador').value,
-        peso: parseFloat(document.getElementById('pesoCarga').value) || 0
-    };
-
-    let limites = { max: 0, mensaje: "", legal: true };
-
-    // 1. Validación LFT (Menores de edad)
-    if (info.edad < 15) {
-        limites.mensaje = "⚠️ PROHIBICIÓN LFT: Trabajo infantil detectado.";
-        limites.legal = false;
-        limites.max = 0;
-    } else if (info.edad < 18) {
-        limites.mensaje = "⚠️ RESTRICCIÓN LFT: Menor en formación (Máx 7kg).";
-        limites.max = 7;
-        limites.legal = info.peso <= 7;
-    } 
-    // 2. Validación NOM-036 (Adultos)[cite: 1]
-    else {
-        if (info.genero === 'H') {
-            limites.max = (info.edad > 45) ? 20 : 25;
-        } else {
-            limites.max = (info.edad > 45) ? 10 : 15;
-        }
-        limites.legal = info.peso <= limites.max;
-        limites.mensaje = limites.legal ? "✅ Peso dentro de límite normativo" : "❌ EXCESO DE CARGA DETECTADO";
-    }
-
-    // 3. Registro de Hallazgo para el Reporte PDF
-    hallazgosNormativos = [{
-        categoria: "Carga Legal",
-        valor: `${info.peso}kg`,
-        limite: `${limites.max}kg`,
-        estado: limites.legal ? "CUMPLE" : "FALLO",
-        nota: limites.mensaje
-    }];
-
-    return limites;
-}
 
 /**
  * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
@@ -950,10 +567,8 @@ function validarNormativa() {
 function generarReporteWBA() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    // =========================================================
-    // 🔹 1. DATOS GENERALES
-    // =========================================================
+    
+    // 1. Recolección de datos del DOM
     const info = {
         emp: document.getElementById('nombreEmpresa')?.value.toUpperCase() || "EMPRESA NO ESPECIFICADA",
         puesto: document.getElementById('puestoTrabajo')?.value || "General",
@@ -963,200 +578,135 @@ function generarReporteWBA() {
         edad: parseInt(document.getElementById('edadTrabajador')?.value) || 0
     };
 
-    // =========================================================
-    // 🔴 2. PROCESAMIENTO NIOSH
-    // =========================================================
-    const avgRWL = nioshStats.muestras > 0 
-        ? (nioshStats.avgRWL / nioshStats.muestras) 
-        : 0;
-
-    const maxLI = isFinite(nioshStats.maxLI) 
-        ? nioshStats.maxLI 
-        : Infinity;
-
-    let estadoNIOSH = "SEGURO";
-    if (!isFinite(maxLI) || maxLI > 3) estadoNIOSH = "CRÍTICO";
-    else if (maxLI > 1) estadoNIOSH = "RIESGO";
-
-    const avgRWL_txt = avgRWL.toFixed(1);
-    const maxLI_txt = isFinite(maxLI) ? maxLI.toFixed(2) : "∞";
-
-    // =========================================================
-    // 🔴 3. LÓGICA LEGAL (NOM-036 + LFT)
-    // =========================================================
+    // 2. Lógica de Cumplimiento Normativo (Sincronizado con NOM-036 y LFT)
     let limiteNormativo = 0;
     let hallazgosLegales = [];
 
     if (info.edad < 15) {
-        hallazgosLegales.push("PROHIBICIÓN: Trabajo infantil (LFT).");
+        hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
         limiteNormativo = 0;
     } else if (info.edad < 18) {
-        hallazgosLegales.push("RESTRICCIÓN: Menor de edad.");
+        hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
         limiteNormativo = 7;
     } else {
-        limiteNormativo = info.gen === 'H'
-            ? (info.edad > 45 ? 20 : 25)
-            : (info.edad > 45 ? 10 : 15);
+        if (info.gen === 'H') {
+            limiteNormativo = (info.edad > 45) ? 20 : 25;
+        } else {
+            limiteNormativo = (info.edad > 45) ? 10 : 15;
+        }
     }
 
-    // =========================================================
-    // 🔴 4. CÁLCULO ERGONÓMICO IA
-    // =========================================================
+    // Cálculos de riesgo postural (IA)
     const porcRiesgo = wbaStats.framesAnalizados > 0 
-        ? (wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100 
+        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
         : 0;
+    
+    const cumpleNorma = (info.peso <= limiteNormativo && porcRiesgo <= 20);
+    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60]; // Verde o Rojo
 
-    const porcRiesgo_txt = porcRiesgo.toFixed(1);
+    // --- DISEÑO DEL PDF ---
 
-    const cumpleNorma = (
-        info.peso <= limiteNormativo &&
-        porcRiesgo <= 20 &&
-        maxLI <= 1
-    );
+    // Encabezado Profesional
+    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold");
+    doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
+    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
+    doc.text("AUDITORÍA DE CUMPLIMIENTO: NOM-036-1-STPS-2018 & LEY FEDERAL DEL TRABAJO", 105, 25, { align: "center" });
+    doc.text(`ID Reporte: LYA-${Date.now()} | Planta: ${info.emp}`, 105, 32, { align: "center" });
 
-    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60];
-
-    // =========================================================
-    // 🎨 5. DISEÑO DEL DOCUMENTO
-    // =========================================================
-
-    // 🔹 HEADER
-    doc.setFillColor(10, 15, 25);
-    doc.rect(0, 0, 210, 42, 'F');
-
-    doc.setTextColor(0, 255, 180);
-    doc.setFontSize(17);
-    doc.setFont("helvetica", "bold");
-    doc.text("INFORME ERGONÓMICO INTELIGENTE", 105, 16, { align: "center" });
-
-    doc.setFontSize(9);
-    doc.setTextColor(255);
-    doc.setFont("helvetica", "normal");
-    doc.text("Evaluación NOM-036-STPS + NIOSH + LFT", 105, 26, { align: "center" });
-    doc.text(`Folio: LYA-${Date.now()} | ${info.emp}`, 105, 33, { align: "center" });
-
-    // =========================================================
-    // 🔹 DATOS GENERALES
-    // =========================================================
-    doc.setTextColor(0);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES", 15, 52);
-
+    // 1. Datos Generales
+    doc.setTextColor(0); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    doc.text("1. DATOS GENERALES Y REFERENCIAS", 15, 50);
     doc.autoTable({
-        startY: 55,
-        theme: 'grid',
-        styles: { fontSize: 8 },
+        startY: 53,
         body: [
-            ['Empresa', info.emp, 'Fecha', new Date().toLocaleDateString()],
-            ['Trabajador', info.trab, 'Edad', `${info.edad} años`],
-            ['Puesto', info.puesto, 'Género', info.gen === 'H' ? 'Hombre' : 'Mujer']
-        ]
+            ['Empresa:', info.emp, 'Fecha de Evaluación:', new Date().toLocaleDateString()],
+            ['Trabajador:', info.trab, 'ID/Edad:', `${info.edad} años`],
+            ['Puesto:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
+        ],
+        theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
     });
 
-    // =========================================================
-    // 🔹 RESULTADOS
-    // =========================================================
-    doc.text("2. RESULTADOS DE EVALUACIÓN", 15, doc.lastAutoTable.finalY + 10);
-
+    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
+    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR', 'VALOR', 'LÍMITE', 'ESTADO']],
-        theme: 'striped',
-        styles: { fontSize: 8 },
+        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
         body: [
-            ['Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
-            ['Postura Crítica', `${porcRiesgo_txt}%`, '≤ 20%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
-            ['NIOSH - LI', maxLI_txt, '< 1.0', estadoNIOSH],
-            ['NIOSH - RWL', `${avgRWL_txt} kg`, '—', 'REFERENCIAL'],
-            ['Zonas afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', '—', '—']
-        ]
+            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
+            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
+            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
+            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
+        ],
+        headStyles: { fillColor: [44, 62, 80] },
+        styles: { fontSize: 8 }
     });
 
-    // =========================================================
-    // 🔴 SEMÁFORO
-    // =========================================================
-    const ySemaforo = doc.lastAutoTable.finalY + 14;
+    // 3. Análisis de Resultados (IA)
+    doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 13,
+        head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
+        body: [
+            ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
+            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
+            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
+        ],
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        columnStyles: { 3: { fontStyle: 'bold' } }
+    });
 
-    doc.setFillColor(...colorSemaforo);
+    // 4. SEMAFORIZACIÓN FINAL Y VERDICTO
+    const ySemaforo = doc.lastAutoTable.finalY + 12;
+    doc.setFillColor(colorSemaforo[0], colorSemaforo[1], colorSemaforo[2]);
     doc.rect(15, ySemaforo, 180, 12, 'F');
+    
+    doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
+    const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
+    doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
 
-    doc.setTextColor(255);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
+    // 5. Conclusiones y Recomendaciones
+    let recomendaciones = "";
+    if (info.peso > limiteNormativo) {
+        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
+    }
+    if (porcRiesgo > 20) {
+        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
+    }
+    if (recomendaciones === "") {
+        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
+    }
 
-    const veredicto = cumpleNorma
-        ? "OPERACIÓN SEGURA"
-        : "NO CUMPLE - REQUIERE INTERVENCIÓN";
+    doc.setTextColor(0); doc.setFontSize(11);
+    doc.text("4. CONCLUSIONES TÉCNICAS", 15, ySemaforo + 22);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    const splitText = doc.splitTextToSize(recomendaciones, 175);
+    doc.text(splitText, 15, ySemaforo + 28);
 
-    doc.text(`VEREDICTO: ${veredicto}`, 105, ySemaforo + 8, { align: "center" });
+    // 6. Sección de Firmas
+    const finalY = ySemaforo + 60;
+    doc.setDrawColor(0); doc.setLineWidth(0.5);
+    doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
+    doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
 
-    // =========================================================
-    // 🔹 CONCLUSIONES
-    // =========================================================
-    let recomendaciones = [];
+    // Pie de Página
+    doc.setFontSize(7); doc.setTextColor(150);
+    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
+    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
 
-    if (info.peso > limiteNormativo)
-        recomendaciones.push(`Exceso de carga (${info.peso} kg > ${limiteNormativo} kg)`);
-
-    if (porcRiesgo > 20)
-        recomendaciones.push("Alta frecuencia de posturas críticas");
-
-    if (maxLI > 1)
-        recomendaciones.push(`Índice NIOSH elevado (LI=${maxLI_txt})`);
-
-    if (hallazgosLegales.length > 0)
-        recomendaciones = recomendaciones.concat(hallazgosLegales);
-
-    if (recomendaciones.length === 0)
-        recomendaciones.push("Condiciones ergonómicas aceptables");
-
-    doc.setTextColor(0);
-    doc.setFontSize(11);
-    doc.text("3. CONCLUSIONES Y RECOMENDACIONES", 15, ySemaforo + 22);
-
-    doc.setFontSize(9);
-    doc.text(
-        doc.splitTextToSize("• " + recomendaciones.join("\n• "), 175),
-        15,
-        ySemaforo + 28
-    );
-
-    // =========================================================
-    // ✍️ FIRMAS
-    // =========================================================
-    const finalY = ySemaforo + 65;
-
-    doc.line(25, finalY, 95, finalY);
-    doc.text("Responsable de Seguridad", 30, finalY + 5);
-
-    doc.line(115, finalY, 185, finalY);
-    doc.text("Trabajador Evaluado", 130, finalY + 5);
-
-    // =========================================================
-    // 💾 EXPORTACIÓN
-    // =========================================================
-    doc.save(`Reporte_Ergonomico_${info.trab.replace(/\s+/g, '_')}.pdf`);
+    // Guardar Documento
+    doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
 }
-
-
     
-    
-/**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN OPTIMIZADA ANDROID
+    /**
+ * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
-
 async function prepararSistema(fuente) {
-    // 1. Captura de Referencias Locales
-    const video = document.getElementById('input_video'); 
-    const canvas = document.getElementById('output_canvas'); 
+    // 1. Referencias y Captura de Datos
     const edadInput = document.getElementById('edadTrabajador');
     const pesoInput = document.getElementById('pesoCarga');
-    const videoControls = document.getElementById('video-controls');
-    const btnGirar = document.getElementById('btn-girar');
-    
-    // IDs para validación de campos obligatorios
     const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
     
     // Validación de campos vacíos
@@ -1166,111 +716,99 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // Validación de EDAD (Estrictamente 2 cifras)
+    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
     const edadValor = edadInput.value.trim();
+    // Verifica que sean exactamente 2 dígitos (10-99 años)
     if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error en EDAD: Debe ingresar exactamente 2 números (Ejemplo: 25).");
+        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
         return;
     }
 
-    // Validación de PESO (Numérico y positivo)
-    const pesoValor = parseFloat(pesoInput.value);
-    if (isNaN(pesoValor) || pesoValor <= 0) {
+    // Validación de peso
+    if (parseFloat(pesoInput.value) <= 0) {
         alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
         pesoInput.focus();
         return;
     }
 
-    // --- LIMPIEZA DE MEMORIA Y ESTADOS GLOBALES ---
-    iaActiva = false; 
+    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
+    // Asegura que el análisis ergonómico empiece de cero
     angleBuffer = {}; 
     posBuffer = {};
-    
-    // Reinicio de estadísticas de auditoría
-    if (typeof wbaStats !== 'undefined') {
-        wbaStats.zonasAfectadas.clear();
-        wbaStats.framesAnalizados = 0;
-        wbaStats.riesgoAltoTotal = 0;
-        wbaStats.inicioAuditoria = null;
-        wbaStats.ciclos = 0;
-    }
+    wbaStats.zonasAfectadas.clear();
+    wbaStats.framesAnalizados = 0;
+    wbaStats.riesgoAltoTotal = 0;
 
-    // Detener flujos de cámara previos para liberar hardware en móviles
+    // 2. Limpieza de flujos previos (Cámara o Archivos)
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    
-    // Liberar memoria de archivos de video anteriores
-    if (video.src && video.src.startsWith('blob:')) {
+    if (video.src.startsWith('blob:')) {
         URL.revokeObjectURL(video.src);
         video.src = "";
     }
 
-    // 2. Configuración según Fuente (Cámara o Archivo Local)
+    // 3. Transición de Interfaz
+    document.getElementById('menu-inicial').style.display = 'none';
+    document.getElementById('contenedor-analisis').style.display = 'block';
+
     try {
         if (fuente === 'camara') {
-            if (videoControls) videoControls.classList.add('d-none');
-            if (btnGirar) btnGirar.classList.remove('d-none');
-
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
-                    facingMode: typeof currentFacingMode !== 'undefined' ? currentFacingMode : "environment", 
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 } 
+                    facingMode: currentFacingMode, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 } 
                 } 
             });
             video.srcObject = stream;
         } else {
-            // Modo ARCHIVO
-            if (videoControls) videoControls.classList.remove('d-none');
-            if (btnGirar) btnGirar.classList.add('d-none');
-
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput ? fileInput.files[0] : null;
-            
+            const file = document.getElementById('fileInput').files[0];
             if (!file) { 
-                alert("Seleccione un archivo de video."); 
+                alert("Seleccione un archivo de video para procesar."); 
+                location.reload();
                 return; 
             }
             video.src = URL.createObjectURL(file);
-            video.loop = true;
         }
 
-        // 3. Transición Visual de Interfaz
-        document.getElementById('menu-inicial').style.display = 'none';
-        document.getElementById('contenedor-analisis').style.display = 'block';
-
-        // Inicialización del Canvas y el Motor de IA
+        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
+            
             try {
                 await video.play();
-                activarIA(); // Dispara el motor de MediaPipe Pose
+                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
             } catch (playError) {
                 console.error("Error al reproducir video:", playError);
+                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
             }
         };
 
     } catch (err) {
-        console.error("Error crítico de hardware:", err);
-        alert("Error: Verifique permisos de cámara o compatibilidad.");
+        console.error("Error de acceso al hardware:", err);
+        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
         location.reload();
     }
 }
+
+    
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     loader.style.display = 'flex';
     
+    // Timeout de seguridad mejorado
     const safetyTimeout = setTimeout(() => {
         if (loader.style.display !== 'none') {
             loader.style.display = 'none';
-            alert("⚠️ El motor de IA tarda en responder. Verifique su conexión o GPU.");
+            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
         }
-    }, 12000);
+    }, 10000);
 
+    // Reinicializar instancia de Pose si ya existía para liberar memoria
     if (pose) {
         try { await pose.close(); } catch(e) {}
     }
@@ -1280,7 +818,7 @@ async function activarIA() {
     });
 
     pose.setOptions({ 
-        modelComplexity: 1, 
+        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
         smoothLandmarks: true, 
         minDetectionConfidence: 0.5, 
         minTrackingConfidence: 0.5 
@@ -1288,48 +826,38 @@ async function activarIA() {
 
     pose.onResults((res) => {
         clearTimeout(safetyTimeout);
-        if (loader.style.display !== 'none') loader.style.display = 'none';
+        if (loader.style.display !== 'none') {
+            loader.style.display = 'none';
+            console.log("IA Operativa - Modelo Jerárquico T Cargado");
+        }
         iaActiva = true;
         onResults(res);
     });
 
-    // Bucle de frames controlado (Evita saturación en Android)
+    // Loop de frames con control de estado
     async function frameLoop() {
         if (video.paused || video.ended) return;
 
         try {
-            // CRÍTICO: Esperamos a que la IA procese el frame antes de pedir el siguiente
             await pose.send({ image: video });
         } catch (e) {
-            console.warn("Frame drop");
+            console.warn("Frame omitido por procesamiento pesado.");
         }
         
-        // Solo solicita el siguiente frame si el sistema sigue activo
-        if (document.getElementById('contenedor-analisis').style.display !== 'none') {
+        if (iaActiva) {
             requestAnimationFrame(frameLoop);
+        } else {
+            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
+            setTimeout(frameLoop, 500);
         }
     }
     
     frameLoop();
-}
-
-// --- GESTIÓN DE VIDEO ---
-function togglePlay() {
-    const playIcon = document.getElementById('playIcon');
-    if (video.paused) {
-        video.play();
-        playIcon.src = "https://img.icons8.com/ios-filled/50/ffffff/pause.png";
-    } else {
-        video.pause();
-        playIcon.src = "https://img.icons8.com/ios-filled/50/ffffff/play.png";
-    }
-}
-
-function rewindVideo() { video.currentTime = Math.max(0, video.currentTime - 5); }
-function forwardVideo() { video.currentTime = Math.min(video.duration, video.currentTime + 5); }
+}   
 
 
     
+
 function descargarVideo() {
     if (recordedChunks.length === 0) return;
 
@@ -1357,13 +885,6 @@ function cambiarCamara() {
 }
 
 function validarYAbrirArchivo() {
-    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
-    
-    if (incompleto) {
-        alert("⚠️ Complete todos los campos antes de cargar el archivo.");
-        return;
-    }
     document.getElementById('fileInput').click();
 }
 </script>
