@@ -1,7 +1,4 @@
-PERFECTO VIVO
-
-
-JUE NOCH V4
+LUN V1
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -278,10 +275,16 @@ const video = document.getElementById('input_video');
 const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
-
-// Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
-const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
-
+// ✅ Umbrales de desviación (Grados) corregidos según NOM-036-1-STPS-2018 y Metodología REBA/RULA
+const TH = { 
+    tronco: 20,    // La norma marca riesgo si la flexión es > 20°
+    cuello: 10,    // El cuello es más sensible; > 10° ya inicia el nivel de riesgo
+    hombros: 20,   // Flexión/Abducción permitida hasta 20°
+    codos: 60,     // El rango de confort es 60°-100°. Se penaliza fuera de este rango.
+    munecas: 15,   // NOM-036/RULA penaliza desviaciones mayores a 15°
+    piernas: 30,   // Flexión de rodilla permitida hasta 30-60° según soporte
+    pies: 15       // Flexión de tobillo (neutro a flexión/extensión)
+};
 /**
  * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
  * Maneja el suavizado de la imagen y los acumuladores de riesgo.
@@ -433,18 +436,24 @@ function onResults(res) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS CLAVE ---
-    const p = {
-        ore_d: pt(8), ore_i: pt(7), 
-        h_d: pt(12), h_i: pt(11), 
-        c_d: pt(14), c_i: pt(13), 
-        m_d: pt(16), m_i: pt(15), 
-        dedo_d: pt(20), dedo_i: pt(19),
-        p_d: pt(24), p_i: pt(23),
-        r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27)
-    };
-
+    
+// --- MAPEO DE PUNTOS CLAVE (OPTIMIZADO NOM-036) ---
+const p = {
+    // Cabeza
+    ore_d: pt(8), ore_i: pt(7), 
+    
+    // Tren Superior
+    h_d: pt(12), h_i: pt(11),      // Hombros
+    c_d: pt(14), c_i: pt(13),      // Codos
+    m_d: pt(16), m_i: pt(15),      // Muñecas
+    dedo_d: pt(20), dedo_i: pt(19), // Dedos (Punto final para vector muñeca)
+    
+    // Tren Inferior
+    p_d: pt(24), p_i: pt(23),      // Pelvis/Cadera
+    r_d: pt(26), r_i: pt(25),      // Rodillas
+    t_d: pt(28), t_i: pt(27),      // Talón/Tobillo
+    pie_d: pt(32), pie_i: pt(31)   // Punta del pie (Punto final para vector pie)
+};
     // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
     // 1. Creamos el punto central exacto entre las orejas
     p.centro_orejas = { 
@@ -474,6 +483,7 @@ function onResults(res) {
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
     // --- CÁLCULO DE ÁNGULOS ---
+  // --- CÁLCULO DE ÁNGULOS (ACTUALIZADO CON MUÑECAS Y PIES) ---
     const currentAngles = {
         cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
         tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
@@ -481,8 +491,13 @@ function onResults(res) {
         h_i: calcAng3D(p.cue, p.h_i, p.c_i),
         c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
         c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+        // Nuevos cálculos:
+        mu_d: calcAng3D(p.c_d, p.m_d, p.dedo_d), // Flexión de muñeca derecha
+        mu_i: calcAng3D(p.c_i, p.m_i, p.dedo_i), // Flexión de muñeca izquierda
         r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
+        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+        pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d), // Ángulo del tobillo derecho
+        pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)  // Ángulo del tobillo izquierdo
     };
 
     Object.keys(currentAngles).forEach(k => {
@@ -491,34 +506,37 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
+    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA (CON NUEVAS EXTREMIDADES) ---
     
-    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
+    // Cabeza y Cuello
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           
 
     // Eje Central (Columna)
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
 
-    // Conexión de Hombros (Barra horizontal del pecho)
+    // Conexión de Hombros
     drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
 
-    // Brazos
+    // Brazos y MUÑECAS
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+    drawV(p.m_d, p.dedo_d, 'mu_d', 'munecas', p.m_d.v, p.dedo_d.v); // Vector Muñeca D
+    drawV(p.m_i, p.dedo_i, 'mu_i', 'munecas', p.m_i.v, p.dedo_i.v); // Vector Muñeca I
 
-    // Piernas (Desde los puntos de la cadera)
+    // Piernas y PIES
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
     drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
+    drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);     // Vector Pie D
+    drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);     // Vector Pie I
 
     ctx.restore();
-}
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
@@ -627,16 +645,17 @@ function generarReporteWBA() {
         theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
     });
 
-    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
-    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
+    // 2. Tabla de Umbrales Técnicos (Actualizada con Muñecas y Pies)
+    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (NOM-036 / REBA)", 15, doc.lastAutoTable.finalY + 10);
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
-        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
+        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Referencia']],
         body: [
-            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
-            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
-            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
-            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
+            ['Tronco (Flexión)', '0°', '20°', 'NOM-036-1-STPS'],
+            ['Cuello (Inclinación)', '0°', '10°', 'ISO 11228-3'],
+            ['Hombros / Codos', '0°', '20° / 60°', 'Método REBA'],
+            ['Muñecas', '0°', '15°', 'Prevención Túnel Carpiano'],
+            ['Pies / Tobillos', '90°', '15° (Flexión)', 'Estabilidad Biomecánica']
         ],
         headStyles: { fillColor: [44, 62, 80] },
         styles: { fontSize: 8 }
@@ -644,13 +663,23 @@ function generarReporteWBA() {
 
     // 3. Análisis de Resultados (IA)
     doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
+    
+    // Traducir zonas afectadas para el reporte
+    const zonasTraduccion = {
+        tronco: "Tronco", cuello: "Cuello", hombros: "Hombros", 
+        codos: "Codos", munecas: "Muñecas", piernas: "Rodillas", pies: "Tobillos"
+    };
+    const zonasTexto = Array.from(wbaStats.zonasAfectadas)
+        .map(z => zonasTraduccion[z] || z)
+        .join(', ') || 'Ninguna';
+
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 13,
         head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
         body: [
             ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
-            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
-            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
+            ['Exposición a Riesgo', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
+            ['Zonas con Estrés', zonasTexto, 'N/A', porcRiesgo > 0 ? 'OBSERVACIÓN' : 'NORMAL']
         ],
         theme: 'striped',
         styles: { fontSize: 8 },
@@ -666,16 +695,22 @@ function generarReporteWBA() {
     const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
     doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
 
-    // 5. Conclusiones y Recomendaciones
+    // 5. Conclusiones y Recomendaciones Específicas
     let recomendaciones = "";
     if (info.peso > limiteNormativo) {
-        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
+        recomendaciones += `• SOBRECARGA: El peso excede el límite de ${limiteNormativo}kg. ${hallazgosLegales.join(" ")} Usar equipo auxiliar. `;
+    }
+    if (wbaStats.zonasAfectadas.has('munecas')) {
+        recomendaciones += "• ERGONOMÍA MANO: Se detectaron ángulos críticos en muñecas; evitar agarres en pinza o desviaciones laterales extremas. ";
+    }
+    if (wbaStats.zonasAfectadas.has('pies')) {
+        recomendaciones += "• POSTURA BASE: Se detectó inestabilidad en tobillos. Verificar calzado de seguridad y superficie de apoyo. ";
     }
     if (porcRiesgo > 20) {
-        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
+        recomendaciones += "• FATIGA: Alta frecuencia de posturas forzadas. Aplicar rotación de puestos y pausas activas. ";
     }
     if (recomendaciones === "") {
-        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
+        recomendaciones = "OPERACIÓN SEGURA: El trabajador mantiene ángulos confortables en todas las articulaciones evaluadas. Continuar con monitoreo periódico.";
     }
 
     doc.setTextColor(0); doc.setFontSize(11);
@@ -685,15 +720,15 @@ function generarReporteWBA() {
     doc.text(splitText, 15, ySemaforo + 28);
 
     // 6. Sección de Firmas
-    const finalY = ySemaforo + 60;
+    const finalY = Math.min(ySemaforo + 80, 270);
     doc.setDrawColor(0); doc.setLineWidth(0.5);
     doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
     doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
 
     // Pie de Página
     doc.setFontSize(7); doc.setTextColor(150);
-    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
-    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
+    doc.text("Reporte generado por LYA-ERGO IA System - Módulo de Visión 3D Integrado.", 105, 285, { align: "center" });
+    doc.text("Cumplimiento normativo basado en NOM-036-1-STPS-2018.", 105, 290, { align: "center" });
 
     // Guardar Documento
     doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
