@@ -1,4 +1,4 @@
-PRUEVA DOM V7
+PRUEVA DOM V8
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -262,8 +262,8 @@ PRUEVA DOM V7
 
     <!-- Botones de Acceso: No se habilitan si faltan campos -->
     <div class="d-flex gap-2">
-        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
+<button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
+<button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>        
     </div>
     <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
 </div>
@@ -467,36 +467,47 @@ let nioshStats = {
     maxLI: 0,
     liAcumulado: 0
 };
-    const validarDatosYLimites = () => {
-    const edadInput = document.getElementById('edadTrabajador');
-    const pesoInput = document.getElementById('pesoCarga');
-    const generoInput = document.getElementById('generoTrabajador');
+const validarEntradasNormativas = () => {
+    const campos = {
+        empresa: document.getElementById('nombreEmpresa').value.trim(),
+        puesto: document.getElementById('puestoTrabajo').value.trim(),
+        nombre: document.getElementById('nombreTrabajador').value.trim(),
+        edad: document.getElementById('edadTrabajador').value.trim(),
+        peso: parseFloat(document.getElementById('pesoCarga').value)
+    };
 
-    const edadValor = edadInput.value.trim();
-    const pesoValor = parseFloat(pesoInput.value);
-    const genero = generoInput.value;
-
-    // --- RESTRICCIONES DE FORMATO ---
-    // Solo permite exactamente 2 números para la edad
-    if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error: La EDAD debe ser de exactamente 2 números.");
-        return null; 
+    // Validar que ningún campo esté vacío
+    if (Object.values(campos).some(v => v === "" || (typeof v === 'number' && isNaN(v)))) {
+        alert("⚠️ Por favor, complete todos los campos del formulario.");
+        return null;
     }
 
-    // --- LÓGICA DE LÍMITES NOM-036-1-STPS-2018 ---
-    const edad = parseInt(edadValor);
-    const limiteMax = (genero === 'H') ? (edad > 45 ? 20 : 25) : (edad > 45 ? 10 : 15);
-
-    // Si el peso excede el límite, se registra pero permite continuar (o bloquea, según prefieras)
-    if (pesoValor > limiteMax) {
-        hallazgosNormativos.push({
-            categoria: "Carga Crítica",
-            estado: "FALLO",
-            nota: `Peso de ${pesoValor}kg excede el límite legal de ${limiteMax}kg[cite: 1, 2]`
-        });
+    // Restricción: Exactamente 2 números para la edad
+    if (!/^\d{2}$/.test(campos.edad)) {
+        alert("❌ Error: La EDAD debe tener exactamente 2 números (ej: 25).");
+        return null;
     }
 
-    return { edad, peso: pesoValor, genero, limiteMax };
+    const edadNum = parseInt(campos.edad);
+    const genero = document.getElementById('generoTrabajador').value;
+    
+    // Lógica de límites legales (NOM-036 y LFT)[cite: 1, 2]
+    let limiteMax = 0;
+    if (edadNum < 15) {
+        alert("⚠️ PROHIBICIÓN LFT: No se permite el trabajo de menores de 15 años.");
+        return null;
+    } else if (edadNum < 18) {
+        limiteMax = 7; // Límite legal LFT para menores de edad
+    } else {
+        // Límites NOM-036 según género y edad[cite: 1]
+        limiteMax = (genero === 'H') ? (edadNum > 45 ? 20 : 25) : (edadNum > 45 ? 10 : 15);
+    }
+
+    if (campos.peso > limiteMax) {
+        alert(`⚠️ ADVERTENCIA: El peso (${campos.peso}kg) excede el límite normativo de ${limiteMax}kg.`);
+    }
+
+    return campos;
 };
 /**
  * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS
@@ -1135,6 +1146,7 @@ function generarReporteWBA() {
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN OPTIMIZADA ANDROID
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
+
 async function prepararSistema(fuente) {
     // 1. Captura de Referencias Locales
     const video = document.getElementById('input_video'); 
@@ -1154,15 +1166,15 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // Validación de EDAD (Estrictamente 2 cifras según requerimiento)[cite: 2]
+    // Validación de EDAD (Estrictamente 2 cifras)
     const edadValor = edadInput.value.trim();
     if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
+        alert("❌ Error en EDAD: Debe ingresar exactamente 2 números (Ejemplo: 25).");
         edadInput.focus();
         return;
     }
 
-    // Validación de peso (Numérico y positivo)[cite: 2]
+    // Validación de PESO (Numérico y positivo)
     const pesoValor = parseFloat(pesoInput.value);
     if (isNaN(pesoValor) || pesoValor <= 0) {
         alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
@@ -1184,13 +1196,13 @@ async function prepararSistema(fuente) {
         wbaStats.ciclos = 0;
     }
 
-    // Detener flujos de cámara previos para liberar hardware en Android
+    // Detener flujos de cámara previos para liberar hardware en móviles
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
     
-    // Liberar memoria de blobs de video anteriores
+    // Liberar memoria de archivos de video anteriores
     if (video.src && video.src.startsWith('blob:')) {
         URL.revokeObjectURL(video.src);
         video.src = "";
@@ -1211,6 +1223,7 @@ async function prepararSistema(fuente) {
             });
             video.srcObject = stream;
         } else {
+            // Modo ARCHIVO
             if (videoControls) videoControls.classList.remove('d-none');
             if (btnGirar) btnGirar.classList.add('d-none');
 
@@ -1225,11 +1238,11 @@ async function prepararSistema(fuente) {
             video.loop = true;
         }
 
-        // 3. Transición Visual de Interfaz[cite: 2]
+        // 3. Transición Visual de Interfaz
         document.getElementById('menu-inicial').style.display = 'none';
         document.getElementById('contenedor-analisis').style.display = 'block';
 
-        // Inicialización del Canvas y el Motor de IA al cargar metadatos
+        // Inicialización del Canvas y el Motor de IA
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
@@ -1243,11 +1256,10 @@ async function prepararSistema(fuente) {
 
     } catch (err) {
         console.error("Error crítico de hardware:", err);
-        alert("Error: Verifique permisos de cámara o compatibilidad del navegador.");
+        alert("Error: Verifique permisos de cámara o compatibilidad.");
         location.reload();
     }
 }
-
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     loader.style.display = 'flex';
