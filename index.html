@@ -15,7 +15,6 @@ JUE NOCH V4
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
 <style>
     /* --- CONFIGURACIÓN BASE --- */
     body { 
@@ -27,7 +26,6 @@ JUE NOCH V4
         height: 100svh; 
     }
 
-    /* --- MENÚ INICIAL (RESPONSIVO) --- */
     #menu-inicial { 
         display: flex; 
         width: 100%; 
@@ -61,7 +59,7 @@ JUE NOCH V4
         font-weight: 600;
     }
 
-    /* --- FORMULARIO PERSONALIZADO --- */
+    /* --- FORMULARIO Y CARGA --- */
     .form-control-custom {
         width: 100%; 
         padding: 10px; 
@@ -80,24 +78,6 @@ JUE NOCH V4
         outline: none;
     }
 
-    .btn-inicio { 
-        flex: 1; 
-        padding: 18px !important; 
-        border-radius: 12px; 
-        font-weight: 800; 
-        font-size: 1rem; 
-        border: none;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        cursor: pointer;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* --- PANTALLA DE CARGA --- */
     #loader-ia { 
         display: none; 
         position: fixed; 
@@ -118,7 +98,7 @@ JUE NOCH V4
         box-shadow: 0 0 15px #00ff00; 
     }
 
-    /* --- HUD Y CONTROLES --- */
+    /* --- HUD DE ANÁLISIS (CANVAS Y CONTROLES) --- */
     #contenedor-analisis { 
         display: none; 
         width: 100vw; 
@@ -157,6 +137,67 @@ JUE NOCH V4
         backdrop-filter: blur(15px);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
+    /* --- BOTÓN VIVO Y GRABACIÓN --- */
+    .btn-vivo-action {
+        background: #27ae60;
+        color: white;
+    }
+
+    .btn-vivo-action:hover {
+        background: #2ecc71;
+        box-shadow: 0 0 20px rgba(46, 204, 113, 0.4);
+    }
+
+    .rec-active {
+        background: #ff4d4d !important;
+        animation: pulse-red 1.5s infinite;
+        transform: scale(1.1);
+    }
+
+    @keyframes pulse-red {
+        0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+        70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+    }
+
+    .plant-tip {
+        font-size: 0.75rem;
+        color: #f1c40f;
+        margin-top: 15px;
+        text-align: center;
+        border: 1px dashed #f1c40f;
+        padding: 10px;
+        border-radius: 8px;
+        max-width: 300px;
+    }
+    /* --- BOTÓN ARCHIVO Y SELECTOR --- */
+    .btn-archivo-action {
+        background: #2980b9;
+        color: white;
+    }
+
+    .btn-archivo-action:hover {
+        background: #3498db;
+        box-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
+    }
+
+    /* Estilo compartido para botones de inicio */
+    .btn-inicio { 
+        flex: 1; 
+        padding: 18px !important; 
+        border-radius: 12px; 
+        font-weight: 800; 
+        font-size: 1rem; 
+        border: none;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
 
     .btn-circular {
         width: 60px; height: 60px;
@@ -172,34 +213,11 @@ JUE NOCH V4
         background: #30363d;
         color: white;
     }
-
-    .rec-active {
-        background: #ff4d4d !important;
-        animation: pulse-red 1.5s infinite;
-        transform: scale(1.1);
-    }
-
-    @keyframes pulse-red {
-        0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-        70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
-    }
-    /* Aviso de recomendación de vestimenta */
-.plant-tip {
-    font-size: 0.75rem;
-    color: #f1c40f; /* Amarillo para resaltar */
-    margin-top: 15px;
-    text-align: center;
-    border: 1px dashed #f1c40f;
-    padding: 10px;
-    border-radius: 8px;
-    max-width: 300px;
-}
 </style>
 </head>
 <body>
 
-<!-- Pantalla de carga de IA -->
+<!-- Pantalla de carga de IA (Motor LYA) -->
 <div id="loader-ia">
     <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
     <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
@@ -211,55 +229,12 @@ JUE NOCH V4
     </div>
 </div>
 
-<!-- Menú de Captura de Datos -->
-<div id="menu-inicial">
-    <h1 class="logo-text">LYA-ERGO</h1>
-    <p class="sub-text">Auditoría Ergonómica NOM-036-STPS</p>
-    
-    <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
-        <div class="row">
-            <div class="col-12 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" placeholder="Ej: Cervecería Modelo" class="form-control-custom">
-            </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">PUESTO:</label>
-                <input type="text" id="puestoTrabajo" placeholder="Ej: Estibador" class="form-control-custom">
-            </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">ID TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" placeholder="Ej: Juan Pérez" class="form-control-custom">
-            </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">GÉNERO:</label>
-                <select id="generoTrabajador" class="form-control-custom">
-                    <option value="H">Hombre</option>
-                    <option value="M">Mujer</option>
-                </select>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">EDAD:</label>
-                <input type="number" id="edadTrabajador" min="15" max="80" class="form-control-custom">
-            </div>
-            <div class="col-12">
-                <label style="color: #27ae60; font-size: 0.7rem; font-weight: bold;">PESO CARGA (KG):</label>
-                <input type="number" id="pesoCarga" min="1" max="50" class="form-control-custom" style="border: 2px solid #27ae60 !important;">
-            </div>
-        </div>
-    </div>
-
-    <div class="d-flex gap-2">
-        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
-    </div>
-    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
-</div>
-
-<!-- Contenedor de Análisis IA -->
+<!-- Contenedor de Análisis IA (Visualización de Resultados) -->
 <div id="contenedor-analisis">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
     <canvas id="output_canvas"></canvas>
-  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
+    <!-- Elemento fuente de video (Oculto para el usuario, procesado por Canvas) -->
+    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
@@ -268,23 +243,25 @@ JUE NOCH V4
         <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
     </div>
 </div>
-
 <script>
+/******************************************************************************
+ * 🟢 INICIO: CÓDIGO GENERAL (NÚCLEO DEL SISTEMA LYA-ERGO IA)
+ * Contiene configuraciones, motores de cálculo, IA y validaciones normativas.
+ ******************************************************************************/
+
 /**
  * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
- * Define los límites de desviación angular permitidos para evitar riesgos.
  */
 const video = document.getElementById('input_video');
 const canvas = document.getElementById('output_canvas');
 const ctx = canvas.getContext('2d');
 const txtStatus = document.getElementById('txt-status');
 
-// Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
+// Umbrales de desviación (Grados) basados en NOM-036-1-STPS-2018
 const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
 
 /**
  * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
- * Maneja el suavizado de la imagen y los acumuladores de riesgo.
  */
 let wbaStats = { 
     riesgoAltoTotal: 0, 
@@ -307,9 +284,11 @@ let currentFacingMode = "environment";
 let pose;
 let mediaRecorder;
 let recordedChunks = [];
-// Objeto para almacenar incumplimientos
 let hallazgosNormativos = [];
 
+/**
+ * LÓGICA DE VALIDACIÓN NORMATIVA (NOM-036 & LFT)
+ */
 function validarNormativa() {
     hallazgosNormativos = []; 
     const edad = parseInt(document.getElementById('edadTrabajador').value);
@@ -325,11 +304,11 @@ function validarNormativa() {
 
     // --- Validación NOM-036 (Peso vs Género/Edad) ---
     let limiteMax = 0;
-    if (genero === "M") { // 'M' de Mujer en tu select
+    if (genero === "M") { 
         if (edad < 18) limiteMax = 7;
         else if (edad <= 45) limiteMax = 15;
         else limiteMax = 10;
-    } else { // Hombre
+    } else { 
         if (edad < 18) limiteMax = 7;
         else if (edad <= 45) limiteMax = 25;
         else limiteMax = 20;
@@ -341,9 +320,9 @@ function validarNormativa() {
     
     return { hallazgos: hallazgosNormativos, limite: limiteMax };
 }
+
 /**
- * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS
- * Funciones para cálculo de ángulos 3D y dibujo de vectores.
+ * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS (CÁLCULOS 3D)
  */
 function calcAng3D(a, b, c) {
     if(!a || !b || !c) return 0;
@@ -379,12 +358,10 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         }
     }
 
-    // Dibujo del vector
     ctx.beginPath();
     ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
     ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-    // Etiqueta de datos si está calibrado
     if (calibrado) {
         const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
         ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -394,35 +371,26 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
         ctx.fillText(status, mx + 15, my + 5);
     }
 };
+
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
- * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
  */
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
-
     ctx.save();
     ctx.clearRect(0, 0, w, h);
-    
-    if (currentFacingMode === "user") { 
-        ctx.translate(w, 0); 
-        ctx.scale(-1, 1); 
-    }
-    
+    if (currentFacingMode === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
     if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
 
     if (!res.poseLandmarks) { 
         txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
-        ctx.restore(); 
-        return; 
+        ctx.restore(); return; 
     }
 
     const loader = document.getElementById('loader-ia');
     if (loader && loader.style.display !== 'none') loader.style.display = 'none';
 
     const lm = res.poseLandmarks;
-
-    // Helper de suavizado
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
@@ -433,55 +401,27 @@ function onResults(res) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS CLAVE ---
     const p = {
-        ore_d: pt(8), ore_i: pt(7), 
-        h_d: pt(12), h_i: pt(11), 
-        c_d: pt(14), c_i: pt(13), 
-        m_d: pt(16), m_i: pt(15), 
-        dedo_d: pt(20), dedo_i: pt(19),
-        p_d: pt(24), p_i: pt(23),
-        r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27)
+        ore_d: pt(8), ore_i: pt(7), h_d: pt(12), h_i: pt(11), 
+        c_d: pt(14), c_i: pt(13), m_d: pt(16), m_i: pt(15), 
+        dedo_d: pt(20), dedo_i: pt(19), p_d: pt(24), p_i: pt(23),
+        r_d: pt(26), r_i: pt(25), t_d: pt(28), t_i: pt(27)
     };
 
-    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
-    // 1. Creamos el punto central exacto entre las orejas
-    p.centro_orejas = { 
-        x: (p.ore_d.x + p.ore_i.x) / 2, 
-        y: (p.ore_d.y + p.ore_i.y) / 2, 
-        z: (p.ore_d.z + p.ore_i.z) / 2 
-    };
-
-    // 2. Punto central de los hombros (Cuello base)
-    p.cue = { 
-        x: (p.h_d.x + p.h_i.x) / 2, 
-        y: (p.h_d.y + p.h_i.y) / 2, 
-        z: (p.h_d.z + p.h_i.z) / 2 
-    };
-
-    // 3. Punto central de la cadera (Espalda baja)
-    p.esp_baja = { 
-        x: (p.p_d.x + p.p_i.x) / 2, 
-        y: (p.p_d.y + p.p_i.y) / 2, 
-        z: (p.p_d.z + p.p_i.z) / 2 
-    };
-
-    // Segmentos del tronco para mayor estabilidad visual
+    p.centro_orejas = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
+    p.cue = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
+    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
     p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
     p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
 
     const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    // --- CÁLCULO DE ÁNGULOS ---
     const currentAngles = {
         cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
         tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
-        h_d: calcAng3D(p.cue, p.h_d, p.c_d),
-        h_i: calcAng3D(p.cue, p.h_i, p.c_i),
-        c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
-        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
+        h_d: calcAng3D(p.cue, p.h_d, p.c_d), hombros: calcAng3D(p.cue, p.h_d, p.c_d),
+        h_i: calcAng3D(p.cue, p.h_i, p.c_i), c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
+        c_i: calcAng3D(p.h_i, p.c_i, p.m_i), r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
         r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
@@ -491,27 +431,16 @@ function onResults(res) {
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA ---
-    
-    // Superior de la "T": Conexión horizontal de orejas y vertical al cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); // Barra horizontal
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           // Barra vertical (Cuello)
-
-    // Eje Central (Columna)
+    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
+    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);
     drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
     drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
     drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
-
-    // Conexión de Hombros (Barra horizontal del pecho)
     drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
-
-    // Brazos
     drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
     drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
     drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
     drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-
-    // Piernas (Desde los puntos de la cadera)
     drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
     drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
     drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
@@ -519,374 +448,199 @@ function onResults(res) {
 
     ctx.restore();
 }
-/**
- * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
- */
-function iniciarCalibracion() {
-    if (!iaActiva) return;
-    txtStatus.innerText = "⚖️ CALIBRANDO... MANTENGA POSTURA NEUTRA";
-    
-    setTimeout(() => {
-        Object.keys(angleBuffer).forEach(k => {
-            const avg = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length;
-            baseAngles[k] = avg;
-        });
-        calibrado = true;
-        document.getElementById('btn-calib').style.background = "#2ecc71";
-        document.getElementById('recordBtn').disabled = false;
-        document.getElementById('recordBtn').style.opacity = "1";
-        txtStatus.innerText = "✅ CALIBRADO COMPLETADO";
-    }, 2000);
-}
-
-function toggleAuditoria() {
-    if (!calibrado) return;
-    analizandoRiesgo = !analizandoRiesgo;
-    const btn = document.getElementById('recordBtn');
-
-    if (analizandoRiesgo) {
-        recordedChunks = [];
-        const stream = canvas.captureStream(30);
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-        mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
-        mediaRecorder.onstop = descargarVideo;
-        mediaRecorder.start();
-        wbaStats.inicioAuditoria = Date.now();
-        btn.innerHTML = "<span>⏹️</span>DETENER"; btn.classList.add('rec-active');
-    } else {
-        btn.innerHTML = "<span>🔴</span>AUDITAR"; btn.classList.remove('rec-active');
-        if (mediaRecorder) mediaRecorder.stop();
-        setTimeout(generarReporteWBA, 800);
-    }
-}
 
 /**
- * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
- * Genera un documento técnico basado en los hallazgos de la IA y la normativa mexicana.
+ * MOTOR DE ARRANQUE IA (Mediapipe)
  */
-function generarReporteWBA() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // 1. Recolección de datos del DOM
-    const info = {
-        emp: document.getElementById('nombreEmpresa')?.value.toUpperCase() || "EMPRESA NO ESPECIFICADA",
-        puesto: document.getElementById('puestoTrabajo')?.value || "General",
-        trab: document.getElementById('nombreTrabajador')?.value || "Sin Nombre",
-        peso: parseFloat(document.getElementById('pesoCarga')?.value) || 0,
-        gen: document.getElementById('generoTrabajador')?.value || 'H',
-        edad: parseInt(document.getElementById('edadTrabajador')?.value) || 0
-    };
-
-    // 2. Lógica de Cumplimiento Normativo (Sincronizado con NOM-036 y LFT)
-    let limiteNormativo = 0;
-    let hallazgosLegales = [];
-
-    if (info.edad < 15) {
-        hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
-        limiteNormativo = 0;
-    } else if (info.edad < 18) {
-        hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
-        limiteNormativo = 7;
-    } else {
-        if (info.gen === 'H') {
-            limiteNormativo = (info.edad > 45) ? 20 : 25;
-        } else {
-            limiteNormativo = (info.edad > 45) ? 10 : 15;
-        }
-    }
-
-    // Cálculos de riesgo postural (IA)
-    const porcRiesgo = wbaStats.framesAnalizados > 0 
-        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
-        : 0;
-    
-    const cumpleNorma = (info.peso <= limiteNormativo && porcRiesgo <= 20);
-    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60]; // Verde o Rojo
-
-    // --- DISEÑO DEL PDF ---
-
-    // Encabezado Profesional
-    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
-    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
-    doc.text("AUDITORÍA DE CUMPLIMIENTO: NOM-036-1-STPS-2018 & LEY FEDERAL DEL TRABAJO", 105, 25, { align: "center" });
-    doc.text(`ID Reporte: LYA-${Date.now()} | Planta: ${info.emp}`, 105, 32, { align: "center" });
-
-    // 1. Datos Generales
-    doc.setTextColor(0); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES Y REFERENCIAS", 15, 50);
-    doc.autoTable({
-        startY: 53,
-        body: [
-            ['Empresa:', info.emp, 'Fecha de Evaluación:', new Date().toLocaleDateString()],
-            ['Trabajador:', info.trab, 'ID/Edad:', `${info.edad} años`],
-            ['Puesto:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
-        ],
-        theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
-    });
-
-    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
-    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
-        body: [
-            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
-            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
-            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
-            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
-        ],
-        headStyles: { fillColor: [44, 62, 80] },
-        styles: { fontSize: 8 }
-    });
-
-    // 3. Análisis de Resultados (IA)
-    doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
-        body: [
-            ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
-            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
-            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
-        ],
-        theme: 'striped',
-        styles: { fontSize: 8 },
-        columnStyles: { 3: { fontStyle: 'bold' } }
-    });
-
-    // 4. SEMAFORIZACIÓN FINAL Y VERDICTO
-    const ySemaforo = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(colorSemaforo[0], colorSemaforo[1], colorSemaforo[2]);
-    doc.rect(15, ySemaforo, 180, 12, 'F');
-    
-    doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
-    doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
-
-    // 5. Conclusiones y Recomendaciones
-    let recomendaciones = "";
-    if (info.peso > limiteNormativo) {
-        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
-    }
-    if (porcRiesgo > 20) {
-        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
-    }
-    if (recomendaciones === "") {
-        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
-    }
-
-    doc.setTextColor(0); doc.setFontSize(11);
-    doc.text("4. CONCLUSIONES TÉCNICAS", 15, ySemaforo + 22);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    const splitText = doc.splitTextToSize(recomendaciones, 175);
-    doc.text(splitText, 15, ySemaforo + 28);
-
-    // 6. Sección de Firmas
-    const finalY = ySemaforo + 60;
-    doc.setDrawColor(0); doc.setLineWidth(0.5);
-    doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
-    doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
-
-    // Pie de Página
-    doc.setFontSize(7); doc.setTextColor(150);
-    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
-    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
-
-    // Guardar Documento
-    doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
-}
-    
-    /**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
- * Controla el ciclo de vida de la cámara, el video y el motor de IA.
- */
-async function prepararSistema(fuente) {
-    // 1. Referencias y Captura de Datos
-    const edadInput = document.getElementById('edadTrabajador');
-    const pesoInput = document.getElementById('pesoCarga');
-    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    
-    // Validación de campos vacíos
-    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
-    if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario antes de iniciar el análisis."); 
-        return; 
-    }
-
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
-    const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
-    if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
-        edadInput.focus();
-        return;
-    }
-
-    // Validación de peso
-    if (parseFloat(pesoInput.value) <= 0) {
-        alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
-        pesoInput.focus();
-        return;
-    }
-
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
-    angleBuffer = {}; 
-    posBuffer = {};
-    wbaStats.zonasAfectadas.clear();
-    wbaStats.framesAnalizados = 0;
-    wbaStats.riesgoAltoTotal = 0;
-
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-    }
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src);
-        video.src = "";
-    }
-
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
-    try {
-        if (fuente === 'camara') {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                } 
-            });
-            video.srcObject = stream;
-        } else {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
-                return; 
-            }
-            video.src = URL.createObjectURL(file);
-        }
-
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
-        video.onloadedmetadata = async () => {
-            canvas.width = video.videoWidth; 
-            canvas.height = video.videoHeight;
-            
-            try {
-                await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
-            } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
-            }
-        };
-
-    } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
-        location.reload();
-    }
-}
-
-    
 async function activarIA() {
     const loader = document.getElementById('loader-ia');
     loader.style.display = 'flex';
-    
-    // Timeout de seguridad mejorado
-    const safetyTimeout = setTimeout(() => {
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
-        }
-    }, 10000);
+    if (pose) { try { await pose.close(); } catch(e) {} }
 
-    // Reinicializar instancia de Pose si ya existía para liberar memoria
-    if (pose) {
-        try { await pose.close(); } catch(e) {}
-    }
-
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
-
-    pose.setOptions({ 
-        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
-        smoothLandmarks: true, 
-        minDetectionConfidence: 0.5, 
-        minTrackingConfidence: 0.5 
-    });
-
+    pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     pose.onResults((res) => {
-        clearTimeout(safetyTimeout);
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            console.log("IA Operativa - Modelo Jerárquico T Cargado");
-        }
-        iaActiva = true;
-        onResults(res);
+        if (loader.style.display !== 'none') loader.style.display = 'none';
+        iaActiva = true; onResults(res);
     });
 
-    // Loop de frames con control de estado
     async function frameLoop() {
         if (video.paused || video.ended) return;
-
-        try {
-            await pose.send({ image: video });
-        } catch (e) {
-            console.warn("Frame omitido por procesamiento pesado.");
-        }
-        
-        if (iaActiva) {
-            requestAnimationFrame(frameLoop);
-        } else {
-            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
-            setTimeout(frameLoop, 500);
-        }
+        try { await pose.send({ image: video }); } catch (e) {}
+        if (iaActiva) requestAnimationFrame(frameLoop);
+        else setTimeout(frameLoop, 500);
     }
-    
     frameLoop();
-}   
+}
 
+/******************************************************************************
+ * 🔴 TERMINA: CÓDIGO GENERAL (NÚCLEO)
+ ******************************************************************************/
+/******************************************************************************
+ * 🔵 FUNCIONALIDAD: BOTÓN "INICIAR EN VIVO"
+ * Gestiona cámara, grabación, interfaz y arranque del motor de IA.
+ ******************************************************************************/
 
+async function iniciarEnVivo() {
+    // 1. Validación de Formulario (Requisito de acceso)
+    const formValido = document.getElementById('nombreTrabajador').value.trim() !== "" &&
+                       document.getElementById('edadTrabajador').value !== "" &&
+                       document.getElementById('pesoCarga').value !== "";
+
+    if (!formValido) {
+        alert("⚠️ Por favor, completa todos los campos del formulario antes de iniciar.");
+        return;
+    }
+
+    // 2. Ejecutar validación normativa antes de iniciar
+    const diagnostico = validarNormativa();
+    console.log("Diagnóstico inicial LFT/NOM-036:", diagnostico);
+
+    // 3. Configuración de Interfaz
+    document.getElementById('menu-principal').style.display = 'none';
+    document.getElementById('container-ia').style.display = 'block';
+    document.getElementById('btn-detener').style.display = 'inline-block';
+    document.getElementById('btn-capturar-base').style.display = 'inline-block';
     
+    txtStatus.innerText = "INICIALIZANDO CÁMARA...";
 
-function descargarVideo() {
-    if (recordedChunks.length === 0) return;
+    // 4. Acceso a la Cámara
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        });
 
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; 
-    a.download = `EVIDENCIA_LYA_${document.getElementById('nombreTrabajador').value}_${Date.now()}.webm`; 
-    a.click();
+        video.srcObject = stream;
+        
+        // 5. Configuración de Grabación (MediaRecorder)
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) recordedChunks.push(event.data);
+        };
 
-    // 🧹 LIMPIEZA DE MEMORIA
-    // Liberamos la URL del objeto después de 100ms para asegurar que la descarga inició
-    setTimeout(() => {
-        URL.revokeObjectURL(url);
-        console.log("Memoria de blob de video liberada con éxito.");
-    }, 100);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            console.log("Grabación finalizada. Tamaño:", blob.size);
+        };
+
+        mediaRecorder.start();
+
+        // 6. Encendido del Motor de IA
+        video.onloadedmetadata = () => {
+            video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            activarIA(); // Llama al núcleo del sistema
+        };
+
+    } catch (err) {
+        console.error("Error al acceder a la cámara:", err);
+        alert("No se pudo acceder a la cámara. Por favor, verifica los permisos.");
+        regresarAlMenu();
+    }
 }
 
-
-
-    
-function cambiarCamara() {
-    currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-    prepararSistema('camara');
+/**
+ * Función auxiliar para cambiar entre cámara frontal y trasera
+ */
+async function alternarCamara() {
+    currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+    if (iaActiva) {
+        // Reiniciar stream con la nueva cámara
+        const stream = video.srcObject;
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        iniciarEnVivo();
+    }
 }
 
-function validarYAbrirArchivo() {
-    document.getElementById('fileInput').click();
+/******************************************************************************
+ * 📁 FUNCIONALIDAD: BOTÓN "SUBIR VIDEO" (ARCHIVO)
+ * Gestiona la carga de archivos locales, validación y enlace con el motor de IA.
+ ******************************************************************************/
+
+async function iniciarDesdeArchivo() {
+    // 1. Validación de Formulario (Requisito de acceso)
+    const formValido = document.getElementById('nombreTrabajador').value.trim() !== "" &&
+                       document.getElementById('edadTrabajador').value !== "" &&
+                       document.getElementById('pesoCarga').value !== "";
+
+    if (!formValido) {
+        alert("⚠️ Por favor, completa todos los campos del formulario antes de subir el archivo.");
+        return;
+    }
+
+    // 2. Crear input de archivo dinámicamente
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'video/*'; // Restricción para aceptar solo archivos de video
+
+    fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 3. Preparación de Interfaz para modo Archivo
+        document.getElementById('menu-principal').style.display = 'none';
+        document.getElementById('container-ia').style.display = 'block';
+        document.getElementById('btn-detener').style.display = 'inline-block';
+        document.getElementById('btn-capturar-base').style.display = 'inline-block';
+        
+        txtStatus.innerText = "CARGANDO ARCHIVO DE VIDEO...";
+
+        // 4. Carga del Video en el elemento fuente
+        const url = URL.createObjectURL(file);
+        video.srcObject = null; // Limpiar stream de cámara si existía
+        video.src = url;
+        video.muted = true; // Asegurar reproducción fluida
+        video.loop = false;
+
+        // 5. Ejecutar validación normativa inicial
+        const diagnostico = validarNormativa();
+        console.log("Diagnóstico preventivo para archivo:", diagnostico);
+
+        // 6. Sincronización con el Motor de IA
+        video.onloadedmetadata = () => {
+            video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Iniciar procesamiento de vectores sobre el archivo cargado
+            activarIA(); 
+            console.log(`Procesando archivo: ${file.name} (${video.videoWidth}x${video.videoHeight})`);
+        };
+
+        // Manejo de finalización del video
+        video.onended = () => {
+            txtStatus.innerText = "ANÁLISIS DE ARCHIVO FINALIZADO";
+            console.log("El video ha terminado de procesarse.");
+        };
+    };
+
+    // Lanzar el selector de archivos
+    fileInput.click();
 }
+
+/**
+ * Función auxiliar para limpiar recursos al cerrar el video
+ */
+function liberarRecursosVideo() {
+    if (video.src) {
+        URL.revokeObjectURL(video.src);
+        video.src = "";
+    }
+}
+    /******************************************************************************
+ * 📁 TERMINA BOTÓN "SUBIR VIDEO" (ARCHIVO)
+ * Gestiona la carga de archivos locales, validación y enlace con el motor de IA.
+ ******************************************************************************/
+
 </script>
+
 </body>
 </html>
