@@ -1,4 +1,4 @@
-LUN V2
+LUN V3
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -195,14 +195,12 @@ LUN V2
 </style>
 </head>
 <body>
-
-<!-- Pantalla de carga de IA -->
-<div id="loader-ia">
+<!-- Pantalla de Carga (Loader) -->
+<div id="loader-ia" style="display:none;">
     <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
     <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
         <div id="bar-id" class="progress-bar" style="width: 100%;"></div>
     </div>
-    <!-- Sugerencia para el Auditor -->
     <div class="plant-tip">
         ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
     </div>
@@ -235,12 +233,13 @@ LUN V2
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">EDAD:</label>
-                <input type="number" id="edadTrabajador" min="15" max="80" class="form-control-custom">
+                <label style="color: #8b949e; font-size: 0.7rem;">EDAD (2 dígitos):</label>
+                <!-- Tipo texto con pattern para asegurar el cumplimiento de la validación del script -->
+                <input type="text" id="edadTrabajador" maxlength="2" placeholder="Ej: 25" class="form-control-custom">
             </div>
             <div class="col-12">
                 <label style="color: #27ae60; font-size: 0.7rem; font-weight: bold;">PESO CARGA (KG):</label>
-                <input type="number" id="pesoCarga" min="1" max="50" class="form-control-custom" style="border: 2px solid #27ae60 !important;">
+                <input type="number" id="pesoCarga" placeholder="Ej: 15" class="form-control-custom" style="border: 2px solid #27ae60 !important;">
             </div>
         </div>
     </div>
@@ -249,14 +248,16 @@ LUN V2
         <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
         <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
     </div>
-    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
+    
+    <!-- Input oculto con onchange para disparar el motor al seleccionar el video -->
+    <input type="file" id="fileInput" style="display:none;" accept="video/*" onchange="prepararSistema('archivo')">
 </div>
 
 <!-- Contenedor de Análisis IA -->
-<div id="contenedor-analisis">
+<div id="contenedor-analisis" style="display:none;">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
     <canvas id="output_canvas"></canvas>
-  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
+    <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
     <div class="barra-controles">
         <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
@@ -794,6 +795,9 @@ function generarReporteWBA() {
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
  * Controla el ciclo de vida de la cámara, el video y el motor de IA.
  */
+/**
+ * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - CORREGIDO
+ */
 async function prepararSistema(fuente) {
     // 1. Referencias y Captura de Datos
     const edadInput = document.getElementById('edadTrabajador');
@@ -807,9 +811,8 @@ async function prepararSistema(fuente) {
         return; 
     }
 
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
+    // Validación de Edad (NOM-036 / LFT)
     const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
     if (!/^\d{2}$/.test(edadValor)) {
         alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
         edadInput.focus();
@@ -823,25 +826,24 @@ async function prepararSistema(fuente) {
         return;
     }
 
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
+    // --- LIMPIEZA DE FLUJOS PREVIOS (CRÍTICO PARA QUE EL BOTÓN RESPONDA) ---
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    if (video.src && video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src);
+        video.src = "";
+    }
+
+    // Reinicio de buffers de la IA
     angleBuffer = {}; 
     posBuffer = {};
     wbaStats.zonasAfectadas.clear();
     wbaStats.framesAnalizados = 0;
     wbaStats.riesgoAltoTotal = 0;
 
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-    }
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src);
-        video.src = "";
-    }
-
-    // 3. Transición de Interfaz
+    // 2. Transición de Interfaz
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
@@ -856,32 +858,35 @@ async function prepararSistema(fuente) {
             });
             video.srcObject = stream;
         } else {
-            const file = document.getElementById('fileInput').files[0];
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
             if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
+                // Si el usuario canceló, volvemos al menú
+                document.getElementById('menu-inicial').style.display = 'block';
+                document.getElementById('contenedor-analisis').style.display = 'none';
                 return; 
             }
             video.src = URL.createObjectURL(file);
+            video.load(); // Forzamos al navegador a reconocer el nuevo blob de video
         }
 
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
+        // 3. Manejo del arranque del motor de IA
         video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth; 
             canvas.height = video.videoHeight;
             
             try {
                 await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
+                activarIA(); // Inicia la estimación de pose
             } catch (playError) {
                 console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
+                alert("Error crítico: No se pudo iniciar la reproducción.");
             }
         };
 
     } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
+        console.error("Error de acceso:", err);
+        alert("No se pudo acceder al recurso. Verifique permisos.");
         location.reload();
     }
 }
