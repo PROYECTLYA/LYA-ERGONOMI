@@ -217,30 +217,59 @@ JUE NOCH V4
 </head>
 <body>
 
-<!-- Pantalla de carga de IA (Motor LYA) -->
-<div id="loader-ia">
-    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
-    <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
-        <div id="bar-id" class="progress-bar" style="width: 100%;"></div>
+<!-- 1. PANTALLA DE INICIO CON FORMULARIO -->
+<div id="menu-principal">
+    <h1 class="logo-text">LYA-ERGO</h1>
+    <p class="sub-text">Auditoría Ergonómica NOM-036-STPS</p>
+    
+    <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+        <label style="font-size: 0.7rem; color: #8b949e;">ID TRABAJADOR / NOMBRE:</label>
+        <input type="text" id="nombreTrabajador" class="form-control-custom" placeholder="Ej: Operador Línea 4">
+        
+        <div class="row">
+            <div class="col-6">
+                <label style="font-size: 0.7rem; color: #8b949e;">EDAD:</label>
+                <input type="number" id="edadTrabajador" class="form-control-custom">
+            </div>
+            <div class="col-6">
+                <label style="font-size: 0.7rem; color: #8b949e;">GÉNERO:</label>
+                <select id="generoTrabajador" class="form-control-custom">
+                    <option value="H">Hombre</option>
+                    <option value="M">Mujer</option>
+                </select>
+            </div>
+        </div>
+        
+        <label style="font-size: 0.7rem; color: #00ff00; font-weight: bold;">PESO DE LA CARGA (KG):</label>
+        <input type="number" id="pesoCarga" class="form-control-custom" style="border: 1px solid #00ff00;" placeholder="0">
     </div>
-    <!-- Sugerencia para el Auditor -->
-    <div class="plant-tip">
-        ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
+
+    <!-- BOTONES INDEPENDIENTES -->
+    <div class="d-flex gap-3" style="width: 90%; max-width: 450px;">
+        <button class="btn-inicio btn-vivo-action" onclick="iniciarEnVivo()">🎥 VIVO</button>
+        <button class="btn-inicio btn-archivo-action" onclick="iniciarDesdeArchivo()">📁 ARCHIVO</button>
     </div>
 </div>
 
-<!-- Contenedor de Análisis IA (Visualización de Resultados) -->
-<div id="contenedor-analisis">
+<!-- 2. PANTALLA DE CARGA IA -->
+<div id="loader-ia">
+    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
+    <div style="width: 70%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 20px; overflow: hidden;">
+        <div class="progress-bar" id="bar-id"></div>
+    </div>
+</div>
+
+<!-- 3. CONTENEDOR DE ANÁLISIS IA -->
+<div id="container-ia">
     <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
     <canvas id="output_canvas"></canvas>
-    <!-- Elemento fuente de video (Oculto para el usuario, procesado por Canvas) -->
     <video id="input_video" autoplay muted playsinline style="display:none;"></video>
     
     <div class="barra-controles">
-        <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
-        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
-        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
+        <button class="btn-circular" onclick="location.reload()" title="Salir">✖</button>
+        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="alternarCamara()" title="Girar Cámara">🔄</button>
+        <button id="btn-capturar-base" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()" title="Calibrar">⚖️</button>
+        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.5;" onclick="toggleAuditoria()" disabled title="Grabar Auditoría">🔴</button>
     </div>
 </div>
 <script>
