@@ -1,4 +1,4 @@
-LUN V1
+LUN V2
 
 <!DOCTYPE html> 
 <html lang="es">
@@ -358,45 +358,82 @@ function calcAng3D(a, b, c) {
     const angle = Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
     return isNaN(angle) ? 0 : angle;
 }
-
 const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    if (vis1 < 0.5 || vis2 < 0.5) return;
+    // 1. FILTRO DE CERTEZA: Elevamos el umbral para evitar el "brinco" de los vectores
+    // Si la visibilidad es baja, dibujamos un vector fantasma (gris tenue) o retornamos
+    if (vis1 < 0.65 || vis2 < 0.65) {
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(200, 200, 200, 0.2)"; // Color neutro para indicar pérdida de señal
+        ctx.lineWidth = 2;
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        return; 
+    }
 
     const buffer = angleBuffer[angKey] || [];
     if (buffer.length === 0) return;
+    
+    // Promedio del buffer para estabilidad del ángulo mostrado
     const avgAngle = buffer.reduce((a, b) => a + b, 0) / buffer.length;
 
+    // Configuración visual por defecto
     let color = "#00ff00", thickness = 4, status = "SEGURO";
 
+    // 2. LÓGICA DE AUDITORÍA (NOM-036 / REBA)
     if (analizandoRiesgo && calibrado) {
         const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
         const limit = TH[groupKey];
+        
+        // Solo incrementamos frames si el tracking es sólido
         wbaStats.framesAnalizados++;
 
         if (diff > (limit * 2)) {
-            color = "#ff3838"; thickness = 10; status = "CRÍTICO";
+            color = "#ff3838"; thickness = 8; status = "CRÍTICO";
             wbaStats.riesgoAltoTotal++;
             wbaStats.zonasAfectadas.add(groupKey);
         } else if (diff > limit) {
-            color = "#f1c40f"; thickness = 6; status = "RIESGO";
+            color = "#f1c40f"; thickness = 5; status = "RIESGO";
         }
     }
 
-    // Dibujo del vector
+    // 3. RENDERIZADO ESTILO PROFESIONAL
     ctx.beginPath();
-    ctx.strokeStyle = color; ctx.lineWidth = thickness; ctx.lineCap = "round";
-    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // Añadimos un pequeño brillo exterior (Glow) al vector para mejorar visibilidad
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = color;
+    
+    ctx.strokeStyle = color; 
+    ctx.lineWidth = thickness; 
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    ctx.moveTo(p1.x, p1.y); 
+    ctx.lineTo(p2.x, p2.y); 
+    ctx.stroke();
+    
+    // Limpiamos el brillo para no afectar otros dibujos
+    ctx.shadowBlur = 0;
 
-    // Etiqueta de datos si está calibrado
+    // 4. ETIQUETADO DINÁMICO (MODO AUDITORÍA)
     if (calibrado) {
         const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(mx + 10, my - 20, 70, 30);
-        ctx.fillStyle = color; ctx.font = "bold 10px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
-        ctx.fillText(status, mx + 15, my + 5);
+        
+        // Fondo de etiqueta estilizado (Semi-transparente)
+        ctx.fillStyle = "rgba(15, 15, 15, 0.8)";
+        ctx.roundRect(mx + 12, my - 22, 65, 32, 5); // Rectángulo con bordes redondeados
+        ctx.fill();
+        
+        // Texto del Ángulo
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 11px Inter, Arial";
+        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 18, my - 8);
+        
+        // Texto del Estatus (Color dinámico según riesgo)
+        ctx.fillStyle = color;
+        ctx.font = "9px Inter, Arial";
+        ctx.fillText(status, mx + 18, my + 5);
     }
 };
+
 /**
  * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
  * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
@@ -426,117 +463,136 @@ function onResults(res) {
     const lm = res.poseLandmarks;
 
     // Helper de suavizado
-    const pt = (i) => {
-        if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
-        if (!posBuffer[i]) posBuffer[i] = { h: [] };
-        posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-        const len = posBuffer[i].h.length;
-        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
-        return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
-    };
+// --- CONFIGURACIÓN DE FILTRADO ---
+const ALPHA = 0.2; // Factor de suavizado (0.1 = muy estable / 0.9 = muy rápido)
+const MIN_CONFIDENCE = 0.65; // Umbral para ignorar "brincos" del modelo
+let smoothLM = {}; // Memoria para el suavizado exponencial
 
+const pt = (i) => {
+    if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
     
+    // 1. FILTRO DE CONFIANZA: Si la IA duda, mantenemos la posición anterior
+    if (lm[i].visibility < MIN_CONFIDENCE && smoothLM[i]) {
+        return { ...smoothLM[i], v: lm[i].visibility };
+    }
+
+    const currentPos = { x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z };
+
+    // 2. SUAVIZADO EXPONENCIAL (EMA): Elimina la vibración/jitter
+    if (!smoothLM[i]) {
+        smoothLM[i] = currentPos;
+    } else {
+        smoothLM[i] = {
+            x: smoothLM[i].x + ALPHA * (currentPos.x - smoothLM[i].x),
+            y: smoothLM[i].y + ALPHA * (currentPos.y - smoothLM[i].y),
+            z: smoothLM[i].z + ALPHA * (currentPos.z - smoothLM[i].z)
+        };
+    }
+
+    return { ...smoothLM[i], v: lm[i].visibility };
+};
+
 // --- MAPEO DE PUNTOS CLAVE (OPTIMIZADO NOM-036) ---
 const p = {
-    // Cabeza
     ore_d: pt(8), ore_i: pt(7), 
-    
-    // Tren Superior
     h_d: pt(12), h_i: pt(11),      // Hombros
     c_d: pt(14), c_i: pt(13),      // Codos
     m_d: pt(16), m_i: pt(15),      // Muñecas
-    dedo_d: pt(20), dedo_i: pt(19), // Dedos (Punto final para vector muñeca)
-    
-    // Tren Inferior
-    p_d: pt(24), p_i: pt(23),      // Pelvis/Cadera
+    dedo_d: pt(20), dedo_i: pt(19), // Dedos
+    p_d: pt(24), p_i: pt(23),      // Pelvis
     r_d: pt(26), r_i: pt(25),      // Rodillas
-    t_d: pt(28), t_i: pt(27),      // Talón/Tobillo
-    pie_d: pt(32), pie_i: pt(31)   // Punta del pie (Punto final para vector pie)
+    t_d: pt(28), t_i: pt(27),      // Talón
+    pie_d: pt(32), pie_i: pt(31)   // Punta pie
 };
-    // --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
-    // 1. Creamos el punto central exacto entre las orejas
-    p.centro_orejas = { 
-        x: (p.ore_d.x + p.ore_i.x) / 2, 
-        y: (p.ore_d.y + p.ore_i.y) / 2, 
-        z: (p.ore_d.z + p.ore_i.z) / 2 
-    };
 
-    // 2. Punto central de los hombros (Cuello base)
-    p.cue = { 
-        x: (p.h_d.x + p.h_i.x) / 2, 
-        y: (p.h_d.y + p.h_i.y) / 2, 
-        z: (p.h_d.z + p.h_i.z) / 2 
-    };
+// --- LÓGICA DE CONEXIÓN EN "T" (CABEZA Y CUELLO) ---
+p.centro_orejas = { 
+    x: (p.ore_d.x + p.ore_i.x) / 2, 
+    y: (p.ore_d.y + p.ore_i.y) / 2, 
+    z: (p.ore_d.z + p.ore_i.z) / 2 
+};
 
-    // 3. Punto central de la cadera (Espalda baja)
-    p.esp_baja = { 
-        x: (p.p_d.x + p.p_i.x) / 2, 
-        y: (p.p_d.y + p.p_i.y) / 2, 
-        z: (p.p_d.z + p.p_i.z) / 2 
-    };
+p.cue = { 
+    x: (p.h_d.x + p.h_i.x) / 2, 
+    y: (p.h_d.y + p.h_i.y) / 2, 
+    z: (p.h_d.z + p.h_i.z) / 2 
+};
 
-    // Segmentos del tronco para mayor estabilidad visual
-    p.torax = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, z: p.cue.z };
-    p.abdomen = { x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, z: p.cue.z };
+p.esp_baja = { 
+    x: (p.p_d.x + p.p_i.x) / 2, 
+    y: (p.p_d.y + p.p_i.y) / 2, 
+    z: (p.p_d.z + p.p_i.z) / 2 
+};
 
-    const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
+// Segmentos del tronco (Para visualización de curvatura de espalda baja)
+p.torax = { 
+    x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.3, 
+    y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.3, 
+    z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.3 
+};
+p.abdomen = { 
+    x: p.cue.x + (p.esp_baja.x - p.cue.x) * 0.6, 
+    y: p.cue.y + (p.esp_baja.y - p.cue.y) * 0.6, 
+    z: p.cue.z + (p.esp_baja.z - p.cue.z) * 0.6 
+};
 
-    // --- CÁLCULO DE ÁNGULOS ---
-  // --- CÁLCULO DE ÁNGULOS (ACTUALIZADO CON MUÑECAS Y PIES) ---
-    const currentAngles = {
-        cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
-        tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
-        h_d: calcAng3D(p.cue, p.h_d, p.c_d),
-        h_i: calcAng3D(p.cue, p.h_i, p.c_i),
-        c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
-        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        // Nuevos cálculos:
-        mu_d: calcAng3D(p.c_d, p.m_d, p.dedo_d), // Flexión de muñeca derecha
-        mu_i: calcAng3D(p.c_i, p.m_i, p.dedo_i), // Flexión de muñeca izquierda
-        r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
-        pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d), // Ángulo del tobillo derecho
-        pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)  // Ángulo del tobillo izquierdo
-    };
+// Referencia vertical absoluta (basada en el cuello)
+const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
 
-    Object.keys(currentAngles).forEach(k => {
-        if (!angleBuffer[k]) angleBuffer[k] = [];
-        angleBuffer[k].push(currentAngles[k]);
-        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-    });
+// --- CÁLCULO DE ÁNGULOS (NOM-036 / REBA) ---
+const currentAngles = {
+    cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
+    tronco: calcAng3D(p.cue, p.esp_baja, verticalRef),
+    h_d: calcAng3D(p.cue, p.h_d, p.c_d),
+    h_i: calcAng3D(p.cue, p.h_i, p.c_i),
+    c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
+    c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+    mu_d: calcAng3D(p.c_d, p.m_d, p.dedo_d),
+    mu_i: calcAng3D(p.c_i, p.m_i, p.dedo_i),
+    r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
+    r_i: calcAng3D(p.p_i, p.r_i, p.t_i),
+    pie_d: calcAng3D(p.r_d, p.t_d, p.pie_d),
+    pie_i: calcAng3D(p.r_i, p.t_i, p.pie_i)
+};
 
-    // --- RENDERIZADO DE LA "T" Y EL ESQUEMA (CON NUEVAS EXTREMIDADES) ---
+// --- BUFFER DE ÁNGULOS ---
+Object.keys(currentAngles).forEach(k => {
+    if (!angleBuffer[k]) angleBuffer[k] = [];
+    angleBuffer[k].push(currentAngles[k]);
+    if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
+});
+
+// --- RENDERIZADO DEL ESQUEMA VECTORIAL ---
+// Cabeza y Cuello (Conexión T)
+drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
+drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           
+
+// Eje Central (Columna segmentada)
+drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
+drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
+drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
+
+// Tren Superior
+drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
+drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
+drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
+drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
+drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
+drawV(p.m_d, p.dedo_d, 'mu_d', 'munecas', p.m_d.v, p.dedo_d.v);
+drawV(p.m_i, p.dedo_i, 'mu_i', 'munecas', p.m_i.v, p.dedo_i.v);
+
+// Tren Inferior
+drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
+drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
+drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
+drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
+drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);     
+drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);
+
+ctx.restore();
+
+
     
-    // Cabeza y Cuello
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v); 
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', 1, 1);           
-
-    // Eje Central (Columna)
-    drawV(p.cue, p.torax, 'tronco', 'tronco', 1, 1);
-    drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
-    drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
-
-    // Conexión de Hombros
-    drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
-
-    // Brazos y MUÑECAS
-    drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_d, p.dedo_d, 'mu_d', 'munecas', p.m_d.v, p.dedo_d.v); // Vector Muñeca D
-    drawV(p.m_i, p.dedo_i, 'mu_i', 'munecas', p.m_i.v, p.dedo_i.v); // Vector Muñeca I
-
-    // Piernas y PIES
-    drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
-    drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
-    drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
-    drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_d, p.pie_d, 'pie_d', 'pies', p.t_d.v, p.pie_d.v);     // Vector Pie D
-    drawV(p.t_i, p.pie_i, 'pie_i', 'pies', p.t_i.v, p.pie_i.v);     // Vector Pie I
-
-    ctx.restore();}
 /**
  * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
  */
