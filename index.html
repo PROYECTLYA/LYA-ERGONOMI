@@ -790,11 +790,7 @@ function generarReporteWBA() {
     // Guardar Documento
     doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
 }
-    
-    /**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
- * Controla el ciclo de vida de la cámara, el video y el motor de IA.
- */
+
 /**
  * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - CORREGIDO
  */
@@ -980,8 +976,98 @@ function cambiarCamara() {
     prepararSistema('camara');
 }
 
+/**
+ * 🏷️ BLOQUE 7: CONTROL DE FLUJO Y HARDWARE - REPARADO
+ */
+
+// Esta función es llamada por el botón "ARCHIVO"
 function validarYAbrirArchivo() {
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    
+    // 1. Validar campos vacíos
+    const incompleto = ids.some(id => {
+        const el = document.getElementById(id);
+        return !el || !el.value.trim();
+    });
+
+    if (incompleto) {
+        alert("⚠️ Por favor, complete todos los campos del formulario antes de seleccionar un video.");
+        return;
+    }
+
+    // 2. Validar Edad (2 cifras)
+    const edadVal = document.getElementById('edadTrabajador').value.trim();
+    if (!/^\d{2}$/.test(edadVal)) {
+        alert("❌ Error en EDAD: Debe ingresar exactamente 2 cifras.");
+        return;
+    }
+
+    // 3. Si todo está bien, abrir el selector
     document.getElementById('fileInput').click();
+}
+
+// Esta es la función maestra que arranca el motor
+async function prepararSistema(fuente) {
+    console.log("Intentando arrancar sistema via:", fuente);
+
+    // Re-validación de seguridad
+    const edadInput = document.getElementById('edadTrabajador');
+    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
+    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
+
+    if (incompleto) {
+        alert("⚠️ Complete el formulario.");
+        return;
+    }
+
+    if (!/^\d{2}$/.test(edadInput.value.trim())) {
+        alert("❌ Edad debe ser de 2 cifras.");
+        return;
+    }
+
+    // --- LIMPIEZA TOTAL DE MEMORIA ---
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    if (video.src && video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src);
+        video.src = "";
+    }
+
+    try {
+        if (fuente === 'camara') {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
+            });
+            video.srcObject = stream;
+        } else {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return;
+            video.src = URL.createObjectURL(fileInput.files[0]);
+            video.load(); 
+        }
+
+        // TRANSICIÓN VISUAL
+        document.getElementById('menu-inicial').style.display = 'none';
+        document.getElementById('contenedor-analisis').style.display = 'block';
+
+        // DISPARO DEL MOTOR IA
+        video.onloadedmetadata = async () => {
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            try {
+                await video.play();
+                activarIA(); // <--- Asegúrate de que esta función esté definida abajo
+            } catch (e) {
+                console.error("Error en play:", e);
+            }
+        };
+
+    } catch (err) {
+        alert("Error al acceder a la cámara o archivo.");
+        console.error(err);
+    }
 }
 </script>
 </body>
