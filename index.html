@@ -1,4 +1,4 @@
-forjado IA 1
+forjado IA 2
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -687,7 +687,9 @@ function toggleAuditoria() {
 function generarReporteSTPS() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const puntosNOM = evaluarRiesgoNOM(); // Calcula puntos y llena hallazgosNormativos
+    
+    // Ejecutar motor de riesgo para obtener puntos y hallazgos finales
+    const puntosNOM = evaluarRiesgoNOM(); 
 
     // --- 1. ENCABEZADO INSTITUCIONAL ---
     doc.setFillColor(44, 62, 80); 
@@ -698,30 +700,32 @@ function generarReporteSTPS() {
     doc.text("INFORME DE EVALUACIÓN ERGONÓMICA", 105, 20, { align: "center" });
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Sistema LYA-ERGO IA v21.0 | NOM-036-1-STPS-2018`, 105, 28, { align: "center" });
+    doc.text("Sistema LYA-ERGO IA v21.0 | NOM-036-1-STPS-2018", 105, 28, { align: "center" });
     doc.text(`ID Único: ${evalData.id} | Fecha: ${new Date().toLocaleString()}`, 105, 35, { align: "center" });
 
-    // --- 2. DATOS DE TRAZABILIDAD (FORMULARIO COMPLETO) ---
+    // --- 2. DATOS DE TRAZABILIDAD (INTEGRACIÓN TOTAL DEL FORMULARIO) ---
     doc.setTextColor(0);
     doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
     doc.text("1. DATOS GENERALES Y DE TRAZABILIDAD", 15, 50);
     
     doc.autoTable({
         startY: 55,
         theme: 'grid',
-        headStyles: { fillGray: 200, textColor: 0 },
+        headStyles: { fillGray: 200, textColor: 0, fontStyle: 'bold' },
         body: [
             ['Centro de Trabajo:', document.getElementById('nombreEmpresa').value, 'Auditor:', document.getElementById('auditorNombre').value],
-            ['Trabajador:', document.getElementById('nombreTrabajador').value, 'Género / Edad:', `${document.getElementById('generoTrabajador').value} / ${document.getElementById('edadTrabajador').value} años[cite: 1]`],
+            ['Trabajador:', document.getElementById('nombreTrabajador').value, 'Género / Edad:', `${document.getElementById('generoTrabajador').value} / ${document.getElementById('edadTrabajador').value} años`],
             ['Peso de Carga:', `${document.getElementById('pesoCarga').value} kg`, 'Frecuencia:', `${document.getElementById('frecuenciaLev').value} lev/min`],
             ['Tipo de Agarre:', document.getElementById('tipoAgarre').options[document.getElementById('tipoAgarre').selectedIndex].text, 'Capacitación:', document.getElementById('trabajadorCapacitado').value],
             ['Ubicación GPS:', `${evalData.lat}, ${evalData.lng}`, 'Piso / Ritmo:', `${document.getElementById('tipoPiso').value} / ${document.getElementById('ritmoTrabajo').value}`]
         ],
-        styles: { fontSize: 8 }
+        styles: { fontSize: 8, cellPadding: 3 }
     });
 
-    // --- 3. RESUMEN DE LA EVALUACIÓN BIOMECÁNICA (IA)[cite: 1] ---
-    doc.text("2. ANÁLISIS DE TOLERANCIAS Y UMBRALES", 15, doc.lastAutoTable.finalY + 15);
+    // --- 3. ANÁLISIS DE TOLERANCIAS Y UMBRALES BIOMECÁNICOS ---
+    doc.setFontSize(12);
+    doc.text("2. ANÁLISIS DE TOLERANCIAS Y UMBRALES (IA)", 15, doc.lastAutoTable.finalY + 15);
     
     doc.autoTable({
         startY: doc.lastAutoTable.finalY + 20,
@@ -730,12 +734,13 @@ function generarReporteSTPS() {
             ['Torsión Axial (Tronco)', `${wbaStats.maxTorsion.toFixed(1)}°`, `${TH.torsion}°`, wbaStats.maxTorsion > TH.torsion ? 'Riesgo Alto' : 'Aceptable'],
             ['Inclinación Lateral', `${wbaStats.maxInclinacion.toFixed(1)}°`, `${TH.lateral}°`, wbaStats.maxInclinacion > TH.lateral ? 'Riesgo Alto' : 'Aceptable'],
             ['Desviación de Cuello', `${(Math.abs(baseAngles.cuello - (angleBuffer.cuello[0] || 0))).toFixed(1)}°`, `${TH.cuello}°`, 'Evaluado'],
-            ['Puntaje NOM-036', `${puntosNOM} Pts`, 'Límite: 3 Pts[cite: 1]', puntosNOM > 3 ? 'ACCIÓN INMEDIATA' : 'RIESGO BAJO']
+            ['Puntaje NOM-036', `${puntosNOM} Pts`, 'Límite: 3 Pts', puntosNOM > 3 ? 'ACCIÓN INMEDIATA' : 'RIESGO BAJO']
         ],
-        columnStyles: { 3: { fontStyle: 'bold' } }
+        columnStyles: { 3: { fontStyle: 'bold' } },
+        styles: { cellPadding: 3 }
     });
 
-    // --- 4. CONCLUSIÓN DEL RIESGO Y HALLAZGOS[cite: 1] ---
+    // --- 4. CONCLUSIÓN DEL RIESGO Y HALLAZGOS NORMATIVOS ---
     const yConclusion = doc.lastAutoTable.finalY + 15;
     doc.setFont("helvetica", "bold");
     doc.text("3. CONCLUSIÓN TÉCNICA Y MEDIDAS PREVENTIVAS", 15, yConclusion);
@@ -743,44 +748,54 @@ function generarReporteSTPS() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     
-    // Generar texto de conclusión basado en puntos
+    // Lógica de veredicto basada en puntos reales
     let veredicto = puntosNOM > 3 
-        ? "SE DETECTA RIESGO SIGNIFICATIVO. Es obligatorio implementar medidas de control, rediseño de puesto o mecanización según la NOM-036[cite: 1]."
-        : "El nivel de riesgo es aceptable bajo las condiciones actuales. Se recomienda seguimiento periódico[cite: 1].";
+        ? "SE DETECTA RIESGO SIGNIFICATIVO. Es obligatorio implementar medidas de control, rediseño de puesto o mecanización según la NOM-036-1-STPS-2018."
+        : "El nivel de riesgo es aceptable bajo las condiciones actuales. Se recomienda seguimiento periódico de acuerdo al programa de seguridad e higiene.";
 
     const lineasVeredicto = doc.splitTextToSize(veredicto, 180);
-    doc.text(lineasVeredicto, 15, yConclusion + 10);
+    doc.text(lineasVeredicto, 15, yConclusion + 8);
 
-    // Listado de hallazgos específicos[cite: 1]
     let yHallazgos = yConclusion + 25;
     doc.setFont("helvetica", "bold");
     doc.text("Hallazgos específicos detectados:", 15, yHallazgos);
     doc.setFont("helvetica", "normal");
     
-    let listaHallazgos = hallazgosNormativos.length > 0 ? hallazgosNormativos : ["No se encontraron desviaciones críticas en los parámetros evaluados[cite: 1]."];
+    // Limpieza de etiquetas de sistema en los hallazgos
+    let listaHallazgos = hallazgosNormativos.length > 0 
+        ? hallazgosNormativos.map(h => h.replace(/\/g, "").trim()) 
+        : ["No se encontraron desviaciones críticas en los parámetros evaluados."];
+
     listaHallazgos.forEach((h, i) => {
-        doc.text(`• ${h}`, 20, yHallazgos + 7 + (i * 5));
+        doc.text(`• ${h}`, 20, yHallazgos + 7 + (i * 6));
     });
 
-    // --- 5. FIRMAS DE VALIDACIÓN ---
+    // --- 5. PANEL DE FIRMAS ---
     const yFirmas = 265;
+    doc.setLineWidth(0.5);
+    
+    // Firma Auditor
     doc.line(20, yFirmas, 90, yFirmas); 
-    doc.text("FIRMA DEL AUDITOR RESPONSABLE", 25, yFirmas + 5);
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.text(document.getElementById('auditorNombre').value.toUpperCase(), 55, yFirmas - 2, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text("FIRMA DEL AUDITOR RESPONSABLE", 55, yFirmas + 5, { align: "center" });
 
-    doc.setFontSize(9);
+    // Firma Trabajador
     doc.line(120, yFirmas, 190, yFirmas); 
-    doc.text("FIRMA DEL TRABAJADOR EVALUADO", 125, yFirmas + 5);
-    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
     doc.text(document.getElementById('nombreTrabajador').value.toUpperCase(), 155, yFirmas - 2, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text("FIRMA DEL TRABAJADOR EVALUADO", 155, yFirmas + 5, { align: "center" });
 
-    // Descarga del documento
-    const nombreArchivo = `REPORTE_NOM036_${document.getElementById('nombreEmpresa').value.replace(/\s+/g, '_')}_${evalData.id}.pdf`;
+    // --- GENERACIÓN DEL ARCHIVO ---
+    const empresaSanitizada = document.getElementById('nombreEmpresa').value.replace(/\s+/g, '_');
+    const nombreArchivo = `REPORTE_NOM036_${empresaSanitizada}_${evalData.id}.pdf`;
+    
     doc.save(nombreArchivo);
     
-    // Reiniciar para nueva evaluación
-    alert("Reporte generado exitosamente. El sistema se reiniciará[cite: 1].");
+    // Finalización
+    alert("Reporte generado con éxito. El sistema se reiniciará para una nueva evaluación.");
     location.reload();
 }
 function descargarEvidencia() {
