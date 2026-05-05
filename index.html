@@ -536,135 +536,204 @@ function onResults(res) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS SEGÚN JERARQUÍA AVANZADA ---
-    const p = {
-        ore_d: pt(8), ore_i: pt(7), h_d: pt(12), h_i: pt(11),
-        c_d: pt(14), c_i: pt(13), m_d: pt(16), m_i: pt(15),
-        p_d: pt(24), p_i: pt(23), r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27), pie_d: pt(32), pie_i: pt(31)
-    };
+   // --- MAPEO DE PUNTOS SEGÚN JERARQUÍA AVANZADA (CORREGIDO) ---
+const p = {
+    ore_d: pt(8), ore_i: pt(7), nar: pt(0), // Añadida nariz como respaldo
+    h_d: pt(12), h_i: pt(11),
+    c_d: pt(14), c_i: pt(13), m_d: pt(16), m_i: pt(15),
+    p_d: pt(24), p_i: pt(23), r_d: pt(26), r_i: pt(25),
+    t_d: pt(28), t_i: pt(27), pie_d: pt(32), pie_i: pt(31)
+};
 
-    // --- CONEXIÓN EN "T" (CABEZA -> CUELLO -> HOMBROS) ---
-    p.cabeza_central = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
-    p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
-    p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
-    
-    // Segmentación del Tronco
-    p.torax = { x: p.cuello.x, y: p.cuello.y + (p.esp_baja.y - p.cuello.y) * 0.3, z: p.cuello.z };
-    p.abdomen = { x: p.cuello.x, y: p.cuello.y + (p.esp_baja.y - p.cuello.y) * 0.7, z: p.cuello.z };
+// --- CONEXIÓN EN "T" CON PROTECCIÓN CONTRA PUNTOS INVISIBLES ---
+// Si las orejas no se ven (visibilidad < 0.5), usamos la nariz para la cabeza central
+p.cabeza_central = (p.ore_d.v > 0.5 && p.ore_i.v > 0.5) ? 
+    { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 } : 
+    { x: p.nar.x, y: p.nar.y, z: p.nar.z };
 
-    // --- CÁLCULO DE ÁNGULOS Y SEMAFORIZACIÓN ---
-    const currentAngles = {
-        cuello: calcAng3D(p.cabeza_central, p.cuello, p.torax),
-        tronco: calcAng3D(p.cuello, p.esp_baja, {x: p.esp_baja.x, y: p.esp_baja.y + 100, z: p.esp_baja.z}),
-        brazo_d: calcAng3D(p.h_d, p.c_d, p.m_d), brazo_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        pierna_d: calcAng3D(p.p_d, p.r_d, p.t_d), pierna_i: calcAng3D(p.p_i, p.r_i, p.t_i)
-    };
+p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
+p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_i.x + p.p_i.x) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
 
-    Object.keys(currentAngles).forEach(k => {
+// Segmentación dinámica del tronco para mayor precisión biomecánica
+p.torax = { x: p.cuello.x, y: p.cuello.y + (p.esp_baja.y - p.cuello.y) * 0.3, z: p.cuello.z };
+
+// --- CÁLCULO DE ÁNGULOS CON VALIDACIÓN DE EXISTENCIA ---
+const currentAngles = {
+    cuello: calcAng3D(p.cabeza_central, p.cuello, p.torax),
+    tronco: calcAng3D(p.cuello, p.esp_baja, {x: p.esp_baja.x, y: p.esp_baja.y + 100, z: p.esp_baja.z}),
+    brazo_d: calcAng3D(p.h_d, p.c_d, p.m_d), 
+    brazo_i: calcAng3D(p.h_i, p.c_i, p.m_i),
+    pierna_d: calcAng3D(p.p_d, p.r_d, p.t_d), 
+    pierna_i: calcAng3D(p.p_i, p.r_i, p.t_i)
+};
+
+// Actualización de buffers solo con datos válidos
+Object.keys(currentAngles).forEach(k => {
+    if (!isNaN(currentAngles[k])) { // Solo guardamos si el cálculo fue exitoso
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-    });
+    }
+});
 
-    // --- RENDERIZADO DE VECTORES GRUESOS CON ETIQUETAS ---
-    const drawVectorComp = (p1, p2, key, group, label) => {
-        const buffer = angleBuffer[key] || [];
-        const avg = buffer.length > 0 ? buffer.reduce((a,b)=>a+b)/buffer.length : 0;
-        let color = "#00ff00", thick = 5; // Grosor base aumentado
+// --- RENDERIZADO ROBUSTO (MÉTODO ÚNICO) ---
+const drawVectorComp = (p1, p2, key, group, label) => {
+    // Si los puntos no tienen visibilidad mínima, no dibujamos para no ensuciar el análisis[cite: 1]
+    if (!p1 || !p2 || (p1.v < 0.4 && p2.v < 0.4)) return;
 
-        if (analizandoRiesgo && calibrado) {
-            const diff = Math.abs(avg - (baseAngles[key] || avg));
-            if (diff > (TH[group] * 1.5)) { color = "#ff0000"; thick = 12; }
-            else if (diff > TH[group]) { color = "#ffff00"; thick = 8; }
+    const buffer = angleBuffer[key] || [];
+    const avg = buffer.length > 0 ? buffer.reduce((a,b)=>a+b)/buffer.length : 0;
+    let color = "#00ff00", thick = 5;
+
+    if (analizandoRiesgo && calibrado) {
+        const diff = Math.abs(avg - (baseAngles[key] || avg));
+        const limit = TH[group] || 20;
+
+        if (diff > (limit * 1.5)) { 
+            color = "#ff0000"; thick = 12; 
+            wbaStats.zonasAfectadas.add(group); 
         }
+        else if (diff > limit) { color = "#ffff00"; thick = 8; }
+    }
 
-        ctx.beginPath();
-        ctx.strokeStyle = color; ctx.lineWidth = thick; ctx.lineCap = "round";
-        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    ctx.beginPath();
+    ctx.strokeStyle = color; ctx.lineWidth = thick; ctx.lineCap = "round";
+    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-        // Etiqueta de Ángulo en Pantalla
-        ctx.fillStyle = "white"; ctx.font = "bold 12px Arial";
-        ctx.fillText(`${label}: ${avg.toFixed(1)}°`, (p1.x + p2.x)/2, (p1.y + p2.y)/2);
-    };
+    // HUD de ángulos en tiempo real[cite: 1]
+    ctx.fillStyle = "white"; 
+    ctx.strokeStyle = "black"; ctx.lineWidth = 2;
+    ctx.font = "bold 14px Arial";
+    ctx.strokeText(`${label}: ${avg.toFixed(1)}°`, (p1.x + p2.x)/2, (p1.y + p2.y)/2);
+    ctx.fillText(`${label}: ${avg.toFixed(1)}°`, (p1.x + p2.x)/2, (p1.y + p2.y)/2);
+};
 
-    // 1. Eje Central (Vectorización T)
-    drawVectorComp(p.cabeza_central, p.cuello, 'cuello', 'cuello', 'CUE');
-    drawVectorComp(p.cuello, p.h_d, 'tronco', 'hombros', 'H');
-    drawVectorComp(p.cuello, p.h_i, 'tronco', 'hombros', 'H');
-    drawVectorComp(p.cuello, p.esp_baja, 'tronco', 'tronco', 'TRN');
+// --- ORDEN DE DIBUJO JERÁRQUICO ---
+// 1. Eje Central (Vectorización T mejorada)
+drawVectorComp(p.cabeza_central, p.cuello, 'cuello', 'cuello', 'CUE');
+drawVectorComp(p.cuello, p.h_d, 'tronco', 'hombros', 'H_D');
+drawVectorComp(p.cuello, p.h_i, 'tronco', 'hombros', 'H_I');
+drawVectorComp(p.cuello, p.esp_baja, 'tronco', 'tronco', 'TRN');
 
-    // 2. Extremidades Superiores (Incluye Muñecas)
-    drawVectorComp(p.h_d, p.c_d, 'brazo_d', 'hombros', 'BR');
-    drawVectorComp(p.c_d, p.m_d, 'brazo_d', 'hombros', 'MÑ');
-    drawVectorComp(p.h_i, p.c_i, 'brazo_i', 'hombros', 'BR');
-    drawVectorComp(p.c_i, p.m_i, 'brazo_i', 'hombros', 'MÑ');
+// 2. Extremidades Superiores
+drawVectorComp(p.h_d, p.c_d, 'brazo_d', 'hombros', 'BR_D');
+drawVectorComp(p.c_d, p.m_d, 'brazo_d', 'hombros', 'MÑ_D');
+drawVectorComp(p.h_i, p.c_i, 'brazo_i', 'hombros', 'BR_I');
+drawVectorComp(p.c_i, p.m_i, 'brazo_i', 'hombros', 'MÑ_I');
 
-    // 3. Extremidades Inferiores (Incluye Pies)
-    drawVectorComp(p.esp_baja, p.p_d, 'pierna_d', 'piernas', 'CD');
-    drawVectorComp(p.p_d, p.r_d, 'pierna_d', 'piernas', 'PN');
-    drawVectorComp(p.r_d, p.t_d, 'pierna_d', 'piernas', 'TB');
-    drawVectorComp(p.t_d, p.pie_d, 'pierna_d', 'piernas', 'PIE');
+// 3. Extremidades Inferiores
+drawVectorComp(p.esp_baja, p.p_d, 'pierna_d', 'piernas', 'PN_D');
+drawVectorComp(p.p_d, p.r_d, 'pierna_d', 'piernas', 'PN_D');
+drawVectorComp(p.r_d, p.t_d, 'pierna_d', 'piernas', 'TB_D');
+drawVectorComp(p.t_d, p.pie_d, 'pierna_d', 'piernas', 'PIE_D');
 
-    drawVectorComp(p.esp_baja, p.p_i, 'pierna_i', 'piernas', 'CD');
-    drawVectorComp(p.p_i, p.r_i, 'pierna_i', 'piernas', 'PN');
-    drawVectorComp(p.r_i, p.t_i, 'pierna_i', 'piernas', 'TB');
-    drawVectorComp(p.t_i, p.pie_i, 'pierna_i', 'piernas', 'PIE');
+drawVectorComp(p.esp_baja, p.p_i, 'pierna_i', 'piernas', 'PN_I');
+drawVectorComp(p.p_i, p.r_i, 'pierna_i', 'piernas', 'PN_I');
+drawVectorComp(p.r_i, p.t_i, 'pierna_i', 'piernas', 'TB_I');
+drawVectorComp(p.t_i, p.pie_i, 'pierna_i', 'piernas', 'PIE_I');
 
-    ctx.restore();
-}
-
+ctx.restore();
 /**
  * 🏷️ BLOQUE 7: CONTROL DE HARDWARE Y ARRANQUE IA
  */
+/**
+ * 🏷️ BLOQUE 7: CONTROL DE HARDWARE Y FLUJO (CORREGIDO)
+ */
 async function prepararSistema(fuente) {
     const ids = ['auditorNombre', 'nombreEmpresa', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    if (ids.some(id => !document.getElementById(id).value.trim())) {
-        alert("⚠️ Error: Todos los campos de trazabilidad legal son obligatorios[cite: 1].");
+    
+    // 1. Validación de campos vacíos
+    for (let id of ids) {
+        const el = document.getElementById(id);
+        if (!el || !el.value.trim()) {
+            alert(`⚠️ Error: El campo "${id}" es obligatorio para cumplir con la NOM-036.`);
+            return; 
+        }
+    }
+
+    // 2. Validación estricta de Edad (2 dígitos exactos)
+    const edadInput = document.getElementById('edadTrabajador').value;
+    if (!/^\d{2}$/.test(edadInput)) {
+        alert("❌ La edad debe tener exactamente 2 cifras (ej. 25).");
         return;
     }
 
-    // Validación de Edad (2 dígitos exactos)[cite: 1]
-    if (!/^\d{2}$/.test(document.getElementById('edadTrabajador').value)) {
-        alert("❌ La edad debe ser de exactamente 2 cifras[cite: 1].");
-        return;
+    // 3. Validación de archivo (Solo si la fuente es 'archivo')[cite: 1]
+    let archivoVideo = null;
+    if (fuente === 'archivo') {
+        const fileInput = document.getElementById('fileInput');
+        if (!fileInput || !fileInput.files[0]) {
+            alert("📂 Por favor, selecciona un archivo de video primero[cite: 1].");
+            return;
+        }
+        archivoVideo = fileInput.files[0];
     }
 
+    // Transición de interfaz
     document.getElementById('menu-inicial').style.display = 'none';
     document.getElementById('contenedor-analisis').style.display = 'block';
 
     try {
         if (fuente === 'camara') {
-            video.srcObject = await navigator.mediaDevices.getUserMedia({ 
+            const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
             });
+            video.srcObject = stream;
         } else {
-            const file = document.getElementById('fileInput').files[0];
-            video.src = URL.createObjectURL(file);
+            video.src = URL.createObjectURL(archivoVideo);
         }
+
         video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            activarIA();
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            activarIA(); // Inicia MediaPipe una vez el video está listo[cite: 1]
         };
-    } catch (err) { alert("Error de hardware: " + err); location.reload(); }
+    } catch (err) { 
+        alert("🚨 Error de acceso al hardware: " + err); 
+        location.reload(); 
+    }
 }
 
 async function activarIA() {
-    document.getElementById('loader-ia').style.display = 'flex';
-    pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6 });
-    pose.onResults((res) => {
-        document.getElementById('loader-ia').style.display = 'none';
-        iaActiva = true; onResults(res);
+    const loader = document.getElementById('loader-ia');
+    if (loader) loader.style.display = 'flex';
+
+    // Inicialización optimizada de Pose[cite: 1]
+    pose = new Pose({ 
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
     });
 
+    pose.setOptions({ 
+        modelComplexity: 1, 
+        smoothLandmarks: true, 
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6 
+    });
+
+    pose.onResults((res) => {
+        if (loader) loader.style.display = 'none';
+        iaActiva = true;
+        onResults(res); // Llama a tu Bloque 6 corregido anteriormente
+    });
+
+    // Loop de procesamiento con control de estado[cite: 1]
     async function frameLoop() {
-        if (!video.paused && !video.ended) {
+        if (video.paused || video.ended) return;
+        
+        try {
             await pose.send({ image: video });
+        } catch (e) {
+            console.error("Error en procesamiento de frame:", e);
+        }
+        
+        if (window.requestAnimationFrame) {
             requestAnimationFrame(frameLoop);
+        } else {
+            setTimeout(frameLoop, 33); // Fallback para navegadores antiguos
         }
     }
-    video.play(); frameLoop();
+
+    video.play().then(() => frameLoop()).catch(e => console.error("Error al reproducir:", e));
 }
 
 /**
