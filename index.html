@@ -1,4 +1,4 @@
-forjado IA 2
+forjado IA VECTOR "T"
 <!DOCTYPE html> 
 <html lang="es">
 <head>
@@ -505,6 +505,10 @@ const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
  * 🏷️ BLOQUE 6: PROCESAMIENTO DE IA (JERARQUÍA MUSCULAR Y VECTORIZACIÓN)
  * Implementa la estructura de árbol: Cabeza -> Tronco -> Extremidades
  */
+/**
+ * 🏷️ BLOQUE 6: PROCESAMIENTO DE IA (JERARQUÍA MUSCULAR Y VECTORIZACIÓN AVANZADA)
+ * Implementa la estructura de árbol: Cabeza -> Cuello (T) -> Tronco -> Extremidades (Manos/Pies)
+ */
 function onResults(res) {
     const w = canvas.width, h = canvas.height;
     ctx.save();
@@ -521,7 +525,7 @@ function onResults(res) {
 
     const lm = res.poseLandmarks;
 
-    // Helper de suavizado de coordenadas[cite: 1]
+    // Helper de suavizado de coordenadas
     const pt = (i) => {
         if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
         if (!posBuffer[i]) posBuffer[i] = { h: [] };
@@ -532,7 +536,7 @@ function onResults(res) {
         return { x: avg.x / len, y: avg.y / len, z: avg.z / len, v: lm[i].visibility };
     };
 
-    // --- MAPEO DE PUNTOS SEGÚN JERARQUÍA DE LA IMAGEN ---
+    // --- MAPEO DE PUNTOS SEGÚN JERARQUÍA AVANZADA ---
     const p = {
         ore_d: pt(8), ore_i: pt(7), h_d: pt(12), h_i: pt(11),
         c_d: pt(14), c_i: pt(13), m_d: pt(16), m_i: pt(15),
@@ -540,55 +544,72 @@ function onResults(res) {
         t_d: pt(28), t_i: pt(27), pie_d: pt(32), pie_i: pt(31)
     };
 
-    // --- NODOS DE ARTICULACIÓN CENTRAL (EJE TRONCO) ---
-    p.cabeza = { x: (p.ore_d.x + p.ore_i.x) / 2, y: Math.min(p.ore_d.y, p.ore_i.y) - 20, z: (p.ore_d.z + p.ore_i.z) / 2 };
+    // --- CONEXIÓN EN "T" (CABEZA -> CUELLO -> HOMBROS) ---
+    p.cabeza_central = { x: (p.ore_d.x + p.ore_i.x) / 2, y: (p.ore_d.y + p.ore_i.y) / 2, z: (p.ore_d.z + p.ore_i.z) / 2 };
     p.cuello = { x: (p.h_d.x + p.h_i.x) / 2, y: (p.h_d.y + p.h_i.y) / 2, z: (p.h_d.z + p.h_i.z) / 2 };
     p.esp_baja = { x: (p.p_d.x + p.p_i.x) / 2, y: (p.p_d.y + p.p_i.y) / 2, z: (p.p_d.z + p.p_i.z) / 2 };
     
-    // Segmentación del Tronco (Tórax y Abdomen)[cite: 1]
+    // Segmentación del Tronco
     p.torax = { x: p.cuello.x, y: p.cuello.y + (p.esp_baja.y - p.cuello.y) * 0.3, z: p.cuello.z };
     p.abdomen = { x: p.cuello.x, y: p.cuello.y + (p.esp_baja.y - p.cuello.y) * 0.7, z: p.cuello.z };
 
-    // --- CÁLCULO DE ÁNGULOS PARA SEMAFORIZACIÓN ---
+    // --- CÁLCULO DE ÁNGULOS Y SEMAFORIZACIÓN ---
     const currentAngles = {
-        cuello: calcAng3D(p.cabeza, p.cuello, {x: p.cuello.x, y: p.cuello.y + 100, z: p.cuello.z}),
+        cuello: calcAng3D(p.cabeza_central, p.cuello, p.torax),
         tronco: calcAng3D(p.cuello, p.esp_baja, {x: p.esp_baja.x, y: p.esp_baja.y + 100, z: p.esp_baja.z}),
         brazo_d: calcAng3D(p.h_d, p.c_d, p.m_d), brazo_i: calcAng3D(p.h_i, p.c_i, p.m_i),
         pierna_d: calcAng3D(p.p_d, p.r_d, p.t_d), pierna_i: calcAng3D(p.p_i, p.r_i, p.t_i)
     };
 
-    // Actualizar búfers[cite: 1]
     Object.keys(currentAngles).forEach(k => {
         if (!angleBuffer[k]) angleBuffer[k] = [];
         angleBuffer[k].push(currentAngles[k]);
         if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
     });
 
-    // --- RENDERIZADO VECTORIAL JERÁRQUICO ---
-    
-    // 1. Eje Central (Cabeza -> Cuello -> Tórax -> Abdomen -> Espalda Baja)[cite: 1]
-    drawV(p.cabeza, p.cuello, 'cuello', 'cuello', 1, 1);
-    drawV(p.cuello, p.torax, 'tronco', 'tronco', 1, 1);
-    drawV(p.torax, p.abdomen, 'tronco', 'tronco', 1, 1);
-    drawV(p.abdomen, p.esp_baja, 'tronco', 'tronco', 1, 1);
+    // --- RENDERIZADO DE VECTORES GRUESOS CON ETIQUETAS ---
+    const drawVectorComp = (p1, p2, key, group, label) => {
+        const buffer = angleBuffer[key] || [];
+        const avg = buffer.length > 0 ? buffer.reduce((a,b)=>a+b)/buffer.length : 0;
+        let color = "#00ff00", thick = 5; // Grosor base aumentado
 
-    // 2. Rama Superior (Hombros -> Brazos -> Codos -> Antebrazos -> Muñecas/Manos)[cite: 1]
-    drawV(p.cuello, p.h_d, 'tronco', 'hombros', 1, 1);
-    drawV(p.cuello, p.h_i, 'tronco', 'hombros', 1, 1);
-    drawV(p.h_d, p.c_d, 'brazo_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.h_i, p.c_i, 'brazo_i', 'hombros', p.h_i.v, p.c_i.v);
-    drawV(p.c_d, p.m_d, 'brazo_d', 'hombros', p.c_d.v, p.m_d.v);
-    drawV(p.c_i, p.m_i, 'brazo_i', 'hombros', p.c_i.v, p.m_i.v);
+        if (analizandoRiesgo && calibrado) {
+            const diff = Math.abs(avg - (baseAngles[key] || avg));
+            if (diff > (TH[group] * 1.5)) { color = "#ff0000"; thick = 12; }
+            else if (diff > TH[group]) { color = "#ffff00"; thick = 8; }
+        }
 
-    // 3. Rama Inferior (Espalda Baja -> Piernas -> Rodillas -> Tobillos -> Pies)[cite: 1]
-    drawV(p.esp_baja, p.p_d, 'pierna_d', 'piernas', 1, 1);
-    drawV(p.esp_baja, p.p_i, 'pierna_i', 'piernas', 1, 1);
-    drawV(p.p_d, p.r_d, 'pierna_d', 'piernas', p.p_d.v, p.r_d.v);
-    drawV(p.p_i, p.r_i, 'pierna_i', 'piernas', p.p_i.v, p.r_i.v);
-    drawV(p.r_d, p.t_d, 'pierna_d', 'piernas', p.r_d.v, p.t_d.v);
-    drawV(p.r_i, p.t_i, 'pierna_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_d, p.pie_d, 'pierna_d', 'piernas', p.t_d.v, p.pie_d.v);
-    drawV(p.t_i, p.pie_i, 'pierna_i', 'piernas', p.t_i.v, p.pie_i.v);
+        ctx.beginPath();
+        ctx.strokeStyle = color; ctx.lineWidth = thick; ctx.lineCap = "round";
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+        // Etiqueta de Ángulo en Pantalla
+        ctx.fillStyle = "white"; ctx.font = "bold 12px Arial";
+        ctx.fillText(`${label}: ${avg.toFixed(1)}°`, (p1.x + p2.x)/2, (p1.y + p2.y)/2);
+    };
+
+    // 1. Eje Central (Vectorización T)
+    drawVectorComp(p.cabeza_central, p.cuello, 'cuello', 'cuello', 'CUE');
+    drawVectorComp(p.cuello, p.h_d, 'tronco', 'hombros', 'H');
+    drawVectorComp(p.cuello, p.h_i, 'tronco', 'hombros', 'H');
+    drawVectorComp(p.cuello, p.esp_baja, 'tronco', 'tronco', 'TRN');
+
+    // 2. Extremidades Superiores (Incluye Muñecas)
+    drawVectorComp(p.h_d, p.c_d, 'brazo_d', 'hombros', 'BR');
+    drawVectorComp(p.c_d, p.m_d, 'brazo_d', 'hombros', 'MÑ');
+    drawVectorComp(p.h_i, p.c_i, 'brazo_i', 'hombros', 'BR');
+    drawVectorComp(p.c_i, p.m_i, 'brazo_i', 'hombros', 'MÑ');
+
+    // 3. Extremidades Inferiores (Incluye Pies)
+    drawVectorComp(p.esp_baja, p.p_d, 'pierna_d', 'piernas', 'CD');
+    drawVectorComp(p.p_d, p.r_d, 'pierna_d', 'piernas', 'PN');
+    drawVectorComp(p.r_d, p.t_d, 'pierna_d', 'piernas', 'TB');
+    drawVectorComp(p.t_d, p.pie_d, 'pierna_d', 'piernas', 'PIE');
+
+    drawVectorComp(p.esp_baja, p.p_i, 'pierna_i', 'piernas', 'CD');
+    drawVectorComp(p.p_i, p.r_i, 'pierna_i', 'piernas', 'PN');
+    drawVectorComp(p.r_i, p.t_i, 'pierna_i', 'piernas', 'TB');
+    drawVectorComp(p.t_i, p.pie_i, 'pierna_i', 'piernas', 'PIE');
 
     ctx.restore();
 }
