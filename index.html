@@ -1,935 +1,1111 @@
-NO TOCAR
-
-JUE NOCH V4
-
-<!DOCTYPE html> 
-<html lang="es">
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYA-ERGO v20.2 | AUDITORÍA CERVECERA HIERÁRQUICA</title>
-    
-    <!-- Librerías de Visión Artificial y Generación de Documentos -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-<style>
-    /* --- CONFIGURACIÓN BASE --- */
-    body { 
-        background-color: #0d1117; 
-        color: white; 
-        margin: 0; 
-        overflow: hidden; 
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-        height: 100svh; 
-    }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LYA-ERGO | Motor Multimétodo de Evaluación Ergonómica Integrada</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MediaPipe Pose 3D & Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <!-- FontAwesome Iconset -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #090d16; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .body-node { transition: all 0.2s ease-in-out; }
+        .body-node:hover { transform: scale(1.03); cursor: pointer; }
 
-    /* --- MENÚ INICIAL (RESPONSIVO) --- */
-    #menu-inicial { 
-        display: flex; 
-        width: 100%; 
-        height: 100svh;
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-        background: radial-gradient(circle at center, #161b22 0%, #0d1117 100%); 
-        position: fixed; 
-        z-index: 5000; 
-        padding: 20px;
-        box-sizing: border-box;
-        overflow-y: auto;
-    }
-
-    .logo-text { 
-        color: #00ff00; 
-        font-weight: 900; 
-        letter-spacing: -1px; 
-        margin: 0; 
-        font-size: clamp(2.5rem, 10vw, 4rem);
-        text-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-    }
-
-    .sub-text { 
-        color: #8b949e; 
-        font-size: clamp(0.7rem, 2.5vw, 0.85rem); 
-        text-transform: uppercase; 
-        letter-spacing: 4px; 
-        margin-bottom: 30px; 
-        font-weight: 600;
-    }
-
-    /* --- FORMULARIO PERSONALIZADO --- */
-    .form-control-custom {
-        width: 100%; 
-        padding: 10px; 
-        border-radius: 8px; 
-        border: 1px solid #30363d; 
-        background: #0d1117; 
-        color: white;
-        box-sizing: border-box;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
-    }
-
-    .form-control-custom:focus {
-        border-color: #00ff00 !important;
-        box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
-        outline: none;
-    }
-
-    .btn-inicio { 
-        flex: 1; 
-        padding: 18px !important; 
-        border-radius: 12px; 
-        font-weight: 800; 
-        font-size: 1rem; 
-        border: none;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        cursor: pointer;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* --- PANTALLA DE CARGA --- */
-    #loader-ia { 
-        display: none; 
-        position: fixed; 
-        top:0; left:0; width:100%; height:100svh;
-        background: rgba(13, 17, 23, 0.95); 
-        z-index: 9999; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center; 
-        backdrop-filter: blur(10px);
-    }
-
-    .progress-bar { 
-        width: 0%; 
-        height: 100%; 
-        background: #00ff00; 
-        transition: width 0.4s ease; 
-        box-shadow: 0 0 15px #00ff00; 
-    }
-
-    /* --- HUD Y CONTROLES --- */
-    #contenedor-analisis { 
-        display: none; 
-        width: 100vw; 
-        height: 100svh;
-        position: relative; 
-        background: #000; 
-    }
-
-    canvas { width: 100%; height: 100%; object-fit: contain; }
-
-    .status-badge { 
-        position: absolute; 
-        top: 25px; 
-        left: 50%; 
-        transform: translateX(-50%);
-        background: rgba(13, 17, 23, 0.8);
-        color: #00ff00;
-        padding: 8px 20px;
-        border-radius: 30px;
-        font-weight: 800;
-        border: 1px solid rgba(0, 255, 0, 0.5);
-        z-index: 7000;
-    }
-
-    .barra-controles {
-        position: absolute;
-        bottom: 40px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 15px;
-        z-index: 7000;
-        background: rgba(22, 27, 34, 0.8);
-        padding: 15px 25px;
-        border-radius: 100px;
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .btn-circular {
-        width: 60px; height: 60px;
-        border-radius: 50%;
-        border: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.55rem;
-        font-weight: 900;
-        cursor: pointer;
-        background: #30363d;
-        color: white;
-    }
-
-    .rec-active {
-        background: #ff4d4d !important;
-        animation: pulse-red 1.5s infinite;
-        transform: scale(1.1);
-    }
-
-    @keyframes pulse-red {
-        0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-        70% { box-shadow: 0 0 0 15px rgba(255, 77, 77, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
-    }
-    /* Aviso de recomendación de vestimenta */
-.plant-tip {
-    font-size: 0.75rem;
-    color: #f1c40f; /* Amarillo para resaltar */
-    margin-top: 15px;
-    text-align: center;
-    border: 1px dashed #f1c40f;
-    padding: 10px;
-    border-radius: 8px;
-    max-width: 300px;
-}
-</style>
+        /* ESTILOS ESPECÍFICOS PARA EL INFORME IMPRESO Y MARCA / SELLO */
+        @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            header, main, footer, #evaluator-modal-backdrop {
+                display: none !important;
+            }
+            #report-print-container {
+                display: block !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        #report-print-container {
+            display: none;
+        }
+    </style>
 </head>
-<body>
+<body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 overflow-x-hidden custom-scrollbar">
 
-<!-- Pantalla de carga de IA -->
-<div id="loader-ia">
-    <h3 style="color:#00ff00; letter-spacing: 4px; font-weight: 900;">INICIALIZANDO MOTOR LYA</h3>
-    <div style="width: 75%; height: 6px; background: #21262d; border-radius: 10px; margin-top: 25px; overflow: hidden;">
-        <div id="bar-id" class="progress-bar" style="width: 100%;"></div>
-    </div>
-    <!-- Sugerencia para el Auditor -->
-    <div class="plant-tip">
-        ⚙️ <b>TIP DE PLANTA:</b> Asegúrese de que el trabajador no use ropa muy holgada para mayor precisión en la vectorización muscular.
-    </div>
-</div>
+    <!-- MODAL INICIAL DE CAPTURA DE DATOS DEL EVALUADOR -->
+    <div id="evaluator-modal-backdrop" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl relative">
+            <div class="flex items-center space-x-3 mb-4 border-b border-slate-800 pb-3">
+                <div class="bg-blue-600 text-white font-black text-xl rounded-lg w-10 h-10 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    LYA
+                </div>
+                <div>
+                    <h2 class="text-base font-bold text-slate-100 uppercase tracking-wider">Acreditación del Evaluador</h2>
+                    <p class="text-xs text-slate-400">Requisito obligatorio antes de iniciar la evaluación ergonómica.</p>
+                </div>
+            </div>
 
-<!-- Menú de Captura de Datos -->
-<div id="menu-inicial">
-    <h1 class="logo-text">LYA-ERGO</h1>
-    <p class="sub-text">Auditoría Ergonómica NOM-036-STPS</p>
-    
-    <div style="width: 90%; max-width: 450px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
-        <div class="row">
-            <div class="col-12 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">EMPRESA / PLANTA:</label>
-                <input type="text" id="nombreEmpresa" placeholder="Ej: Cervecería Modelo" class="form-control-custom">
+            <form id="form-evaluator" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Completo del Evaluador / Auditor *</label>
+                    <input type="text" id="ev-name" required placeholder="Ej. Ing. Carlos Mendoza Ruiz" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Puesto de Trabajo *</label>
+                    <input type="text" id="ev-position" required placeholder="Ej. Especialista en Ergonomía Ocupacional" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Cédula de Acreditación / Registro Profesional *</label>
+                    <input type="text" id="ev-id" required placeholder="Ej. CED-PER-894125 / STPS-LYA-0492" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>Iniciar Sesión & Habilitar Evaluación</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ENCABEZADO Y CONTROL SISTÉMICO -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-[1700px] mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white font-black text-xl tracking-tighter shadow-lg shadow-blue-500/20 flex items-center justify-center w-10 h-10">
+                    LYA
+                </div>
+                <div>
+                    <h1 class="font-black text-base md:text-lg tracking-wider text-slate-100 flex items-center gap-2">
+                        LYA-ERGO
+                        <span class="text-[10px] font-semibold text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full bg-blue-500/10 uppercase tracking-normal">Motor Multimétodo 100% Off-Line</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400">Sistema Inteligente de Evaluación Ergonómica de Cuerpo Completo por Video Pregrabado</p>
+                </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">PUESTO:</label>
-                <input type="text" id="puestoTrabajo" placeholder="Ej: Estibador" class="form-control-custom">
+
+            <div class="hidden xl:flex items-center space-x-3 text-xs">
+                <div id="header-evaluator-badge" class="bg-slate-800/90 border border-blue-500/40 px-3 py-1.5 rounded-md text-blue-300 font-mono flex items-center gap-2 text-[11px]">
+                    <i class="fa-solid fa-user-shield text-blue-400"></i> Evaluador: <span id="display-evaluator-name" class="font-semibold text-white">Pendiente</span>
+                </div>
+                <span class="bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-md text-slate-300 font-mono flex items-center gap-2">
+                    <i class="fa-solid fa-code-branch text-blue-400"></i> REBA + RULA + OCRA + JSI + NIOSH + ISO
+                </span>
+                <span class="bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-md text-slate-300 font-mono flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i> NOM-036-1-STPS
+                </span>
             </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">ID TRABAJADOR:</label>
-                <input type="text" id="nombreTrabajador" placeholder="Ej: Juan Pérez" class="form-control-custom">
+        </div>
+    </header>
+
+    <!-- ÁREA TRABAJO PRINCIPAL MULTICOLUMNA -->
+    <main class="flex-1 max-w-[1700px] w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- COLUMNA 1: CONFIGURACIÓN, PARÁMETROS Y REPRODUCTOR DE VIDEO -->
+        <section class="lg:col-span-5 flex flex-col space-y-5">
+
+            <!-- BLOQUE DATOS PERSONALES -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-address-card text-blue-500 mr-2"></i> Datos Personales y Generales de la Persona Evaluada</span>
+                    <span class="text-[10px] text-blue-400 font-mono">Sujeto Auditado</span>
+                </h2>
+
+                <div class="space-y-2.5">
+                    <div>
+                        <label class="block text-[10px] font-medium text-slate-400">Nombre Completo del Trabajador / Auditado</label>
+                        <input type="text" id="subject-name" placeholder="Ej. Juan Pérez López" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Puesto de Trabajo</label>
+                            <input type="text" id="subject-position" placeholder="Ej. Operador de Envasado" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Categoría</label>
+                            <input type="text" id="subject-category" placeholder="Ej. Sindicalizado / Operativo B" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Área</label>
+                            <input type="text" id="subject-area" placeholder="Ej. Producción Planta 1" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Sub-Área</label>
+                            <input type="text" id="subject-subarea" placeholder="Ej. Línea de Empaque Final" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Edad (Años)</label>
+                            <input type="number" id="subject-age" value="32" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Tiempo en Puesto</label>
+                            <input type="text" id="subject-tenure" placeholder="Ej. 3 años 4 meses" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400">Duración Jornada</label>
+                            <input type="text" id="subject-shift-duration" placeholder="Ej. 8 horas" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-medium text-slate-400">Turno de Trabajo</label>
+                        <select id="subject-shift-type" class="w-full mt-0.5 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                            <option value="PRIMERO">PRIMERO (Matutino)</option>
+                            <option value="SEGUNDO">SEGUNDO (Vespertino)</option>
+                            <option value="TERCERO">TERCERO (Nocturno)</option>
+                            <option value="MIXTO">MIXTO</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">GÉNERO:</label>
-                <select id="generoTrabajador" class="form-control-custom">
-                    <option value="H">Hombre</option>
-                    <option value="M">Mujer</option>
-                </select>
+
+            <!-- BLOQUE 1.1: CARGA Y PARÁMETROS -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-video text-blue-500 mr-2"></i> 1. Carga de Video & Calibración</span>
+                    <span class="text-[10px] text-slate-500 normal-case font-normal">Sin transmisión / Solo local</span>
+                </h2>
+
+                <div class="mb-3">
+                    <label class="block text-[11px] font-medium text-slate-400 mb-1">Seleccionar archivo desde galería (.mp4, .mov, .avi, .mkv)</label>
+                    <input type="file" id="video-input" accept="video/*" class="block w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer border border-slate-800 rounded-lg bg-slate-950 p-1">
+                </div>
+
+                <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-3">
+                    <div class="text-[11px] font-bold text-blue-400 border-b border-slate-800 pb-1 uppercase tracking-wider">Variables Operativas de Entrada</div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Estatura Sujeto (cm)</label>
+                            <input type="number" id="p-height" value="170" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Masa Carga (kg)</label>
+                            <input type="number" id="p-weight" value="12" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Fuerza Real (N)</label>
+                            <input type="number" id="p-force" value="45" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Fuerza Empuje (N)</label>
+                            <input type="number" id="p-push-force" value="180" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Dist. Horiz. H (cm)</label>
+                            <input type="number" id="p-dist-h" value="35" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Alt. Vertical V (cm)</label>
+                            <input type="number" id="p-dist-v" value="75" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Acoplamiento / Agarre</label>
+                            <select id="p-grip" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                                <option value="good">Bueno (Asas / Huecos)</option>
+                                <option value="fair">Regular (Sujeción aceptable)</option>
+                                <option value="poor">Malo (Pieza lisa/deslizante)</option>
+                                <option value="pinch">Pinza Digital / Presión puntas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400">Tipo de Tarea Clasificada</label>
+                            <select id="p-task-type" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500">
+                                <option value="lifting">Levantamiento Manual Cargas</option>
+                                <option value="repetitive">Repetitiva de Alta Frecuencia</option>
+                                <option value="push_pull">Empuje / Arrastre (ISO 11228-2)</option>
+                                <option value="static">Postura Estática Prolongada</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-process" disabled class="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Ejecutar Procesamiento Frame a Frame</span>
+                </button>
             </div>
-            <div class="col-md-6 mb-3">
-                <label style="color: #8b949e; font-size: 0.7rem;">EDAD:</label>
-                <input type="number" id="edadTrabajador" min="15" max="80" class="form-control-custom">
+
+            <!-- BLOQUE 1.2: VISUALIZADOR CANVAS -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl flex flex-col items-center">
+                <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center">
+                    <video id="video-element" class="hidden" playsinline></video>
+                    <canvas id="output-canvas" class="w-full h-full object-contain"></canvas>
+                    <div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 p-4 text-center">
+                        <i class="fa-solid fa-film text-3xl mb-2"></i>
+                        <p class="text-xs">Previsualización de Vectorización Anatómica 3D</p>
+                    </div>
+                </div>
+
+                <div class="w-full mt-2 grid grid-cols-4 gap-1 text-center font-mono text-[10px] bg-slate-950 p-2 rounded border border-slate-800 text-slate-400">
+                    <div>FPS: <span id="tele-fps" class="text-blue-400">--</span></div>
+                    <div>Total Frames: <span id="tele-frames" class="text-blue-400">--</span></div>
+                    <div>Tiempo: <span id="tele-time" class="text-blue-400">0.0s</span></div>
+                    <div>Estado: <span id="tele-status" class="text-amber-400">Esperando</span></div>
+                </div>
             </div>
-            <div class="col-12">
-                <label style="color: #27ae60; font-size: 0.7rem; font-weight: bold;">PESO CARGA (KG):</label>
-                <input type="number" id="pesoCarga" min="1" max="50" class="form-control-custom" style="border: 2px solid #27ae60 !important;">
+
+            <!-- BLOQUE 1.3: CUMPLIMIENTO LEGAL MEXICANO NOM-036-1-STPS-2018 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span><i class="fa-solid fa-landmark text-emerald-500 mr-2"></i> Módulo Normativo México (NOM-036-1-STPS)</span>
+                    <span class="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">Vigente</span>
+                </h3>
+                <p class="text-[11px] text-slate-400 mb-3">Evaluación legal para Manejo Manual de Cargas independiente de puntuaciones técnicas internacionales.</p>
+                <div id="nom-result" class="p-2.5 rounded border border-slate-800 bg-slate-950 text-xs flex items-center justify-between font-mono">
+                    <span class="text-slate-400">Dictamen NOM-036:</span>
+                    <span class="font-bold text-slate-500">Pendiente de evaluación</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- COLUMNA 2: PERFIL MULTIMÉTODO Y REPORTE -->
+        <section class="lg:col-span-7 flex flex-col space-y-5">
+
+            <!-- BLOQUE 2.1: MATRIZ DE RESULTADOS MULTIMÉTODO -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                    <div>
+                        <h2 class="text-sm font-bold text-slate-100">Perfil Ergonómico Global de la Tarea</h2>
+                        <p class="text-[11px] text-slate-400">Integración por Regla del Riesgo Máximo Crítico (Non-Averaging)</p>
+                    </div>
+                    <div id="badge-global-risk" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-500 border border-slate-700">
+                        NO EVALUADO
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">A. REBA</div>
+                        <div class="text-[10px] text-slate-500">Postura Global</div>
+                        <div id="score-reba" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">B. RULA</div>
+                        <div class="text-[10px] text-slate-500">Miembro Superior</div>
+                        <div id="score-rula" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">C. OCRA</div>
+                        <div class="text-[10px] text-slate-500">Repetitividad</div>
+                        <div id="score-ocra" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">D. STRAIN INDEX</div>
+                        <div class="text-[10px] text-slate-500">Mano / Muñeca</div>
+                        <div id="score-jsi" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">E. NIOSH</div>
+                        <div class="text-[10px] text-slate-500">Levantamiento</div>
+                        <div id="score-niosh" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">F. ISO 11228</div>
+                        <div class="text-[10px] text-slate-500">Empuje / Arrastre</div>
+                        <div id="score-iso11228" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">G. ISO 11226</div>
+                        <div class="text-[10px] text-slate-500">Postura Estática</div>
+                        <div id="score-iso11226" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">H. OWAS</div>
+                        <div class="text-[10px] text-slate-500">Carga Combinada</div>
+                        <div id="score-owas" class="text-xs font-mono font-bold text-slate-200 mt-1">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE 2.2: MAPA CORPORAL Y TRAZABILIDAD -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-5 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800 pb-4 md:pb-0 md:pr-4">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Mapa Corporal Anatómicamente Asignado</h3>
+                    
+                    <div class="w-full max-w-[220px] space-y-1.5 text-[10px] font-mono">
+                        <div onclick="selectSegment('Cabeza / Cuello')" class="body-node bg-slate-950 border border-slate-800 p-1.5 rounded flex items-center justify-between">
+                            <span>CABEZA / CUELLO</span>
+                            <span id="dot-neck" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+                        </div>
+                        <div onclick="selectSegment('Tórax / Tronco / Espalda Baja')" class="body-node bg-slate-950 border border-slate-800 p-1.5 rounded flex items-center justify-between">
+                            <span>TORSO / ESPALDA BAJA</span>
+                            <span id="dot-torso" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1">
+                            <div onclick="selectSegment('Hombro / Brazo D')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>HOMBRO D.</span>
+                                <span id="dot-arm-r" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                            <div onclick="selectSegment('Hombro / Brazo I')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>HOMBRO I.</span>
+                                <span id="dot-arm-l" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1">
+                            <div onclick="selectSegment('Muñeca / Mano D')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>MANO D. (JSI)</span>
+                                <span id="dot-hand-r" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                            <div onclick="selectSegment('Muñeca / Mano I')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>MANO I. (JSI)</span>
+                                <span id="dot-hand-l" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1">
+                            <div onclick="selectSegment('Piernas / Rodillas')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>PIERNAS</span>
+                                <span id="dot-legs" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                            <div onclick="selectSegment('Tobillo / Pie')" class="body-node bg-slate-950 border border-slate-800 p-1 rounded text-[9px] flex items-center justify-around">
+                                <span>TOBILLO / PIE</span>
+                                <span id="dot-feet" class="w-2 h-2 rounded-full bg-slate-700"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-7 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                            <h3 id="seg-title" class="text-xs font-bold text-blue-400 uppercase tracking-wider">Seleccione Segmento</h3>
+                            <span id="seg-method" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Método: --</span>
+                        </div>
+
+                        <div class="space-y-1.5 text-xs">
+                            <div class="flex justify-between border-b border-slate-800/50 py-0.5">
+                                <span class="text-slate-400">Ángulos (Max / Min / Prom):</span>
+                                <span id="seg-angles" class="font-mono text-slate-200">-- / -- / --</span>
+                            </div>
+                            <div class="flex justify-between border-b border-slate-800/50 py-0.5">
+                                <span class="text-slate-400">Tiempo fuera de rango neutro:</span>
+                                <span id="seg-timeout" class="font-mono text-slate-200">--</span>
+                            </div>
+                            <div class="flex justify-between border-b border-slate-800/50 py-0.5">
+                                <span class="text-slate-400">Factor causante de riesgo:</span>
+                                <span id="seg-factor" class="text-slate-200">--</span>
+                            </div>
+                            <div class="pt-2">
+                                <span class="text-slate-400 block mb-1">Evidencia / Trazabilidad Matemática:</span>
+                                <p id="seg-evidence" class="text-[10px] font-mono text-slate-300 bg-slate-950 p-2 rounded border border-slate-800 leading-relaxed">
+                                    Haga clic en una región del mapa corporal para inspeccionar las variables cinemáticas calculadas.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-2 border-t border-slate-800">
+                        <span class="text-slate-400 text-xs block mb-0.5">Acción Recomendada:</span>
+                        <p id="seg-action" class="text-xs text-amber-400/90 font-medium italic">
+                            Seleccione un segmento para desplegar los controles ergonómicos.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BLOQUE EXPORTACIÓN -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-file-pdf text-rose-500"></i> Informe Técnico Oficial LYA ERGONOMI
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Exporta el análisis biomecánico completo con membrete, fundamento normativo y hojas de firmas legales.</p>
+                </div>
+                <button id="btn-export-report" disabled onclick="generateReportAndPrint()" class="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-lg text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 shrink-0">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Exportar Informe Oficial</span>
+                </button>
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer class="border-t border-slate-800 bg-slate-950 py-2.5 text-center text-xs text-slate-500">
+        LYA-ERGO Multi-method Ergonomics Engine &copy; 2026 | Desarrollado para Procesamiento Batch de Video Pregrabado
+    </footer>
+
+    <!-- ESTRUCTURA PARA INFORME DE IMPRESIÓN -->
+    <div id="report-print-container" class="p-8 bg-white text-black font-sans">
+        <div class="min-h-screen flex flex-col justify-between">
+            <div>
+                <div class="border-b-2 border-black pb-4 mb-6 flex justify-between items-center">
+                    <div class="flex items-center space-x-3">
+                        <div class="border-2 border-black p-2 font-black text-2xl tracking-tighter bg-black text-white">
+                            LYA
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-black uppercase tracking-wider">LYA ERGONOMI</h1>
+                            <p class="text-xs font-bold text-gray-700">SELLO DE EVALUACIÓN ERGONÓMICA DE ALTA PRECISIÓN</p>
+                            <p class="text-[10px] text-gray-500">Consultoría & Ingeniería de Riesgos Ergonómicos Ocupacionales</p>
+                        </div>
+                    </div>
+                    <div class="text-right text-xs">
+                        <div class="font-bold border border-black px-2 py-1 bg-gray-100 inline-block mb-1">INFORME TÉCNICO OFICIAL</div>
+                        <p><strong>Fecha de Emisión:</strong> <span id="rpt-date"></span></p>
+                        <p><strong>Código de Folio:</strong> LYA-ERGO-<span id="rpt-folio"></span></p>
+                    </div>
+                </div>
+
+                <h2 class="text-base font-bold uppercase text-center border-b border-gray-300 pb-1 mb-4">
+                    ESTUDIO DE EVALUACIÓN ERGONÓMICA INTEGRADA MULTIMÉTODO
+                </h2>
+
+                <div class="grid grid-cols-2 gap-4 mb-6 text-xs">
+                    <div class="border border-gray-400 p-3 rounded">
+                        <h3 class="font-bold border-b border-gray-300 pb-1 mb-2 uppercase text-blue-900">1. Datos del Evaluador / Auditor</h3>
+                        <p class="mb-1"><strong>Nombre Completo:</strong> <span id="rpt-ev-name"></span></p>
+                        <p class="mb-1"><strong>Puesto de Trabajo:</strong> <span id="rpt-ev-position"></span></p>
+                        <p class="mb-1"><strong>Cédula / Acreditación:</strong> <span id="rpt-ev-id"></span></p>
+                    </div>
+
+                    <div class="border border-gray-400 p-3 rounded">
+                        <h3 class="font-bold border-b border-gray-300 pb-1 mb-2 uppercase text-blue-900">2. Datos de la Persona Evaluada</h3>
+                        <p class="mb-1"><strong>Nombre Completo:</strong> <span id="rpt-sub-name"></span></p>
+                        <p class="mb-1"><strong>Puesto:</strong> <span id="rpt-sub-position"></span> | <strong>Categoría:</strong> <span id="rpt-sub-cat"></span></p>
+                        <p class="mb-1"><strong>Área:</strong> <span id="rpt-sub-area"></span> | <strong>Sub-Área:</strong> <span id="rpt-sub-subarea"></span></p>
+                        <p class="mb-1"><strong>Edad:</strong> <span id="rpt-sub-age"></span> años | <strong>Estatura:</strong> <span id="rpt-sub-height"></span> cm</p>
+                        <p class="mb-1"><strong>Antigüedad en Puesto:</strong> <span id="rpt-sub-tenure"></span></p>
+                        <p class="mb-1"><strong>Jornada:</strong> <span id="rpt-sub-shift-dur"></span> | <strong>Turno:</strong> <span id="rpt-sub-shift-type"></span></p>
+                    </div>
+                </div>
+
+                <div class="border border-gray-400 p-3 rounded mb-6 text-xs">
+                    <h3 class="font-bold border-b border-gray-300 pb-1 mb-3 uppercase text-blue-900">3. Dictamen Global y Matriz Multimétodo de Riesgo</h3>
+                    
+                    <div class="flex justify-between items-center bg-gray-100 p-2 mb-3 border border-gray-300 font-bold">
+                        <span>NIVEL DE RIESGO GLOBAL INTEGRADO (MAXIMUM CRITICAL RULE):</span>
+                        <span id="rpt-global-risk-badge" class="px-2 py-1 text-sm text-white bg-black rounded">--</span>
+                    </div>
+
+                    <table class="w-full border-collapse border border-gray-400 text-center text-xs">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                <th class="border border-gray-400 p-1">Metodología</th>
+                                <th class="border border-gray-400 p-1">Segmento / Dimensión</th>
+                                <th class="border border-gray-400 p-1">Puntuación / Valor</th>
+                                <th class="border border-gray-400 p-1">Nivel de Riesgo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rpt-table-scores"></tbody>
+                    </table>
+                </div>
+
+                <div class="border border-gray-400 p-3 rounded text-xs mb-4">
+                    <h3 class="font-bold border-b border-gray-300 pb-1 mb-2 uppercase text-blue-900">4. Cumplimiento Legal NOM-036-1-STPS-2018</h3>
+                    <p class="mb-1"><strong>Masa Manejada:</strong> <span id="rpt-nom-weight"></span> kg | <strong>Fuerza de Empuje/Arrastre:</strong> <span id="rpt-nom-push"></span> N</p>
+                    <p class="mb-1"><strong>Dictamen Oficial:</strong> <span id="rpt-nom-verdict" class="font-bold"></span></p>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-300 pt-2 text-[9px] text-gray-500 text-between flex justify-between">
+                <span>Informe Ergonómico LYA ERGONOMI</span>
+                <span>Página 1 de 2</span>
+            </div>
+        </div>
+
+        <div class="page-break pt-8 min-h-screen flex flex-col justify-between">
+            <div>
+                <div class="border-b-2 border-black pb-4 mb-6 flex justify-between items-center">
+                    <div class="flex items-center space-x-3">
+                        <div class="border-2 border-black p-2 font-black text-2xl tracking-tighter bg-black text-white">
+                            LYA
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-black uppercase tracking-wider">LYA ERGONOMI</h1>
+                            <p class="text-xs font-bold text-gray-700">SELLO DE EVALUACIÓN ERGONÓMICA DE ALTA PRECISIÓN</p>
+                        </div>
+                    </div>
+                    <div class="text-right text-xs">
+                        <div class="font-bold border border-black px-2 py-1 bg-gray-100 inline-block mb-1">INFORME TÉCNICO OFICIAL</div>
+                        <p><strong>Folio:</strong> LYA-ERGO-<span id="rpt-folio-p2"></span></p>
+                    </div>
+                </div>
+
+                <div class="border border-gray-400 p-4 rounded text-xs mb-6 space-y-2">
+                    <h3 class="font-bold border-b border-gray-300 pb-1 uppercase text-blue-900">5. Fundamento Normativo y Metodológico Involucrado</h3>
+                    <p class="text-justify leading-relaxed">
+                        El presente estudio ergonómico biomecánico ha sido formulado aplicando el Motor Multimétodo de Inspección Cinemática Visual. Se fundamenta técnicamente en los siguientes marcos normativos internacionales y nacionales:
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1 text-[11px]">
+                        <li><strong>ISO 11226:2000 (Ergonomics — Evaluation of static working postures):</strong> Determinación del límite de sostenimiento de ángulos articulares fuera de la zona neutra por periodos continuos mayores a 4 segundos.</li>
+                        <li><strong>ISO 11228-1 / 11228-2:</strong> Métodos para la evaluación de tareas de manejo manual de cargas, levantamiento, transporte, empuje y arrastre de cargas.</li>
+                        <li><strong>Métodos REBA (Rapid Entire Body Assessment) y RULA (Rapid Upper Limb Assessment):</strong> Evaluación postural global y de extremidades superiores por cálculo de ángulos vectoriales en 3D.</li>
+                        <li><strong>Ecuación Revisada de NIOSH (1991):</strong> Determinación del Límite de Peso Recomendado (RPL) e Índice de Levantamiento (LI).</li>
+                        <li><strong>Strain Index / JSI (Job Strain Index) & OCRA Checklist:</strong> Evaluación de riesgo de desórdenes músculo-esqueléticos en miembros superiores por repetitividad y esfuerzo distal.</li>
+                    </ul>
+                </div>
+
+                <div class="border border-gray-400 p-4 rounded text-xs mb-8 space-y-2 bg-gray-50">
+                    <h3 class="font-bold border-b border-gray-300 pb-1 uppercase text-blue-900">6. Declaración de Derechos Reservados y Marco Legal en México</h3>
+                    <p class="text-justify text-[10px] leading-relaxed font-mono">
+                        <strong>DERECHOS RESERVADOS &copy; 2026 LYA ERGONOMI.</strong> Este documento, su estructura de cálculo, representaciones vectoriales e informes derivados son propiedad intelectual exclusiva de LYA ERGONOMI. Queda prohibida la reproducción parcial o total sin autorización expresa por escrito.
+                    </p>
+                    <p class="text-justify text-[10px] leading-relaxed">
+                        <strong>FUNDAMENTO NORMATIVO EN MÉXICO:</strong> El presente estudio se realiza en estricto cumplimiento con el <em>Artículo 123, Fracción XIV y XV de la Constitución Política de los Estados Unidos Mexicanos</em>; los <em>Artículos 132 Fracción XVI y 512 de la Ley Federal del Trabajo</em>; el <em>Reglamento Federal de Seguridad y Salud en el Trabajo (RFSST) Artículos 42 y 43</em>; y la <strong>Norma Oficial Mexicana NOM-036-1-STPS-2018</strong>.
+                    </p>
+                </div>
+
+                <div class="mt-12 pt-6 border-t border-gray-300">
+                    <h3 class="font-bold text-center uppercase text-xs mb-10">FIRMAS DE VALIDEZ Y CONFORMIDAD DEL ESTUDIO</h3>
+                    <div class="grid grid-cols-2 gap-12 text-center text-xs">
+                        <div class="flex flex-col items-center">
+                            <div class="w-64 border-b border-black mb-2"></div>
+                            <p class="font-bold uppercase" id="rpt-sign-ev-name">NOMBRE DEL AUDITOR</p>
+                            <p class="text-gray-700" id="rpt-sign-ev-position">PUESTO DEL AUDITOR</p>
+                            <p class="text-gray-500 text-[10px]" id="rpt-sign-ev-id">CÉDULA DE ACREDITACIÓN</p>
+                            <span class="mt-1 text-[9px] font-bold text-blue-900 border border-blue-900 px-2 py-0.5 rounded">EVALUADOR CERTIFICADO</span>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="w-64 border-b border-black mb-2"></div>
+                            <p class="font-bold uppercase" id="rpt-sign-sub-name">NOMBRE DE LA PERSONA AUDITADA</p>
+                            <p class="text-gray-700" id="rpt-sign-sub-position">PUESTO TRABAJO AUDITADO</p>
+                            <p class="text-gray-500 text-[10px]">TRABAJADOR EVALUADO</p>
+                            <span class="mt-1 text-[9px] font-bold text-gray-700 border border-gray-700 px-2 py-0.5 rounded">FIRMA DE CONFORMIDAD</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-300 pt-2 text-[9px] text-gray-500 text-between flex justify-between">
+                <span>LYA ERGONOMI &copy; Todos los derechos reservados | NOM-036-1-STPS-2018</span>
+                <span>Página 2 de 2</span>
             </div>
         </div>
     </div>
 
-    <div class="d-flex gap-2">
-        <button class="btn-inicio" style="background:#27ae60; color:white; width: 180px;" onclick="prepararSistema('camara')">🎥 VIVO</button>
-        <button class="btn-inicio" style="background:#2980b9; color:white; width: 180px;" onclick="validarYAbrirArchivo()">📁 ARCHIVO</button>
-    </div>
-    <input type="file" id="fileInput" hidden accept="video/*" onchange="prepararSistema('archivo')">
-</div>
-
-<!-- Contenedor de Análisis IA -->
-<div id="contenedor-analisis">
-    <div class="status-badge" id="txt-status">BUSCANDO SUJETO...</div>
-    <canvas id="output_canvas"></canvas>
-  <video id="input_video" autoplay muted playsinline style="display:none;"></video>
-    
-    <div class="barra-controles">
-        <button class="btn-circular" onclick="location.reload()"><span>✖</span>SALIR</button>
-        <button class="btn-circular" style="background:#00d2d3; color:#000;" onclick="cambiarCamara()"><span>🔄</span>GIRAR</button>
-        <button id="btn-calib" class="btn-circular" style="background:#f1c40f; color:#000;" onclick="iniciarCalibracion()"><span>⚖️</span>CALIBRAR</button>
-        <button id="recordBtn" class="btn-circular" style="background:#ff4d4d; color: white; opacity: 0.3;" onclick="toggleAuditoria()" disabled><span>🔴</span>AUDITAR</button>
-    </div>
-</div>
-
-<script>
-/**
- * 🏷️ BLOQUE 1: CONFIGURACIÓN Y UMBRALES NOM-036
- * Define los límites de desviación angular permitidos para evitar riesgos.
- */
-const video = document.getElementById('input_video');
-const canvas = document.getElementById('output_canvas');
-const ctx = canvas.getContext('2d');
-const txtStatus = document.getElementById('txt-status');
-
-// Umbrales de desviación (Grados) basados en NOM-036-STPS-2018
-const TH = { tronco: 18, cuello: 12, hombros: 15, codos: 25, munecas: 20, piernas: 25 };
-
-/**
- * 🏷️ BLOQUE 2: VARIABLES DE ESTADO Y ESTADÍSTICAS
- * Maneja el suavizado de la imagen y los acumuladores de riesgo.
- */
-let wbaStats = { 
-    riesgoAltoTotal: 0, 
-    framesAnalizados: 0, 
-    zonasAfectadas: new Set(), 
-    inicioAuditoria: null, 
-    ciclos: 0 
-};
-
-let baseAngles = {};        // Ángulos capturados en la calibración (postura neutra)
-let angleBuffer = {};       // Búfer para media móvil de ángulos
-let posBuffer = {};         // Búfer para suavizar el jitter de los puntos
-const HISTORIAL_MAX = 15;   // Cuadros para suavizar ángulos
-const SUAVIZADO_POS = 5;    // Cuadros para suavizar coordenadas
-
-let iaActiva = false;
-let calibrado = false;
-let analizandoRiesgo = false;
-let currentFacingMode = "environment";
-let pose;
-let mediaRecorder;
-let recordedChunks = [];
-// Objeto para almacenar incumplimientos
-let hallazgosNormativos = [];
-
-function validarNormativa() {
-    hallazgosNormativos = []; 
-    const edad = parseInt(document.getElementById('edadTrabajador').value);
-    const genero = document.getElementById('generoTrabajador').value; 
-    const peso = parseFloat(document.getElementById('pesoCarga').value);
-
-    // --- Validación LFT (Edad) ---
-    if (edad < 15) {
-        hallazgosNormativos.push("INCUMPLIMIENTO CRÍTICO LFT: Trabajador menor de edad legal (menor a 15 años).");
-    } else if (edad < 18) {
-        hallazgosNormativos.push("OBSERVACIÓN LFT: Menor en edad de aprendizaje (15-17 años). Carga restringida.");
-    }
-
-    // --- Validación NOM-036 (Peso vs Género/Edad) ---
-    let limiteMax = 0;
-    if (genero === "M") { // 'M' de Mujer en tu select
-        if (edad < 18) limiteMax = 7;
-        else if (edad <= 45) limiteMax = 15;
-        else limiteMax = 10;
-    } else { // Hombre
-        if (edad < 18) limiteMax = 7;
-        else if (edad <= 45) limiteMax = 25;
-        else limiteMax = 20;
-    }
-
-    if (peso > limiteMax) {
-        hallazgosNormativos.push(`INCUMPLIMIENTO NOM-036: Peso de ${peso}kg excede el límite de ${limiteMax}kg para este perfil.`);
-    }
-    
-    return { hallazgos: hallazgosNormativos, limite: limiteMax };
-}
-/**
- * 🏷️ BLOQUE 3: MATEMÁTICAS DINÁMICAS
- * Funciones para cálculo de ángulos 3D y dibujo de vectores.
- */
-function calcAng3D(a, b, c) {
-    if(!a || !b || !c) return 0;
-    const v1 = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
-    const v2 = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z };
-    const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-    const m1 = Math.sqrt(v1.x**2 + v1.y**2 + v1.z**2);
-    const m2 = Math.sqrt(v2.x**2 + v2.y**2 + v2.z**2);
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * (180 / Math.PI);
-    return isNaN(angle) ? 0 : angle;
-}
-
-/**
- * 🏷️ BLOQUE 3 CORREGIDO: VECTORIZACIÓN ESTABLE CON ESTADOS DE COLOR
- * Maneja la transición entre "Buscando" (Gris) y "Reconocido" (Verde/Rojo).
- */
-const drawV = (p1, p2, angKey, groupKey, vis1, vis2) => {
-    // 1. FILTRO DE EXISTENCIA: Si los puntos son casi invisibles, no dibujamos para evitar saltos.
-    if (vis1 < 0.2 || vis2 < 0.2) return;
-
-    // 2. DETERMINAR ESTABILIDAD (Confianza de la IA)
-    // Definimos un umbral para considerar que el vector es "seguro" de analizar.
-    const esEstable = (vis1 > 0.55 && vis2 > 0.55);
-
-    const buffer = angleBuffer[angKey] || [];
-    const avgAngle = buffer.length > 0 ? buffer.reduce((a, b) => a + b, 0) / buffer.length : 0;
-
-    // Valores por defecto: ESTADO INESTABLE (GRIS)
-    let color = "#8e8e8e"; // Gris: La IA "ve algo" pero no es totalmente claro
-    let thickness = 3;
-    let status = "BUSCANDO...";
-
-    // 3. LÓGICA DE RECONOCIMIENTO ACTIVO (VERDE / AMARILLO / ROJO)
-    if (esEstable) {
-        color = "#00ff00"; // Verde por defecto (Identificado y Seguro)
-        thickness = 5;
-        status = "SEGURO";
-
-        if (analizandoRiesgo && calibrado) {
-            const diff = Math.abs(avgAngle - (baseAngles[angKey] || avgAngle));
-            const limit = TH[groupKey];
-            wbaStats.framesAnalizados++;
-
-            if (diff > (limit * 2)) {
-                color = "#ff3838"; // Rojo (Crítico)
-                thickness = 10;
-                status = "CRÍTICO";
-                wbaStats.riesgoAltoTotal++;
-                wbaStats.zonasAfectadas.add(groupKey);
-            } else if (diff > limit) {
-                color = "#f1c40f"; // Amarillo (Riesgo)
-                thickness = 7;
-                status = "RIESGO";
-            }
-        }
-    }
-
-    // 4. RENDERIZADO DEL VECTOR
-    ctx.beginPath();
-    ctx.strokeStyle = color; 
-    ctx.lineWidth = thickness; 
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round"; // Suaviza las conexiones entre vectores
-    ctx.moveTo(p1.x, p1.y); 
-    ctx.lineTo(p2.x, p2.y); 
-    ctx.stroke();
-
-    // 5. ETIQUETA DE DATOS (Solo se muestra si hay calibración y estabilidad)
-    if (calibrado && esEstable) {
-        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(mx + 10, my - 22, 65, 30);
-        
-        ctx.fillStyle = color; 
-        ctx.font = "bold 11px Arial";
-        ctx.fillText(`${avgAngle.toFixed(0)}°`, mx + 15, my - 8);
-        ctx.fillText(status, mx + 15, my + 4);
-    }
-};
-/**
- * 🏷️ BLOQUE 4: PROCESAMIENTO DE IA (REDISEÑO JERÁRQUICO "T")
- * Conecta orejas -> centro cabeza -> cuello para una visualización limpia.
- */
-/**
- * 🏷️ BLOQUE 4 CORREGIDO: PROCESAMIENTO DE IA
- * Calcula visibilidad dinámica para puntos estructurales y conecta con drawV estable.
- */
-function onResults(res) {
-    const w = canvas.width, h = canvas.height;
-
-    ctx.save();
-    ctx.clearRect(0, 0, w, h);
-    
-    if (currentFacingMode === "user") { 
-        ctx.translate(w, 0); 
-        ctx.scale(-1, 1); 
-    }
-    
-    if (res.image) ctx.drawImage(res.image, 0, 0, w, h);
-
-    if (!res.poseLandmarks) { 
-        txtStatus.innerText = "BUSCANDO TRABAJADOR..."; 
-        ctx.restore(); 
-        return; 
-    }
-
-    const loader = document.getElementById('loader-ia');
-    if (loader && loader.style.display !== 'none') loader.style.display = 'none';
-
-    const lm = res.poseLandmarks;
-
-    const pt = (i) => {
-        if (!lm[i]) return { x: 0, y: 0, z: 0, v: 0 };
-        if (!posBuffer[i]) posBuffer[i] = { h: [] };
-        posBuffer[i].h.push({ x: lm[i].x * w, y: lm[i].y * h, z: lm[i].z });
-        if (posBuffer[i].h.length > SUAVIZADO_POS) posBuffer[i].h.shift();
-        const len = posBuffer[i].h.length;
-        const avg = posBuffer[i].h.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }), { x: 0, y: 0, z: 0 });
-        return { 
-            x: avg.x / len, 
-            y: avg.y / len, 
-            z: avg.z / len, 
-            v: lm[i].visibility // Confianza nativa de MediaPipe
+    <!-- MOTOR LÓGICO DE CÁLCULO JAVASCRIPT -->
+    <script>
+        const state = {
+            videoFile: null,
+            fps: 30,
+            duration: 0,
+            totalFrames: 0,
+            isProcessing: false,
+            evaluator: { name: '', position: '', id: '' },
+            subject: { name: '', position: '', category: '', area: '', subarea: '', age: 32, tenure: '', shiftDuration: '', shiftType: 'PRIMERO' },
+            params: { height: 170, weight: 12, force: 45, pushForce: 180, distH: 35, distV: 75, grip: 'good', taskType: 'lifting' },
+            temporalData: {
+                timestamps: [],
+                neck: [],
+                trunk: [],
+                shoulderR: [], shoulderL: [],
+                elbowR: [], elbowL: [],
+                wristR: [], wristL: [],
+                kneeR: [], kneeL: [],
+                ankleR: [], ankleL: []
+            },
+            results: { reba: 1, rula: 1, ocra: 0, jsi: 0, nioshLI: 0, iso11228: 'N/A', iso11226: false, owas: 1, globalRisk: 'PENDIENTE' }
         };
-    };
 
-    // --- MAPEO DE PUNTOS CLAVE ---
-    const p = {
-        ore_d: pt(8), ore_i: pt(7), 
-        h_d: pt(12), h_i: pt(11), 
-        c_d: pt(14), c_i: pt(13), 
-        m_d: pt(16), m_i: pt(15), 
-        dedo_d: pt(20), dedo_i: pt(19),
-        p_d: pt(24), p_i: pt(23),
-        r_d: pt(26), r_i: pt(25),
-        t_d: pt(28), t_i: pt(27),
-        pie_d: pt(32), pie_i: pt(31)
-    };
+        const videoInput = document.getElementById('video-input');
+        const videoElement = document.getElementById('video-element');
+        const canvasElement = document.getElementById('output-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const btnProcess = document.getElementById('btn-process');
+        const btnExportReport = document.getElementById('btn-export-report');
 
-    // --- PUNTOS DE CONEXIÓN (Cálculo de visibilidad promedio) ---
-    p.centro_orejas = { 
-        x: (p.ore_d.x + p.ore_i.x) / 2, 
-        y: (p.ore_d.y + p.ore_i.y) / 2, 
-        z: (p.ore_d.z + p.ore_i.z) / 2,
-        v: (p.ore_d.v + p.ore_i.v) / 2 // Visibilidad promedio de la cabeza
-    };
+        document.getElementById('form-evaluator').addEventListener('submit', (e) => {
+            e.preventDefault();
+            state.evaluator.name = document.getElementById('ev-name').value.trim();
+            state.evaluator.position = document.getElementById('ev-position').value.trim();
+            state.evaluator.id = document.getElementById('ev-id').value.trim();
 
-    p.cue = { 
-        x: (p.h_d.x + p.h_i.x) / 2, 
-        y: (p.h_d.y + p.h_i.y) / 2, 
-        z: (p.h_d.z + p.h_i.z) / 2,
-        v: (p.h_d.v + p.h_i.v) / 2 // Visibilidad promedio de hombros
-    };
-    
-    p.sacro = { 
-        x: (p.p_d.x + p.p_i.x) / 2, 
-        y: (p.p_d.y + p.p_i.y) / 2, 
-        z: (p.p_d.z + p.p_i.z) / 2,
-        v: (p.p_d.v + p.p_i.v) / 2 // Visibilidad promedio de pelvis
-    };
-
-    // Puntos intermedios heredan la visibilidad del eje
-    const visEje = (p.cue.v + p.sacro.v) / 2;
-    p.torax = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.3, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.3, z: p.cue.z, v: visEje };
-    p.abdomen = { x: p.cue.x + (p.sacro.x - p.cue.x) * 0.6, y: p.cue.y + (p.sacro.y - p.cue.y) * 0.6, z: p.cue.z, v: visEje };
-
-    const verticalRef = { x: p.cue.x, y: p.cue.y + 100, z: p.cue.z };
-
-    // --- CÁLCULO DE ÁNGULOS ---
-    const currentAngles = {
-        cuello: calcAng3D(p.centro_orejas, p.cue, verticalRef),
-        tronco: calcAng3D(p.cue, p.sacro, verticalRef),
-        h_d: calcAng3D(p.cue, p.h_d, p.c_d),
-        h_i: calcAng3D(p.cue, p.h_i, p.c_i),
-        c_d: calcAng3D(p.h_d, p.c_d, p.m_d),
-        c_i: calcAng3D(p.h_i, p.c_i, p.m_i),
-        r_d: calcAng3D(p.p_d, p.r_d, p.t_d),
-        r_i: calcAng3D(p.p_i, p.r_i, p.t_i)
-    };
-
-    Object.keys(currentAngles).forEach(k => {
-        if (!angleBuffer[k]) angleBuffer[k] = [];
-        angleBuffer[k].push(currentAngles[k]);
-        if (angleBuffer[k].length > HISTORIAL_MAX) angleBuffer[k].shift();
-    });
-
-    // --- RENDERIZADO CON VISIBILIDAD CORREGIDA ---
-    
-    // Cuello y Cabeza
-    drawV(p.ore_d, p.ore_i, 'cuello', 'cuello', p.ore_d.v, p.ore_i.v);
-    drawV(p.centro_orejas, p.cue, 'cuello', 'cuello', p.centro_orejas.v, p.cue.v);
-
-    // Eje Central (Usa visibilidad dinámica en lugar de 1, 1)
-    drawV(p.cue, p.torax, 'tronco', 'tronco', p.cue.v, p.torax.v);
-    drawV(p.torax, p.abdomen, 'tronco', 'tronco', p.torax.v, p.abdomen.v);
-    drawV(p.abdomen, p.sacro, 'tronco', 'tronco', p.abdomen.v, p.sacro.v);
-
-    // Hombros y Pelvis
-    drawV(p.h_d, p.h_i, 'tronco', 'hombros', p.h_d.v, p.h_i.v);
-    drawV(p.p_d, p.p_i, 'tronco', 'piernas', p.p_d.v, p.p_i.v);
-
-    // Extremidades Superiores
-    drawV(p.h_d, p.c_d, 'h_d', 'hombros', p.h_d.v, p.c_d.v);
-    drawV(p.h_i, p.c_i, 'h_i', 'hombros', p.h_i.v, p.c_i.v);
-    drawV(p.c_d, p.m_d, 'c_d', 'codos', p.c_d.v, p.m_d.v);
-    drawV(p.c_i, p.m_i, 'c_i', 'codos', p.c_i.v, p.m_i.v);
-    drawV(p.m_d, p.dedo_d, 'c_d', 'munecas', p.m_d.v, p.dedo_d.v);
-    drawV(p.m_i, p.dedo_i, 'c_i', 'munecas', p.m_i.v, p.dedo_i.v);
-
-    // Extremidades Inferiores
-    drawV(p.p_d, p.r_d, 'r_d', 'piernas', p.p_d.v, p.r_d.v);
-    drawV(p.p_i, p.r_i, 'r_i', 'piernas', p.p_i.v, p.r_i.v);
-    drawV(p.r_d, p.t_d, 'r_d', 'piernas', p.r_d.v, p.t_d.v);
-    drawV(p.r_i, p.t_i, 'r_i', 'piernas', p.r_i.v, p.t_i.v);
-    drawV(p.t_d, p.pie_d, 'r_d', 'piernas', p.t_d.v, p.pie_d.v);
-    drawV(p.t_i, p.pie_i, 'r_i', 'piernas', p.t_i.v, p.pie_i.v);
-
-    ctx.restore();
-}
-/**
- * 🏷️ BLOQUE 5: CONTROL DE CALIBRACIÓN Y AUDITORÍA
- */
-function iniciarCalibracion() {
-    if (!iaActiva) return;
-    txtStatus.innerText = "⚖️ CALIBRANDO... MANTENGA POSTURA NEUTRA";
-    
-    setTimeout(() => {
-        Object.keys(angleBuffer).forEach(k => {
-            const avg = angleBuffer[k].reduce((a, b) => a + b, 0) / angleBuffer[k].length;
-            baseAngles[k] = avg;
+            if (state.evaluator.name && state.evaluator.position && state.evaluator.id) {
+                document.getElementById('display-evaluator-name').innerText = state.evaluator.name;
+                document.getElementById('evaluator-modal-backdrop').classList.add('hidden');
+            }
         });
-        calibrado = true;
-        document.getElementById('btn-calib').style.background = "#2ecc71";
-        document.getElementById('recordBtn').disabled = false;
-        document.getElementById('recordBtn').style.opacity = "1";
-        txtStatus.innerText = "✅ CALIBRADO COMPLETADO";
-    }, 2000);
-}
 
-function toggleAuditoria() {
-    if (!calibrado) return;
-    analizandoRiesgo = !analizandoRiesgo;
-    const btn = document.getElementById('recordBtn');
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
 
-    if (analizandoRiesgo) {
-        recordedChunks = [];
-        const stream = canvas.captureStream(30);
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-        mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
-        mediaRecorder.onstop = descargarVideo;
-        mediaRecorder.start();
-        wbaStats.inicioAuditoria = Date.now();
-        btn.innerHTML = "<span>⏹️</span>DETENER"; btn.classList.add('rec-active');
-    } else {
-        btn.innerHTML = "<span>🔴</span>AUDITAR"; btn.classList.remove('rec-active');
-        if (mediaRecorder) mediaRecorder.stop();
-        setTimeout(generarReporteWBA, 800);
-    }
-}
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
 
-/**
- * 🏷️ BLOQUE 6: SISTEMA DE REPORTES PDF (VERSIÓN INTEGRAL NOM-036 & LFT)
- * Genera un documento técnico basado en los hallazgos de la IA y la normativa mexicana.
- */
-function generarReporteWBA() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // 1. Recolección de datos del DOM
-    const info = {
-        emp: document.getElementById('nombreEmpresa')?.value.toUpperCase() || "EMPRESA NO ESPECIFICADA",
-        puesto: document.getElementById('puestoTrabajo')?.value || "General",
-        trab: document.getElementById('nombreTrabajador')?.value || "Sin Nombre",
-        peso: parseFloat(document.getElementById('pesoCarga')?.value) || 0,
-        gen: document.getElementById('generoTrabajador')?.value || 'H',
-        edad: parseInt(document.getElementById('edadTrabajador')?.value) || 0
-    };
+        pose.onResults(onPoseResults);
 
-    // 2. Lógica de Cumplimiento Normativo (Sincronizado con NOM-036 y LFT)
-    let limiteNormativo = 0;
-    let hallazgosLegales = [];
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-    if (info.edad < 15) {
-        hallazgosLegales.push("PROHIBICIÓN LFT: Trabajo infantil detectado.");
-        limiteNormativo = 0;
-    } else if (info.edad < 18) {
-        hallazgosLegales.push("RESTRICCIÓN LFT: Menor en etapa de desarrollo.");
-        limiteNormativo = 7;
-    } else {
-        if (info.gen === 'H') {
-            limiteNormativo = (info.edad > 45) ? 20 : 25;
-        } else {
-            limiteNormativo = (info.edad > 45) ? 10 : 15;
+            state.videoFile = file;
+            videoElement.src = URL.createObjectURL(file);
+
+            videoElement.onloadedmetadata = () => {
+                document.getElementById('video-placeholder').classList.add('hidden');
+                document.getElementById('tele-fps').innerText = state.fps;
+                document.getElementById('tele-frames').innerText = Math.floor(videoElement.duration * state.fps);
+                document.getElementById('tele-time').innerText = videoElement.duration.toFixed(1) + 's';
+                document.getElementById('tele-status').innerText = 'Listo';
+                document.getElementById('tele-status').className = 'text-blue-400';
+
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                btnProcess.disabled = false;
+                videoElement.currentTime = 0;
+            };
+        });
+
+        btnProcess.addEventListener('click', () => {
+            if (!state.videoFile || state.isProcessing) return;
+            executeBatchEvaluation();
+        });
+
+        async function executeBatchEvaluation() {
+            state.isProcessing = true;
+            btnProcess.disabled = true;
+            btnExportReport.disabled = true;
+            document.getElementById('tele-status').innerText = 'Procesando...';
+            document.getElementById('tele-status').className = 'text-amber-400 animate-pulse';
+
+            state.subject.name = document.getElementById('subject-name').value.trim() || 'No especificado';
+            state.subject.position = document.getElementById('subject-position').value.trim() || 'No especificado';
+            state.subject.category = document.getElementById('subject-category').value.trim() || 'No especificada';
+            state.subject.area = document.getElementById('subject-area').value.trim() || 'No especificada';
+            state.subject.subarea = document.getElementById('subject-subarea').value.trim() || 'No especificada';
+            state.subject.age = parseInt(document.getElementById('subject-age').value) || 0;
+            state.subject.tenure = document.getElementById('subject-tenure').value.trim() || 'No especificada';
+            state.subject.shiftDuration = document.getElementById('subject-shift-duration').value.trim() || 'No especificada';
+            state.subject.shiftType = document.getElementById('subject-shift-type').value;
+
+            state.params.height = parseFloat(document.getElementById('p-height').value) || 170;
+            state.params.weight = parseFloat(document.getElementById('p-weight').value) || 0;
+            state.params.force = parseFloat(document.getElementById('p-force').value) || 0;
+            state.params.pushForce = parseFloat(document.getElementById('p-push-force').value) || 0;
+            state.params.distH = parseFloat(document.getElementById('p-dist-h').value) || 35;
+            state.params.distV = parseFloat(document.getElementById('p-dist-v').value) || 75;
+            state.params.grip = document.getElementById('p-grip').value;
+            state.params.taskType = document.getElementById('p-task-type').value;
+
+            state.temporalData = {
+                timestamps: [], neck: [], trunk: [], shoulderR: [], shoulderL: [],
+                elbowR: [], elbowL: [], wristR: [], wristL: [], kneeR: [], kneeL: [], ankleR: [], ankleL: []
+            };
+
+            const step = 1 / state.fps;
+            videoElement.currentTime = 0;
+
+            const processFrame = async () => {
+                if (videoElement.currentTime < videoElement.duration && state.isProcessing) {
+                    await pose.send({ image: videoElement });
+                    state.temporalData.timestamps.push(videoElement.currentTime);
+                    document.getElementById('tele-time').innerText = videoElement.currentTime.toFixed(1) + 's';
+                    videoElement.currentTime += step;
+                } else {
+                    videoElement.removeEventListener('seeked', processFrame);
+                    runMultimethodEvaluationEngine();
+                }
+            };
+
+            videoElement.addEventListener('seeked', processFrame);
+            processFrame();
         }
-    }
 
-    // Cálculos de riesgo postural (IA)
-    const porcRiesgo = wbaStats.framesAnalizados > 0 
-        ? ((wbaStats.riesgoAltoTotal / wbaStats.framesAnalizados) * 100).toFixed(1) 
-        : 0;
-    
-    const cumpleNorma = (info.peso <= limiteNormativo && porcRiesgo <= 20);
-    const colorSemaforo = cumpleNorma ? [46, 204, 113] : [231, 76, 60]; // Verde o Rojo
+        function onPoseResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    // --- DISEÑO DEL PDF ---
+            if (results.poseLandmarks) {
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FFC8', lineWidth: 2 });
+                drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0055', lineWidth: 1, radius: 3 });
 
-    // Encabezado Profesional
-    doc.setFillColor(13, 17, 23); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 255, 0); doc.setFontSize(18); doc.setFont("helvetica", "bold");
-    doc.text("INFORME DE EVALUACIÓN ERGONÓMICA IA", 105, 15, { align: "center" });
-    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
-    doc.text("AUDITORÍA DE CUMPLIMIENTO: NOM-036-1-STPS-2018 & LEY FEDERAL DEL TRABAJO", 105, 25, { align: "center" });
-    doc.text(`ID Reporte: LYA-${Date.now()} | Planta: ${info.emp}`, 105, 32, { align: "center" });
+                const lm = results.poseLandmarks;
+                const earR = lm[8], earL = lm[7];
+                const sR = lm[12], sL = lm[11];
+                const eR = lm[14], eL = lm[13];
+                const wR = lm[16], wL = lm[15];
+                const hR = lm[24], hL = lm[23];
+                const kR = lm[26], kL = lm[25];
+                const aR = lm[28], aL = lm[27];
+                const iR = lm[20], iL = lm[19]; // Dedos índice (Manos distales)
+                const fR = lm[32], fL = lm[31]; // Pie distal (Punta pie)
 
-    // 1. Datos Generales
-    doc.setTextColor(0); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    doc.text("1. DATOS GENERALES Y REFERENCIAS", 15, 50);
-    doc.autoTable({
-        startY: 53,
-        body: [
-            ['Empresa:', info.emp, 'Fecha de Evaluación:', new Date().toLocaleDateString()],
-            ['Trabajador:', info.trab, 'ID/Edad:', `${info.edad} años`],
-            ['Puesto:', info.puesto, 'Género:', info.gen === 'H' ? 'Hombre' : 'Mujer']
-        ],
-        theme: 'grid', styles: { fontSize: 8, cellPadding: 2 }
-    });
+                const midS = { x: (sR.x + sL.x)/2, y: (sR.y + sL.y)/2, z: (sR.z + sL.z)/2 };
+                const midE = { x: (earR.x + earL.x)/2, y: (earR.y + earL.y)/2, z: (earR.z + earL.z)/2 };
+                const midH = { x: (hR.x + hL.x)/2, y: (hR.y + hL.y)/2, z: (hR.z + hL.z)/2 };
 
-    // 2. Tabla de Umbrales Técnicos (Referencia NOM-036)
-    doc.text("2. MATRIZ DE UMBRALES ADMISIBLES (REFERENCIA TÉCNICA)", 15, doc.lastAutoTable.finalY + 10);
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['Región Anatómica', 'Ángulo Neutro', 'Tolerancia Máx.', 'Nivel de Riesgo']],
-        body: [
-            ['Tronco (Flexión)', '0°', '20°', 'NOM-036 / ISO 11228'],
-            ['Cuello (Inclinación)', '0°', '15°', 'Referencia RULA'],
-            ['Hombros/Brazos', '0°', '20°', 'Riesgo Biomecánico'],
-            ['Piernas', 'Simétrico', '25°', 'Estabilidad Base']
-        ],
-        headStyles: { fillColor: [44, 62, 80] },
-        styles: { fontSize: 8 }
-    });
+                const angleNeck = angle3D(midE, midS, { x: midS.x, y: midS.y - 0.5, z: midS.z });
+                const angleTrunk = angle3D(midS, midH, { x: midH.x, y: midH.y + 0.5, z: midH.z });
+                
+                const angleShoulderR = angle3D(eR, sR, hR);
+                const angleShoulderL = angle3D(eL, sL, hL);
+                const angleElbowR = angle3D(sR, eR, wR);
+                const angleElbowL = angle3D(sL, eL, wL);
+                
+                // Mantiene vectorización distal de manos
+                const angleWristR = angle3D(eR, wR, iR);
+                const angleWristL = angle3D(eL, wL, iL);
 
-    // 3. Análisis de Resultados (IA)
-    doc.text("3. RESULTADOS DE LA EVALUACIÓN EN TIEMPO REAL", 15, doc.lastAutoTable.finalY + 10);
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 13,
-        head: [['FACTOR ANALIZADO', 'VALOR DETECTADO', 'LÍMITE LEGAL', 'ESTADO']],
-        body: [
-            ['Masa de Carga', `${info.peso} kg`, `${limiteNormativo} kg`, info.peso > limiteNormativo ? 'EXCEDE' : 'CUMPLE'],
-            ['Postura Crítica', `${porcRiesgo}%`, '20.0%', porcRiesgo > 20 ? 'CRÍTICO' : 'ACEPTABLE'],
-            ['Zonas Afectadas', Array.from(wbaStats.zonasAfectadas).join(', ') || 'Ninguna', 'N/A', '-']
-        ],
-        theme: 'striped',
-        styles: { fontSize: 8 },
-        columnStyles: { 3: { fontStyle: 'bold' } }
-    });
+                const angleKneeR = angle3D(hR, kR, aR);
+                const angleKneeL = angle3D(hL, kL, aL);
+                
+                // Mantiene vectorización distal de pies
+                const angleAnkleR = angle3D(kR, aR, fR);
+                const angleAnkleL = angle3D(kL, aL, fL);
 
-    // 4. SEMAFORIZACIÓN FINAL Y VERDICTO
-    const ySemaforo = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(colorSemaforo[0], colorSemaforo[1], colorSemaforo[2]);
-    doc.rect(15, ySemaforo, 180, 12, 'F');
-    
-    doc.setTextColor(255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-    const veredicto = cumpleNorma ? "VERDICTO: CUMPLE CON LOS ESTÁNDARES DE SEGURIDAD" : "VERDICTO: NO CUMPLE - REQUIERE INTERVENCIÓN INMEDIATA";
-    doc.text(veredicto, 105, ySemaforo + 8, { align: "center" });
-
-    // 5. Conclusiones y Recomendaciones
-    let recomendaciones = "";
-    if (info.peso > limiteNormativo) {
-        recomendaciones += `ALERTA: El peso de ${info.peso}kg supera el máximo legal permitido de ${limiteNormativo}kg para este perfil. ${hallazgosLegales.join(" ")} Se requiere asistencia mecánica (patín, polipasto) de forma obligatoria. `;
-    }
-    if (porcRiesgo > 20) {
-        recomendaciones += "RIESGO BIOMECÁNICO: Se detectó una frecuencia excesiva de posturas forzadas. Es imperativo realizar pausas activas cada 30 minutos y re-entrenar en higiene postural.";
-    }
-    if (recomendaciones === "") {
-        recomendaciones = "OPERACIÓN SEGURA: El trabajador realiza la maniobra dentro de los límites de fatiga y carga permitidos. Se recomienda mantener el monitoreo preventivo anual.";
-    }
-
-    doc.setTextColor(0); doc.setFontSize(11);
-    doc.text("4. CONCLUSIONES TÉCNICAS", 15, ySemaforo + 22);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    const splitText = doc.splitTextToSize(recomendaciones, 175);
-    doc.text(splitText, 15, ySemaforo + 28);
-
-    // 6. Sección de Firmas
-    const finalY = ySemaforo + 60;
-    doc.setDrawColor(0); doc.setLineWidth(0.5);
-    doc.line(25, finalY, 95, finalY); doc.text("Responsable de Seguridad / Auditor", 32, finalY + 5);
-    doc.line(115, finalY, 185, finalY); doc.text("Firma del Trabajador Evaluado", 130, finalY + 5);
-
-    // Pie de Página
-    doc.setFontSize(7); doc.setTextColor(150);
-    doc.text("Este informe fue generado automáticamente por el sistema LYA-ERGO mediante algoritmos de visión artificial y Pose Estimation.", 105, 285, { align: "center" });
-    doc.text("Basado en el cumplimiento de la NOM-036-1-STPS-2018 (Manejo manual de cargas).", 105, 290, { align: "center" });
-
-    // Guardar Documento
-    doc.save(`Auditoria_Ergo_${info.trab.replace(/\s+/g, '_')}_${info.emp}.pdf`);
-}
-    
-    /**
- * 🏷️ BLOQUE 7: GESTIÓN DE HARDWARE Y ARRANQUE - VERSIÓN MEJORADA
- * Controla el ciclo de vida de la cámara, el video y el motor de IA.
- */
-async function prepararSistema(fuente) {
-    // 1. Referencias y Captura de Datos
-    const edadInput = document.getElementById('edadTrabajador');
-    const pesoInput = document.getElementById('pesoCarga');
-    const ids = ['nombreEmpresa', 'puestoTrabajo', 'nombreTrabajador', 'edadTrabajador', 'pesoCarga'];
-    
-    // Validación de campos vacíos
-    const incompleto = ids.some(id => !document.getElementById(id).value.trim());
-    if (incompleto) { 
-        alert("⚠️ Por favor, complete todos los campos del formulario antes de iniciar el análisis."); 
-        return; 
-    }
-
-    // --- MEJORA: VALIDACIÓN DE EDAD (ESTRICTAMENTE 2 CIFRAS) ---
-    const edadValor = edadInput.value.trim();
-    // Verifica que sean exactamente 2 dígitos (10-99 años)
-    if (!/^\d{2}$/.test(edadValor)) {
-        alert("❌ Error en EDAD: Debe ingresar un valor de exactamente 2 cifras (Ejemplo: 25).");
-        edadInput.focus();
-        return;
-    }
-
-    // Validación de peso
-    if (parseFloat(pesoInput.value) <= 0) {
-        alert("❌ El peso de la carga debe ser un número positivo mayor a cero.");
-        pesoInput.focus();
-        return;
-    }
-
-    // --- LIMPIEZA DE MEMORIA Y BUFFERS ---
-    // Asegura que el análisis ergonómico empiece de cero
-    angleBuffer = {}; 
-    posBuffer = {};
-    wbaStats.zonasAfectadas.clear();
-    wbaStats.framesAnalizados = 0;
-    wbaStats.riesgoAltoTotal = 0;
-
-    // 2. Limpieza de flujos previos (Cámara o Archivos)
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-    }
-    if (video.src.startsWith('blob:')) {
-        URL.revokeObjectURL(video.src);
-        video.src = "";
-    }
-
-    // 3. Transición de Interfaz
-    document.getElementById('menu-inicial').style.display = 'none';
-    document.getElementById('contenedor-analisis').style.display = 'block';
-
-    try {
-        if (fuente === 'camara') {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                } 
-            });
-            video.srcObject = stream;
-        } else {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) { 
-                alert("Seleccione un archivo de video para procesar."); 
-                location.reload();
-                return; 
+                state.temporalData.neck.push(angleNeck);
+                state.temporalData.trunk.push(angleTrunk);
+                state.temporalData.shoulderR.push(angleShoulderR);
+                state.temporalData.shoulderL.push(angleShoulderL);
+                state.temporalData.elbowR.push(angleElbowR);
+                state.temporalData.elbowL.push(angleElbowL);
+                state.temporalData.wristR.push(angleWristR);
+                state.temporalData.wristL.push(angleWristL);
+                state.temporalData.kneeR.push(angleKneeR);
+                state.temporalData.kneeL.push(angleKneeL);
+                state.temporalData.ankleR.push(angleAnkleR);
+                state.temporalData.ankleL.push(angleAnkleL);
             }
-            video.src = URL.createObjectURL(file);
+            canvasCtx.restore();
         }
 
-        // 4. Manejo del arranque del motor de IA MediaPipe[cite: 1]
-        video.onloadedmetadata = async () => {
-            canvas.width = video.videoWidth; 
-            canvas.height = video.videoHeight;
+        function angle3D(A, B, C) {
+            const AB = { x: A.x - B.x, y: A.y - B.y, z: A.z - B.z };
+            const BC = { x: C.x - B.x, y: C.y - B.y, z: C.z - B.z };
+            const dot = AB.x * BC.x + AB.y * BC.y + AB.z * BC.z;
+            const magAB = Math.sqrt(AB.x**2 + AB.y**2 + AB.z**2);
+            const magBC = Math.sqrt(BC.x**2 + BC.y**2 + BC.z**2);
+            if (magAB * magBC === 0) return 0;
+            const cos = Math.min(Math.max(dot / (magAB * magBC), -1.0), 1.0);
+            return Math.acos(cos) * (180 / Math.PI);
+        }
+
+        function runMultimethodEvaluationEngine() {
+            state.isProcessing = false;
+            document.getElementById('tele-status').innerText = 'Completado';
+            document.getElementById('tele-status').className = 'text-emerald-400';
+
+            const d = state.temporalData;
+            const maxTrunk = Math.max(...d.trunk, 0);
+            const maxNeck = Math.max(...d.neck, 0);
+            const maxShoulder = Math.max(...d.shoulderR, ...d.shoulderL, 0);
+            const maxKnee = Math.max(...d.kneeR, ...d.kneeL, 0);
+
+            let reba = 1;
+            if (maxTrunk > 60) reba += 4; else if (maxTrunk > 20) reba += 2;
+            if (maxNeck > 20) reba += 2;
+            if (maxKnee > 60) reba += 2;
+            if (state.params.weight > 10) reba += 2;
+            state.results.reba = reba;
+
+            let rula = 1;
+            if (maxShoulder > 90) rula += 4; else if (maxShoulder > 45) rula += 3;
+            if (state.params.force > 50) rula += 2;
+            state.results.rula = rula;
+
+            const cycleDuration = state.temporalData.timestamps.length / state.fps;
+            const repetitionsPerMin = (cycleDuration > 0) ? (60 / cycleDuration) * 15 : 0;
+            const ocraIndex = (repetitionsPerMin / 30) * (state.params.force > 20 ? 1.5 : 1.0);
+            state.results.ocra = ocraIndex.toFixed(1);
+
+            const ie = state.params.force > 90 ? 3.0 : (state.params.force > 40 ? 1.5 : 1.0);
+            const hw = maxShoulder > 45 ? 1.5 : 1.0;
+            const jsi = (ie * hw * 1.5 * 1.0).toFixed(1);
+            state.results.jsi = jsi;
+
+            let nioshLI = 0;
+            if (state.params.weight > 0 && state.params.taskType === 'lifting') {
+                const hm = 25 / (state.params.distH || 25);
+                const vm = 1 - (0.003 * Math.abs((state.params.distV || 75) - 75));
+                const rwl = 23 * hm * vm;
+                nioshLI = (state.params.weight / Math.max(rwl, 1)).toFixed(2);
+            }
+            state.results.nioshLI = nioshLI;
+
+            let iso11228 = 'Aceptable';
+            if (state.params.pushForce > 200) iso11228 = 'Riesgo Alto (Fuerza > 200N)';
+            else if (state.params.pushForce > 100) iso11228 = 'Riesgo Moderado';
+            state.results.iso11228 = iso11228;
+
+            const staticNeckFrames = d.neck.filter(a => a > 20).length / state.fps;
+            const iso11226 = staticNeckFrames > 4.0;
+            state.results.iso11226 = iso11226;
+
+            let owas = 1;
+            if (maxTrunk > 45 && maxShoulder > 45) owas = 3;
+            else if (maxTrunk > 45 || maxKnee > 60) owas = 2;
+            state.results.owas = owas;
+
+            evaluateNOM036(state.params.weight);
+
+            let globalRisk = 'BAJO';
+            let badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+
+            if (reba >= 8 || rula >= 6 || nioshLI > 3.0 || jsi > 7.0 || state.params.pushForce > 220) {
+                globalRisk = 'CRÍTICO / MUY ALTO';
+                badgeClass = 'bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse';
+            } else if (reba >= 4 || rula >= 4 || nioshLI > 1.0 || jsi > 3.0 || iso11226) {
+                globalRisk = 'ALTO / MODERADO';
+                badgeClass = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+            }
+
+            state.results.globalRisk = globalRisk;
+
+            document.getElementById('badge-global-risk').innerText = globalRisk;
+            document.getElementById('badge-global-risk').className = `px-3 py-1 rounded-lg text-xs font-bold border ${badgeClass}`;
+
+            document.getElementById('score-reba').innerText = `Puntos: ${reba}`;
+            document.getElementById('score-rula').innerText = `Puntos: ${rula}`;
+            document.getElementById('score-ocra').innerText = `Índice: ${ocraIndex.toFixed(1)}`;
+            document.getElementById('score-jsi').innerText = `JSI: ${jsi}`;
+            document.getElementById('score-niosh').innerText = nioshLI > 0 ? `LI: ${nioshLI}` : 'N/A';
+            document.getElementById('score-iso11228').innerText = iso11228;
+            document.getElementById('score-iso11226').innerText = iso11226 ? 'No Cumple (>4s)' : 'Cumple';
+            document.getElementById('score-owas').innerText = `Cat. Riesgo: ${owas}`;
+
+            updateBodyDots(reba, rula, jsi, maxKnee);
+            btnExportReport.disabled = false;
+            selectSegment('Cabeza / Cuello');
+        }
+
+        function evaluateNOM036(weight) {
+            const nomDiv = document.getElementById('nom-result');
+            if (weight === 0) {
+                nomDiv.innerHTML = `<span class="text-slate-400">Dictamen NOM-036:</span><span class="font-bold text-slate-400">Sin MMC (Exento)</span>`;
+            } else if (weight <= 15) {
+                nomDiv.innerHTML = `<span class="text-slate-400">Dictamen NOM-036:</span><span class="font-bold text-emerald-400">CUMPLE (Riesgo Tolerable)</span>`;
+            } else if (weight <= 25) {
+                nomDiv.innerHTML = `<span class="text-slate-400">Dictamen NOM-036:</span><span class="font-bold text-amber-400">RIESGO MEDIO (Control Requerido)</span>`;
+            } else {
+                nomDiv.innerHTML = `<span class="text-slate-400">Dictamen NOM-036:</span><span class="font-bold text-rose-400">INCUMPLIMIENTO (>25kg Límite Legal)</span>`;
+            }
+        }
+
+        function updateBodyDots(reba, rula, jsi, knee) {
+            const setDot = (id, level) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (level >= 3) el.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-lg shadow-rose-500/50';
+                else if (level >= 2) el.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+                else el.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+            };
+
+            setDot('dot-neck', reba >= 4 ? 3 : (reba >= 2 ? 2 : 1));
+            setDot('dot-torso', reba >= 4 ? 3 : (reba >= 2 ? 2 : 1));
+            setDot('dot-arm-r', rula >= 4 ? 3 : (rula >= 2 ? 2 : 1));
+            setDot('dot-arm-l', rula >= 4 ? 3 : (rula >= 2 ? 2 : 1));
+            setDot('dot-hand-r', jsi > 3 ? 3 : 1);
+            setDot('dot-hand-l', jsi > 3 ? 3 : 1);
+            setDot('dot-legs', knee > 60 ? 3 : 1);
+            setDot('dot-feet', 1);
+        }
+
+        function selectSegment(name) {
+            document.getElementById('seg-title').innerText = name;
+            const d = state.temporalData;
             
-            try {
-                await video.play();
-                activarIA(); // Inicia la estimación de pose para evaluación ergonómica[cite: 1]
-            } catch (playError) {
-                console.error("Error al reproducir video:", playError);
-                alert("Error crítico: No se pudo iniciar la reproducción del medio.");
+            let method = 'REBA / RULA';
+            let angles = '--';
+            let timeout = '--';
+            let factor = '--';
+            let evidence = '--';
+            let action = '--';
+
+            if (name.includes('Cabeza')) {
+                method = 'RULA / ISO 11226';
+                const max = Math.max(...d.neck, 0).toFixed(1);
+                const min = Math.min(...d.neck, 0).toFixed(1);
+                const avg = average(d.neck).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = state.results.iso11226 ? '> 4.0s estático' : 'En zona neutra';
+                factor = 'Flexión/Extensión mantenida de cuello.';
+                evidence = `Flexión máxima de ${max}°. ISO 11226 evalúa postura sostenida > 4s.`;
+                action = 'Ajustar la altura de la vista del trabajador o el plano de herramientas.';
+            } else if (name.includes('Torso') || name.includes('Tórax')) {
+                method = 'REBA / NIOSH / ISO 11226';
+                const max = Math.max(...d.trunk, 0).toFixed(1);
+                const min = Math.min(...d.trunk, 0).toFixed(1);
+                const avg = average(d.trunk).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = `${(d.trunk.filter(a => a > 20).length / state.fps).toFixed(1)}s`;
+                factor = 'Inclinación de columna lumbar + Carga manual.';
+                evidence = `Ángulo lumbar máximo de ${max}°. Carga levantada: ${state.params.weight}kg. NIOSH Lifting Index: ${state.results.nioshLI}.`;
+                action = 'Reducir la distancia horizontal de agarre e incorporar ayuda mecánica de elevación.';
+            } else if (name.includes('Hombro') || name.includes('Brazo')) {
+                method = 'RULA / REBA';
+                const arr = name.includes('D') ? d.shoulderR : d.shoulderL;
+                const max = Math.max(...arr, 0).toFixed(1);
+                const min = Math.min(...arr, 0).toFixed(1);
+                const avg = average(arr).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = `${(arr.filter(a => a > 45).length / state.fps).toFixed(1)}s`;
+                factor = 'Elevación de brazos por encima de la línea de hombros.';
+                evidence = `Flexión/Abducción de hombro alcanzando ${max}°. Impacto directo en puntuación RULA arm score.`;
+                action = 'Rediseñar la altura del plano de trabajo o utilizar mesa regulable.';
+            } else if (name.includes('Mano') || name.includes('Muñeca')) {
+                method = 'Strain Index (JSI) / OCRA';
+                const arr = name.includes('D') ? d.wristR : d.wristL;
+                const max = Math.max(...arr, 0).toFixed(1);
+                const min = Math.min(...arr, 0).toFixed(1);
+                const avg = average(arr).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = 'N/A';
+                factor = `Fuerza aplicada (${state.params.force} N) + Repetitividad.`;
+                evidence = `Ángulo de muñeca distal: ${max}°. JSI calculado: ${state.results.jsi}.`;
+                action = 'Implementar mangos ergonómicos y rotación de personal en tareas de prensado.';
+            } else if (name.includes('Piernas')) {
+                method = 'REBA / OWAS';
+                const max = Math.max(...d.kneeR, ...d.kneeL, 0).toFixed(1);
+                const min = Math.min(...d.kneeR, ...d.kneeL, 0).toFixed(1);
+                const avg = average([...d.kneeR, ...d.kneeL]).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = `${(d.kneeR.filter(a => a > 60).length / state.fps).toFixed(1)}s`;
+                factor = 'Flexión de rodilla / Postura en cuclillas o desequilibrada.';
+                evidence = `Flexión de rodilla máxima: ${max}°. Impacta postura B en REBA.`;
+                action = 'Proporcionar soporte de descanso o elevadores de tarima.';
+            } else if (name.includes('Tobillo') || name.includes('Pie')) {
+                method = 'Análisis Angular Puro Distal';
+                const arr = name.includes('D') ? d.ankleR : d.ankleL;
+                const max = Math.max(...arr, 0).toFixed(1);
+                const min = Math.min(...arr, 0).toFixed(1);
+                const avg = average(arr).toFixed(1);
+                angles = `${max}° / ${min}° / ${avg}°`;
+                timeout = 'N/A';
+                factor = 'Ángulo de tobillo/pie mantenido.';
+                evidence = `Ángulo anatómico detectado por MediaPipe: ${max}°. Se despliega cinemática real sin umbral inventado.`;
+                action = 'Evaluar estabilidad de la base de apoyo y tapetes antifatiga.';
             }
-        };
 
-    } catch (err) {
-        console.error("Error de acceso al hardware:", err);
-        alert("No se pudo acceder a la cámara. Verifique los permisos en su navegador.");
-        location.reload();
-    }
-}
-
-    
-async function activarIA() {
-    const loader = document.getElementById('loader-ia');
-    loader.style.display = 'flex';
-    
-    // Timeout de seguridad mejorado
-    const safetyTimeout = setTimeout(() => {
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            alert("⚠️ El motor de IA está tardando en responder. Esto puede deberse a la saturación de la GPU.");
+            document.getElementById('seg-method').innerText = `Método: ${method}`;
+            document.getElementById('seg-angles').innerText = angles;
+            document.getElementById('seg-timeout').innerText = timeout;
+            document.getElementById('seg-factor').innerText = factor;
+            document.getElementById('seg-evidence').innerText = evidence;
+            document.getElementById('seg-action').innerText = action;
         }
-    }, 10000);
 
-    // Reinicializar instancia de Pose si ya existía para liberar memoria
-    if (pose) {
-        try { await pose.close(); } catch(e) {}
-    }
-
-    pose = new Pose({ 
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` 
-    });
-
-    pose.setOptions({ 
-        modelComplexity: 1, // Balance óptimo entre velocidad y precisión para industria
-        smoothLandmarks: true, 
-        minDetectionConfidence: 0.5, 
-        minTrackingConfidence: 0.5 
-    });
-
-    pose.onResults((res) => {
-        clearTimeout(safetyTimeout);
-        if (loader.style.display !== 'none') {
-            loader.style.display = 'none';
-            console.log("IA Operativa - Modelo Jerárquico T Cargado");
+        function average(arr) {
+            if (!arr || arr.length === 0) return 0;
+            return arr.reduce((a, b) => a + b, 0) / arr.length;
         }
-        iaActiva = true;
-        onResults(res);
-    });
 
-    // Loop de frames con control de estado
-    async function frameLoop() {
-        if (video.paused || video.ended) return;
+        function generateReportAndPrint() {
+            const today = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+            const folio = Math.floor(100000 + Math.random() * 900000);
 
-        try {
-            await pose.send({ image: video });
-        } catch (e) {
-            console.warn("Frame omitido por procesamiento pesado.");
+            document.getElementById('rpt-date').innerText = today;
+            document.getElementById('rpt-folio').innerText = folio;
+            document.getElementById('rpt-folio-p2').innerText = folio;
+
+            document.getElementById('rpt-ev-name').innerText = state.evaluator.name || 'N/A';
+            document.getElementById('rpt-ev-position').innerText = state.evaluator.position || 'N/A';
+            document.getElementById('rpt-ev-id').innerText = state.evaluator.id || 'N/A';
+
+            document.getElementById('rpt-sub-name').innerText = state.subject.name || 'N/A';
+            document.getElementById('rpt-sub-position').innerText = state.subject.position || 'N/A';
+            document.getElementById('rpt-sub-cat').innerText = state.subject.category || 'N/A';
+            document.getElementById('rpt-sub-area').innerText = state.subject.area || 'N/A';
+            document.getElementById('rpt-sub-subarea').innerText = state.subject.subarea || 'N/A';
+            document.getElementById('rpt-sub-age').innerText = state.subject.age || 'N/A';
+            document.getElementById('rpt-sub-height').innerText = state.params.height || 'N/A';
+            document.getElementById('rpt-sub-tenure').innerText = state.subject.tenure || 'N/A';
+            document.getElementById('rpt-sub-shift-dur').innerText = state.subject.shiftDuration || 'N/A';
+            document.getElementById('rpt-sub-shift-type').innerText = state.subject.shiftType || 'N/A';
+
+            document.getElementById('rpt-global-risk-badge').innerText = state.results.globalRisk;
+
+            const tbody = document.getElementById('rpt-table-scores');
+            tbody.innerHTML = `
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">REBA</td>
+                    <td class="border border-gray-400 p-1">Postura Corporal Completa</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.reba} Puntos</td>
+                    <td class="border border-gray-400 p-1">${state.results.reba >= 8 ? 'Riesgo Alto/Muy Alto' : (state.results.reba >= 4 ? 'Riesgo Medio' : 'Riesgo Bajo')}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">RULA</td>
+                    <td class="border border-gray-400 p-1">Extremidad Superior / Brazos</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.rula} Puntos</td>
+                    <td class="border border-gray-400 p-1">${state.results.rula >= 6 ? 'Riesgo Alto' : (state.results.rula >= 4 ? 'Riesgo Medio' : 'Riesgo Bajo')}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">OCRA Checklist</td>
+                    <td class="border border-gray-400 p-1">Movimiento Repetitivo Tiempos</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.ocra} Ím.</td>
+                    <td class="border border-gray-400 p-1">${state.results.ocra > 2.2 ? 'Riesgo Alto' : 'Aceptable'}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">Strain Index (JSI)</td>
+                    <td class="border border-gray-400 p-1">Esfuerzo Mano / Muñeca Distal</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.jsi} JSI</td>
+                    <td class="border border-gray-400 p-1">${state.results.jsi > 7 ? 'Acción Inmediata' : (state.results.jsi > 3 ? 'Riesgo Moderado' : 'Aceptable')}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">NIOSH Lifting Index</td>
+                    <td class="border border-gray-400 p-1">Levantamiento Manual de Cargas</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.nioshLI > 0 ? state.results.nioshLI : 'N/A'}</td>
+                    <td class="border border-gray-400 p-1">${state.results.nioshLI > 1.0 ? 'Excede Límite Seguro' : 'Aceptable / Sin Carga'}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">ISO 11228</td>
+                    <td class="border border-gray-400 p-1">Empuje, Arrastre y Transporte</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.iso11228}</td>
+                    <td class="border border-gray-400 p-1">${state.results.iso11228.includes('Alto') ? 'Riesgo Alto' : 'Conforme'}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">ISO 11226</td>
+                    <td class="border border-gray-400 p-1">Posturas Estáticas Mantenidas</td>
+                    <td class="border border-gray-400 p-1 font-mono">${state.results.iso11226 ? 'Incumple (>4s)' : 'Cumple'}</td>
+                    <td class="border border-gray-400 p-1">${state.results.iso11226 ? 'Rediseño Requerido' : 'Conforme'}</td>
+                </tr>
+                <tr>
+                    <td class="border border-gray-400 p-1 font-bold">OWAS</td>
+                    <td class="border border-gray-400 p-1">Carga Posicional Combinada</td>
+                    <td class="border border-gray-400 p-1 font-mono">Cat. ${state.results.owas}</td>
+                    <td class="border border-gray-400 p-1">${state.results.owas >= 3 ? 'Acción Correctiva Pronta' : 'Aceptable'}</td>
+                </tr>
+            `;
+
+            document.getElementById('rpt-nom-weight').innerText = state.params.weight;
+            document.getElementById('rpt-nom-push').innerText = state.params.pushForce;
+            const w = state.params.weight;
+            let nomText = "CUMPLE - Riesgo Tolerable (Límite Legal ≤ 15 kg / 25 kg)";
+            if (w > 25) nomText = "INCUMPLIMIENTO GRAVE - Excede el límite de 25 kg estipulado por la NOM-036-1-STPS-2018";
+            else if (w > 15) nomText = "RIESGO MEDIO - Requiere medidas de control y vigilancia médica continua";
+            document.getElementById('rpt-nom-verdict').innerText = nomText;
+
+            document.getElementById('rpt-sign-ev-name').innerText = state.evaluator.name || 'NOMBRE DEL AUDITOR';
+            document.getElementById('rpt-sign-ev-position').innerText = state.evaluator.position || 'PUESTO DEL AUDITOR';
+            document.getElementById('rpt-sign-ev-id').innerText = `CED. / ACREDITACIÓN: ${state.evaluator.id || 'N/A'}`;
+
+            document.getElementById('rpt-sign-sub-name').innerText = state.subject.name || 'NOMBRE DEL TRABAJADOR';
+            document.getElementById('rpt-sign-sub-position').innerText = state.subject.position || 'PUESTO DE TRABAJO';
+
+            window.print();
         }
-        
-        if (iaActiva) {
-            requestAnimationFrame(frameLoop);
-        } else {
-            // Si la IA aún no despierta, intentamos cada 500ms para no saturar
-            setTimeout(frameLoop, 500);
-        }
-    }
-    
-    frameLoop();
-}   
-
-
-    
-
-function descargarVideo() {
-    if (recordedChunks.length === 0) return;
-
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; 
-    a.download = `EVIDENCIA_LYA_${document.getElementById('nombreTrabajador').value}_${Date.now()}.webm`; 
-    a.click();
-
-    // 🧹 LIMPIEZA DE MEMORIA
-    // Liberamos la URL del objeto después de 100ms para asegurar que la descarga inició
-    setTimeout(() => {
-        URL.revokeObjectURL(url);
-        console.log("Memoria de blob de video liberada con éxito.");
-    }, 100);
-}
-
-
-
-    
-function cambiarCamara() {
-    currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-    prepararSistema('camara');
-}
-
-function validarYAbrirArchivo() {
-    document.getElementById('fileInput').click();
-}
-</script>
+    </script>
 </body>
 </html>
