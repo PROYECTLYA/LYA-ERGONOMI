@@ -96,8 +96,7 @@
                     <p class="text-[11px] text-slate-400">Sistema Inteligente de Evaluación Ergonómica de Cuerpo Completo por Video Pregrabado</p>
                 </div>
             </div>
-
-            <!-- INFOBAR DE IDENTIFICACIÓN VERIFICADA Y BADGES DE ESPECIFICACIÓN -->
+<!-- INFOBAR DE IDENTIFICACIÓN VERIFICADA Y BADGES DE ESPECIFICACIÓN -->
             <div class="flex items-center space-x-3 text-xs">
                 <div id="header-user-badge" class="hidden bg-slate-950 border border-slate-800 px-3 py-1 rounded-lg text-right">
                     <div class="text-[10px] font-bold text-blue-400" id="disp-evaluator">--</div>
@@ -128,7 +127,19 @@
         <!-- COLUMNA 1: CONFIGURACIÓN, PARÁMETROS Y CARGA (4 COLS) -->
         <section class="lg:col-span-4 flex flex-col space-y-5">
 
-            <!-- NUEVA SECCIÓN INICIAL: INFORMACIÓN DEL TRABAJADOR EVALUADO -->
+            <!-- NUEVA SECCIÓN INICIAL: FOLIO DE SEGUIMIENTO -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-hashtag text-blue-500 mr-2"></i> Folio de Seguimiento</span>
+                    <span class="text-[10px] text-slate-500 normal-case font-normal">Identificador Único</span>
+                </h2>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Folio de Seguimiento <span class="text-rose-500">*</span></label>
+                    <input type="text" id="tracking-folio" placeholder="Ej. FOL-2026-001" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-100 outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <!-- SECCIÓN: INFORMACIÓN DEL TRABAJADOR EVALUADO -->
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
                 <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center justify-between">
                     <span><i class="fa-solid fa-id-card-clip text-blue-500 mr-2"></i> Información del Personal Evaluado</span>
@@ -197,6 +208,7 @@
                             </label>
                         </div>
                     </div>
+
 
                     <div>
                         <label class="block text-[10px] text-slate-400 mb-1">Afectación en (Selección múltiple)</label>
@@ -666,7 +678,10 @@
         // =========================================================================
         // ESTADO GLOBAL Y VARIABLES DE CONTROL DEL MOTOR LYA-ERGO
         // =========================================================================
-        const state = {
+       const state = {
+            // Folio único para el registro de control y seguimiento
+            trackingFolio: '',
+
             // Datos de verificación del evaluador y sujeto
             auth: {
                 evaluatorName: '',
@@ -735,7 +750,6 @@
                 globalRisk: 'PENDIENTE'
             }
         };
-
         // Helper para obtener valores de casillas marcadas (checkboxes)
         function getCheckedValuesByClass(className) {
             const checkboxes = document.querySelectorAll(`.${className}:checked`);
@@ -778,6 +792,13 @@
 
         // Sincronizar datos del trabajador desde la UI al estado
         function syncWorkerData() {
+            // Sincronización del Folio de Seguimiento
+            const trackingFolioInput = document.getElementById('tracking-folio');
+            if (trackingFolioInput) {
+                state.trackingFolio = trackingFolioInput.value.trim();
+            }
+
+            // Sincronización de los datos del trabajador
             const workerName = document.getElementById('worker-name').value.trim();
             state.worker.name = workerName;
             state.auth.subjectName = workerName;
@@ -794,22 +815,31 @@
             state.worker.tme = document.getElementById('worker-tme').value;
             state.worker.tmeTypes = getCheckedValuesByClass('worker-tme-type-checkbox');
             state.worker.affectations = getCheckedValuesByClass('worker-affectation-checkbox');
-            state.worker.jobTitle = document.getElementById('worker-job').value.trim();
+            
+            const jobEl = document.getElementById('worker-job');
+            if (jobEl) {
+                state.worker.jobTitle = jobEl.value.trim();
+            }
 
-            const tenureYVal = document.getElementById('worker-tenure-years').value;
-            state.worker.tenureYears = tenureYVal !== '' ? parseInt(tenureYVal) : null;
+            const tenureYEl = document.getElementById('worker-tenure-years');
+            if (tenureYEl) {
+                const tenureYVal = tenureYEl.value;
+                state.worker.tenureYears = tenureYVal !== '' ? parseInt(tenureYVal) : null;
+            }
 
-            const tenureMVal = document.getElementById('worker-tenure-months').value;
-            state.worker.tenureMonths = tenureMVal !== '' ? parseInt(tenureMVal) : null;
+            const tenureMEl = document.getElementById('worker-tenure-months');
+            if (tenureMEl) {
+                const tenureMVal = tenureMEl.value;
+                state.worker.tenureMonths = tenureMVal !== '' ? parseInt(tenureMVal) : null;
+            }
 
             const dispSubject = document.getElementById('disp-subject');
             if (dispSubject) {
                 dispSubject.innerText = workerName || '--';
             }
         }
-
         // Validación estricta global de campos obligatorios en el panel secundario
-        function validateAllRequiredFields() {
+       function validateAllRequiredFields() {
             let isValid = true;
 
             const markField = (element, valid) => {
@@ -822,81 +852,89 @@
                 }
             };
 
+            // 0. Validación del Folio de Seguimiento
+            const trackingFolio = document.getElementById('tracking-folio');
+            if (trackingFolio) {
+                markField(trackingFolio, trackingFolio.value.trim() !== '');
+            }
+
             // 1. Campos de texto e inputs numéricos del trabajador
             const workerName = document.getElementById('worker-name');
-            markField(workerName, workerName.value.trim() !== '');
+            if (workerName) markField(workerName, workerName.value.trim() !== '');
 
             const workerAge = document.getElementById('worker-age');
-            markField(workerAge, workerAge.value !== '' && !isNaN(workerAge.value));
+            if (workerAge) markField(workerAge, workerAge.value !== '' && !isNaN(workerAge.value));
 
             const workerWeight = document.getElementById('worker-weight');
-            markField(workerWeight, workerWeight.value !== '' && !isNaN(workerWeight.value));
+            if (workerWeight) markField(workerWeight, workerWeight.value !== '' && !isNaN(workerWeight.value));
 
             const workerHeight = document.getElementById('worker-height-cm');
-            markField(workerHeight, workerHeight.value !== '' && !isNaN(workerHeight.value));
+            if (workerHeight) markField(workerHeight, workerHeight.value !== '' && !isNaN(workerHeight.value));
 
             const workerJob = document.getElementById('worker-job');
-            markField(workerJob, workerJob.value.trim() !== '');
+            if (workerJob) markField(workerJob, workerJob.value.trim() !== '');
 
             const tenureYears = document.getElementById('worker-tenure-years');
-            markField(tenureYears, tenureYears.value !== '' && !isNaN(tenureYears.value));
+            if (tenureYears) markField(tenureYears, tenureYears.value !== '' && !isNaN(tenureYears.value));
 
             const tenureMonths = document.getElementById('worker-tenure-months');
-            markField(tenureMonths, tenureMonths.value !== '' && !isNaN(tenureMonths.value));
+            if (tenureMonths) markField(tenureMonths, tenureMonths.value !== '' && !isNaN(tenureMonths.value));
 
-            // 2. Validación condicional si TME es "Sí" (al menos una casilla seleccionada)
+            // 2. Validación condicional si TME es "Sí"
             const tmeSelect = document.getElementById('worker-tme');
             const typeContainer = document.getElementById('worker-tme-type-container');
             const affectationContainer = document.getElementById('worker-affectation-container');
 
-            if (tmeSelect.value === 'si') {
-                const hasTmeType = document.querySelectorAll('.worker-tme-type-checkbox:checked').length > 0;
-                markField(typeContainer, hasTmeType);
+            if (tmeSelect) {
+                if (tmeSelect.value === 'si') {
+                    const hasTmeType = document.querySelectorAll('.worker-tme-type-checkbox:checked').length > 0;
+                    markField(typeContainer, hasTmeType);
 
-                const hasAffectation = document.querySelectorAll('.worker-affectation-checkbox:checked').length > 0;
-                markField(affectationContainer, hasAffectation);
-            } else {
-                markField(typeContainer, true);
-                markField(affectationContainer, true);
+                    const hasAffectation = document.querySelectorAll('.worker-affectation-checkbox:checked').length > 0;
+                    markField(affectationContainer, hasAffectation);
+                } else {
+                    markField(typeContainer, true);
+                    markField(affectationContainer, true);
+                }
             }
 
             // 3. Variables operativas de entrada
             const pHeight = document.getElementById('p-height');
-            markField(pHeight, pHeight.value !== '' && !isNaN(pHeight.value));
+            if (pHeight) markField(pHeight, pHeight.value !== '' && !isNaN(pHeight.value));
 
             const pWeight = document.getElementById('p-weight');
-            markField(pWeight, pWeight.value !== '' && !isNaN(pWeight.value));
+            if (pWeight) markField(pWeight, pWeight.value !== '' && !isNaN(pWeight.value));
 
             const pForce = document.getElementById('p-force');
-            markField(pForce, pForce.value !== '' && !isNaN(pForce.value));
+            if (pForce) markField(pForce, pForce.value !== '' && !isNaN(pForce.value));
 
             const pPushForce = document.getElementById('p-push-force');
-            markField(pPushForce, pPushForce.value !== '' && !isNaN(pPushForce.value));
+            if (pPushForce) markField(pPushForce, pPushForce.value !== '' && !isNaN(pPushForce.value));
 
             const pDistH = document.getElementById('p-dist-h');
-            markField(pDistH, pDistH.value !== '' && !isNaN(pDistH.value));
+            if (pDistH) markField(pDistH, pDistH.value !== '' && !isNaN(pDistH.value));
 
             const pDistV = document.getElementById('p-dist-v');
-            markField(pDistV, pDistV.value !== '' && !isNaN(pDistV.value));
+            if (pDistV) markField(pDistV, pDistV.value !== '' && !isNaN(pDistV.value));
 
             // Habilitación o deshabilitación de botones de exportación
             const btnExportCsv = document.getElementById('btn-export-csv');
             const btnExportPdf = document.getElementById('btn-export-pdf');
 
-            btnExportCsv.disabled = !isValid;
-            btnExportPdf.disabled = !isValid;
+            if (btnExportCsv) {
+                btnExportCsv.disabled = !isValid;
+                btnExportCsv.classList.toggle('opacity-50', !isValid);
+                btnExportCsv.classList.toggle('cursor-not-allowed', !isValid);
+            }
 
-            if (!isValid) {
-                btnExportCsv.classList.add('opacity-50', 'cursor-not-allowed');
-                btnExportPdf.classList.add('opacity-50', 'cursor-not-allowed');
-            } else {
-                btnExportCsv.classList.remove('opacity-50', 'cursor-not-allowed');
-                btnExportPdf.classList.remove('opacity-50', 'cursor-not-allowed');
+            if (btnExportPdf) {
+                btnExportPdf.disabled = !isValid;
+                btnExportPdf.classList.toggle('opacity-50', !isValid);
+                btnExportPdf.classList.toggle('cursor-not-allowed', !isValid);
             }
 
             return isValid;
         }
-
         // =========================================================================
         // LÓGICA DE VERIFICACIÓN E IDENTIFICACIÓN INICIAL
         // =========================================================================
@@ -969,7 +1007,8 @@
         enhInvert.addEventListener('input', (e) => document.getElementById('val-invert').innerText = e.target.value + '%');
 
         // Eventos para sincronización continua y validación de datos del trabajador y parámetros
-        const fieldsToValidate = [
+       const fieldsToValidate = [
+            'tracking-folio',
             'worker-name', 'worker-age', 'worker-weight', 'worker-height-cm',
             'worker-job', 'worker-tenure-years', 'worker-tenure-months',
             'p-height', 'p-weight', 'p-force', 'p-push-force', 'p-dist-h', 'p-dist-v'
@@ -985,7 +1024,10 @@
             }
         });
 
-        document.getElementById('worker-tme').addEventListener('change', handleTMEToggle);
+        const workerTme = document.getElementById('worker-tme');
+        if (workerTme) {
+            workerTme.addEventListener('change', handleTMEToggle);
+        }
         
         document.querySelectorAll('.worker-tme-type-checkbox').forEach(cb => {
             cb.addEventListener('change', () => {
@@ -993,13 +1035,13 @@
                 validateAllRequiredFields();
             });
         });
+
         document.querySelectorAll('.worker-affectation-checkbox').forEach(cb => {
             cb.addEventListener('change', () => {
                 syncWorkerData();
                 validateAllRequiredFields();
             });
         });
-
         // Inicializar la validación al cargar el script
         window.addEventListener('DOMContentLoaded', () => {
             validateAllRequiredFields();
