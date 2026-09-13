@@ -1658,7 +1658,6 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
         };
 
-        // Variable global interna para control de paginación dinámica
         let currentPageNum = 1;
 
         // ---------------------------------------------------------------------
@@ -1840,12 +1839,13 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7.5);
 
-            const splitFormula = doc.splitTextToSize(item.formula, boxWidth - 36);
-            const splitParts = doc.splitTextToSize(item.parts, boxWidth - 36);
-            const splitWhy = doc.splitTextToSize(item.why, boxWidth - 36);
-            const splitRec = doc.splitTextToSize(item.rec, boxWidth - 36);
+            const textWidth = boxWidth - 38;
+            const splitFormula = doc.splitTextToSize(item.formula, textWidth);
+            const splitParts = doc.splitTextToSize(item.parts, textWidth);
+            const splitWhy = doc.splitTextToSize(item.why, textWidth);
+            const splitRec = doc.splitTextToSize(item.rec, textWidth);
 
-            const cardHeight = 12 + (splitFormula.length * 3.5) + (splitParts.length * 3.5) + (splitWhy.length * 3.5) + (splitRec.length * 3.5) + 12;
+            const cardHeight = 8 + (splitFormula.length * 3.2) + (splitParts.length * 3.2) + (splitWhy.length * 3.2) + (splitRec.length * 3.2) + 10;
 
             if (y + cardHeight > pageHeight - 20) {
                 doc.addPage();
@@ -1876,19 +1876,19 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.text("Fórmula Aplicada:", margin + 4, currentY);
             doc.setFont('helvetica', 'normal');
             doc.text(splitFormula, margin + 34, currentY);
-            currentY += (splitFormula.length * 3.5) + 2;
+            currentY += (splitFormula.length * 3.2) + 2;
 
             doc.setFont('helvetica', 'bold');
             doc.text("Partes Evaluadas:", margin + 4, currentY);
             doc.setFont('helvetica', 'normal');
             doc.text(splitParts, margin + 34, currentY);
-            currentY += (splitParts.length * 3.5) + 2;
+            currentY += (splitParts.length * 3.2) + 2;
 
             doc.setFont('helvetica', 'bold');
             doc.text("Justificación Técnico:", margin + 4, currentY);
             doc.setFont('helvetica', 'normal');
             doc.text(splitWhy, margin + 34, currentY);
-            currentY += (splitWhy.length * 3.5) + 2;
+            currentY += (splitWhy.length * 3.2) + 2;
 
             doc.setFont('helvetica', 'bold');
             doc.text("Recomendación:", margin + 4, currentY);
@@ -1972,7 +1972,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         ];
 
         methodsData.forEach((m) => {
-            if (y > 250) {
+            if (y > 245) {
                 doc.addPage();
                 currentPageNum++;
                 renderHeader();
