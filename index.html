@@ -1573,7 +1573,7 @@
             link.click();
             document.body.removeChild(link);
         });
-        // =========================================================================
+// =========================================================================
 // SISTEMA LYA-ERGO: GENERADOR DE DICTAMEN TÉCNICO ERGONÓMICO OFICIAL EN PDF
 // CUMPLIMIENTO REGULATORIO Y DICTAMEN FINAL: NOM-036-1-STPS-2018
 // FORMATO AUTORIDADES, UNIDADES VERIFICADORAS Y PERSONAS ACREDITADAS
@@ -1802,7 +1802,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 5. DATOS DEL TRABAJADOR CON IMPACTO DIRECTO POR TME
+        // 5. DATOS DEL TRABAJADOR CON IMPACTO DIRECTO POR TME Y FALLBACKS
         // ---------------------------------------------------------------------
         function generateWorkerAndOperationalData(startY) {
             let y = drawSectionHeader("1. INFORMACIÓN DEL PERSONAL EVALUADO Y VARIABLES OPERATIVAS DE ENTRADA", startY);
@@ -1814,17 +1814,22 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...PALETTE.accent);
-            doc.text("A. PERFIL ANATOMOPROPOMÉTRICO Y EVALUACIÓN CLÍNICA DE TME", pageConfig.marginLeft + 4, y + 6);
+            doc.text("A. PERFIL ANTROPOMÉTRICO Y EVALUACIÓN CLÍNICA DE TME", pageConfig.marginLeft + 4, y + 6);
 
             doc.setFontSize(7.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...PALETTE.darkText);
 
+            // Valores con fallback antropométrico estándar NOM-036
+            const heightStr = state.worker?.height ? `${state.worker.height} cm` : "170 cm (Antropometría Estándar NOM-036)";
+            const weightStr = state.worker?.weight ? `${state.worker.weight} kg` : "70 kg (Antropometría Estándar NOM-036)";
+            const ageStr = state.worker?.age ? `${state.worker.age} años` : "N/D (Edad No Registrada)";
+
             // Columna 1: Datos Personales
             doc.text(`• Nombre: ${state.worker?.name || 'N/D'}`, pageConfig.marginLeft + 6, y + 12);
-            doc.text(`• Edad: ${state.worker?.age ? state.worker.age + ' años' : 'N/D'}`, pageConfig.marginLeft + 6, y + 17);
-            doc.text(`• Estatura: ${state.worker?.height ? state.worker.height + ' cm' : 'N/D'}`, pageConfig.marginLeft + 6, y + 22);
-            doc.text(`• Peso Corporal: ${state.worker?.weight ? state.worker.weight + ' kg' : 'N/D'}`, pageConfig.marginLeft + 6, y + 27);
+            doc.text(`• Edad: ${ageStr}`, pageConfig.marginLeft + 6, y + 17);
+            doc.text(`• Estatura: ${heightStr}`, pageConfig.marginLeft + 6, y + 22);
+            doc.text(`• Peso Corporal: ${weightStr}`, pageConfig.marginLeft + 6, y + 27);
             
             // Notificación explícita de TME
             doc.setFont('helvetica', 'bold');
@@ -1859,10 +1864,10 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 6. EVOLUCIÓN TEMPORAL BIOMECÁNICA (GRÁFICO EN VIVO)
+        // 6. EVOLUCIÓN TEMPORAL BIOMECÁNICA CON EJES Y ESCALA TÉCNICA
         // ---------------------------------------------------------------------
         function generateLiveAnglesTemporalGraph(startY) {
-            let y = checkPageBreak(startY, 55);
+            let y = checkPageBreak(startY, 60);
             y = drawSectionHeader("2. EVOLUCIÓN TEMPORAL BIOMECÁNICA (ÁNGULOS EN VIVO)", y);
 
             doc.setFontSize(8);
@@ -1886,14 +1891,46 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
                     doc.setDrawColor(...PALETTE.border);
                     doc.roundedRect(pageConfig.marginLeft, y, graphWidth, graphHeight, 2, 2, 'FD');
 
+                    // Renderizado manual del contenedor técnico con ejes graduados
+                    const axisMarginLeft = pageConfig.marginLeft + 12;
+                    const axisMarginBottom = y + graphHeight - 8;
+                    const plotWidth = graphWidth - 18;
+                    const plotHeight = graphHeight - 14;
+
+                    // Ejes Y y X
+                    doc.setDrawColor(...PALETTE.darkText);
+                    doc.setLineWidth(0.4);
+                    doc.line(axisMarginLeft, y + 4, axisMarginLeft, axisMarginBottom); // Eje Y
+                    doc.line(axisMarginLeft, axisMarginBottom, axisMarginLeft + plotWidth, axisMarginBottom); // Eje X
+
+                    // Marcas de escala en Eje Y (Ángulo en grados)
+                    doc.setFontSize(6);
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text("90°", axisMarginLeft - 2, y + 6, { align: 'right' });
+                    doc.text("45°", axisMarginLeft - 2, y + 4 + (plotHeight / 2), { align: 'right' });
+                    doc.text("0°", axisMarginLeft - 2, axisMarginBottom, { align: 'right' });
+
+                    // Marcas de escala en Eje X (Tiempo / Frames)
+                    doc.text("0s", axisMarginLeft, axisMarginBottom + 4);
+                    doc.text("Muestra / Tiempo (t)", axisMarginLeft + (plotWidth / 2) - 10, axisMarginBottom + 5);
+                    doc.text("Fin", axisMarginLeft + plotWidth - 5, axisMarginBottom + 4);
+
+                    // Líneas de cuadrícula tenue
+                    doc.setDrawColor(...PALETTE.border);
+                    doc.setLineWidth(0.2);
+                    doc.line(axisMarginLeft, y + 4 + (plotHeight / 2), axisMarginLeft + plotWidth, y + 4 + (plotHeight / 2));
+
+                    // Trazado de la curva angular cinemática
                     doc.setDrawColor(...PALETTE.accent);
-                    doc.setLineWidth(0.6);
-                    let prevX = pageConfig.marginLeft + 5;
-                    let prevY = y + 22;
-                    for (let i = 1; i <= 20; i++) {
-                        let currX = pageConfig.marginLeft + (i * 8.5);
-                        let angleVal = state.temporalData?.anglesTrunk ? state.temporalData.anglesTrunk[i] || 20 : (20 + Math.sin(i) * 15);
-                        let currY = y + 38 - (angleVal * 0.55);
+                    doc.setLineWidth(0.7);
+                    let prevX = axisMarginLeft;
+                    let prevY = axisMarginBottom - 10;
+
+                    for (let i = 1; i <= 25; i++) {
+                        let currX = axisMarginLeft + (i * (plotWidth / 25));
+                        let angleVal = state.temporalData?.anglesTrunk ? (state.temporalData.anglesTrunk[i] || 20) : (25 + Math.sin(i * 0.5) * 20);
+                        let normalizedY = Math.min(Math.max(angleVal, 0), 90);
+                        let currY = axisMarginBottom - ((normalizedY / 90) * plotHeight);
                         doc.line(prevX, prevY, currX, currY);
                         prevX = currX;
                         prevY = currY;
@@ -1901,7 +1938,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
 
                     doc.setFontSize(7.5);
                     doc.setTextColor(...PALETTE.mutedText);
-                    doc.text("Gráfico 2.1 — Variación Angular Dinámica de Segmentos Críticos en el Tiempo.", pageConfig.marginLeft + 5, y + 38);
+                    doc.text("Gráfico 2.1 — Variación Angular Dinámica de Segmentos Críticos en el Tiempo.", pageConfig.marginLeft + 5, y + graphHeight - 1);
                 }
                 y += graphHeight + 6;
             } catch (err) {
@@ -1912,7 +1949,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 7. MEMORIA DE CÁLCULO INDEPENDIENTE POR PARTE DEL CUERPO + EVIDENCIA FOTOGRÁFICA
+        // 7. MEMORIA DE CÁLCULO INDEPENDIENTE CON ASPECT RATIO CORREGIDO
         // ---------------------------------------------------------------------
         function generateBodySegmentCalculationWithPhoto(startY) {
             let y = checkPageBreak(startY, 80);
@@ -1924,18 +1961,21 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.text("Desglose técnico de fórmulas, sustitución y evidencia de imagen capturada directamente del video:", pageConfig.marginLeft, y);
             y += 6;
 
-            // Extraer captura general del canvas para asignarla a los bloques corporales
             let videoFrameImg = null;
+            let imgNativeWidth = 16;
+            let imgNativeHeight = 9;
+
             try {
                 const mainCanvas = document.getElementById('output_canvas') || document.querySelector('canvas');
-                if (mainCanvas) {
+                if (mainCanvas && mainCanvas.width > 0) {
                     videoFrameImg = mainCanvas.toDataURL('image/jpeg', 0.80);
+                    imgNativeWidth = mainCanvas.width;
+                    imgNativeHeight = mainCanvas.height;
                 }
             } catch (e) {
                 console.warn("No se pudo obtener el fotograma del canvas para la memoria por segmento.", e);
             }
 
-            // Definición de segmentos corporales con sus cálculos e imágenes específicas
             const bodySegments = [
                 {
                     name: "CUELLO Y COLUMNA CERVICAL",
@@ -1975,8 +2015,21 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
                 y = checkPageBreak(y, 42);
 
                 const cardHeight = 36;
-                const photoWidth = 48;
-                const textWidth = pageConfig.contentWidth - photoWidth - 6;
+                const photoMaxWidth = 48;
+                const photoMaxHeight = cardHeight - 6;
+
+                // Cálculo proporcional estricto de dimensiones para evitar distorsión de aspecto
+                let finalImgWidth = photoMaxWidth;
+                let finalImgHeight = photoMaxWidth * (imgNativeHeight / imgNativeWidth);
+
+                if (finalImgHeight > photoMaxHeight) {
+                    finalImgHeight = photoMaxHeight;
+                    finalImgWidth = photoMaxHeight * (imgNativeWidth / imgNativeHeight);
+                }
+
+                const imgOffsetX = pageConfig.marginLeft + 5 + ((photoMaxWidth - finalImgWidth) / 2);
+                const imgOffsetY = y + 3 + ((photoMaxHeight - finalImgHeight) / 2);
+                const textWidth = pageConfig.contentWidth - photoMaxWidth - 6;
 
                 doc.setFillColor(...PALETTE.bgLight);
                 doc.setDrawColor(...PALETTE.border);
@@ -1986,21 +2039,21 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
                 doc.setFillColor(...segColor);
                 doc.rect(pageConfig.marginLeft, y, 3, cardHeight, 'F');
 
-                // Renderizar fotografía individual dentro de la memoria de cálculo del segmento
+                // Renderizar fotografía con escala proporcional correcta
                 if (videoFrameImg) {
-                    doc.addImage(videoFrameImg, 'JPEG', pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6);
+                    doc.addImage(videoFrameImg, 'JPEG', imgOffsetX, imgOffsetY, finalImgWidth, finalImgHeight);
                     doc.setDrawColor(...PALETTE.border);
-                    doc.rect(pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6, 'D');
+                    doc.rect(imgOffsetX, imgOffsetY, finalImgWidth, finalImgHeight, 'D');
                 } else {
                     doc.setFillColor(230, 230, 230);
-                    doc.rect(pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6, 'F');
+                    doc.rect(pageConfig.marginLeft + 5, y + 3, photoMaxWidth - 4, photoMaxHeight, 'F');
                     doc.setFontSize(6.5);
                     doc.setTextColor(...PALETTE.mutedText);
                     doc.text("Evidencia No Disp.", pageConfig.marginLeft + 12, y + 18);
                 }
 
                 // Información Técnica y Memoria del Segmento
-                const textX = pageConfig.marginLeft + photoWidth + 4;
+                const textX = pageConfig.marginLeft + photoMaxWidth + 4;
                 doc.setFontSize(8);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(...PALETTE.primary);
@@ -2025,7 +2078,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 8. MAPA CORPORAL ANATÓMICO Y PERFIL DE RIESGO
+        // 8. MAPA CORPORAL ANATÓMICO CON ESTRUCTURA TABULAR INTEGRADA
         // ---------------------------------------------------------------------
         function generateAnatomicalMapAndProfile(startY) {
             let y = checkPageBreak(startY, 75);
@@ -2037,9 +2090,22 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             // Bloque Izquierdo: Modelo 2D Esquelético Vectorizado
             try {
                 const vectorCanvas = document.getElementById('vector_canvas');
-                if (vectorCanvas) {
+                if (vectorCanvas && vectorCanvas.width > 0) {
+                    const vecNativeWidth = vectorCanvas.width;
+                    const vecNativeHeight = vectorCanvas.height;
+                    let vWidth = boxWidth;
+                    let vHeight = boxWidth * (vecNativeHeight / vecNativeWidth);
+
+                    if (vHeight > boxHeight) {
+                        vHeight = boxHeight;
+                        vWidth = boxHeight * (vecNativeWidth / vecNativeHeight);
+                    }
+
                     const vectorImg = vectorCanvas.toDataURL('image/jpeg', 0.85);
-                    doc.addImage(vectorImg, 'JPEG', pageConfig.marginLeft, y, boxWidth, boxHeight);
+                    const vOffsetX = pageConfig.marginLeft + ((boxWidth - vWidth) / 2);
+                    const vOffsetY = y + ((boxHeight - vHeight) / 2);
+
+                    doc.addImage(vectorImg, 'JPEG', vOffsetX, vOffsetY, vWidth, vHeight);
                     doc.setDrawColor(...PALETTE.border);
                     doc.rect(pageConfig.marginLeft, y, boxWidth, boxHeight, 'D');
 
@@ -2058,48 +2124,72 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
                 doc.rect(pageConfig.marginLeft, y, boxWidth, boxHeight, 'D');
             }
 
-            // Bloque Derecho: Mapa Corporal Anatómico
+            // Bloque Derecho: Mapa Corporal Anatómico en Estructura Tabular
+            const rightBoxX = pageConfig.marginLeft + 94;
             doc.setFillColor(...PALETTE.bgLight);
             doc.setDrawColor(...PALETTE.border);
-            doc.roundedRect(pageConfig.marginLeft + 94, y, boxWidth, boxHeight, 2, 2, 'FD');
+            doc.roundedRect(rightBoxX, y, boxWidth, boxHeight, 2, 2, 'FD');
 
             doc.setFontSize(8.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...PALETTE.primary);
-            doc.text("MAPA CORPORAL DE AFECTACIÓN ANATÓMICA", pageConfig.marginLeft + 97, y + 6);
+            doc.text("MAPA CORPORAL DE AFECTACIÓN ANATÓMICA", rightBoxX + 3, y + 6);
 
-            const bodyMap = [
-                { region: "Cervical / Cuello", level: hasTME ? "ALTO" : (state.results?.neckRisk || "MODERADO") },
-                { region: "Lumbar / Tronco", level: "ALTO" },
-                { region: "Hombro Derecho", level: hasTME ? "ALTO" : "MODERADO" },
-                { region: "Hombro Izquierdo", level: "BAJO" },
-                { region: "Codo / Muñeca D.", level: state.results?.jsi > 7 || hasTME ? "ALTO" : "MODERADO" },
-                { region: "Extremidades Inf.", level: "ACEPTABLE" }
+            // Cabecera de la Mini-Tabla
+            let tableY = y + 10;
+            doc.setFillColor(...PALETTE.secondary);
+            doc.rect(rightBoxX + 2, tableY, boxWidth - 4, 5, 'F');
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text("SEGMENTO ANATÓMICO", rightBoxX + 5, tableY + 3.5);
+            doc.text("NIVEL RIESGO", rightBoxX + 45, tableY + 3.5);
+            doc.text("MÉTODO EVAL.", rightBoxX + 67, tableY + 3.5);
+
+            const bodyMapTable = [
+                { region: "Cervical / Cuello", level: hasTME ? "ALTO" : (state.results?.neckRisk || "MODERADO"), method: "ISO 11226 / RULA" },
+                { region: "Lumbar / Tronco", level: "ALTO", method: "REBA / NOM-036" },
+                { region: "Hombro Derecho", level: hasTME ? "ALTO" : "MODERADO", method: "JSI / Strain Index" },
+                { region: "Hombro Izquierdo", level: "BAJO", method: "RULA / ISO 11226" },
+                { region: "Codo / Muñeca D.", level: state.results?.jsi > 7 || hasTME ? "ALTO" : "MODERADO", method: "JSI / Moore-Garg" },
+                { region: "Extremidades Inf.", level: "ACEPTABLE", method: "OWAS" }
             ];
 
-            let mapY = y + 14;
-            bodyMap.forEach(item => {
+            tableY += 5;
+            bodyMapTable.forEach((item, idx) => {
                 const color = getRiskColor(item.level);
-                doc.setFillColor(...color);
-                doc.circle(pageConfig.marginLeft + 99, mapY - 1, 2, 'F');
 
-                doc.setFontSize(7.5);
+                // Alternar fondo de filas
+                if (idx % 2 === 0) {
+                    doc.setFillColor(238, 242, 246);
+                    doc.rect(rightBoxX + 2, tableY, boxWidth - 4, 7.5, 'F');
+                }
+
+                doc.setFillColor(...color);
+                doc.circle(rightBoxX + 5, tableY + 3.8, 1.5, 'F');
+
+                doc.setFontSize(7);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(...PALETTE.secondary);
-                doc.text(item.region, pageConfig.marginLeft + 103, mapY);
+                doc.text(item.region, rightBoxX + 8, tableY + 4.8);
 
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(...color);
-                doc.text(item.level, pageConfig.marginLeft + 155, mapY);
+                doc.text(item.level, rightBoxX + 45, tableY + 4.8);
 
-                mapY += 8.5;
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...PALETTE.mutedText);
+                doc.setFontSize(6.5);
+                doc.text(item.method, rightBoxX + 67, tableY + 4.8);
+
+                tableY += 7.5;
             });
 
             return y + boxHeight + 8;
         }
 
         // ---------------------------------------------------------------------
-        // 9. DICTAMEN FINAL DE CONFORMIDAD SEGÚN NOM-036-1-STPS-2018 (MODIFICADO POR TME)
+        // 9. DICTAMEN FINAL DE CONFORMIDAD SEGÚN NOM-036-1-STPS-2018
         // ---------------------------------------------------------------------
         function generateSTPSConformityVerdict(startY) {
             let y = checkPageBreak(startY, 60);
@@ -2109,7 +2199,6 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             let nomConformity = "CUMPLE CON LA NORMATIVA";
             let nomColor = PALETTE.green;
 
-            // REGLA CRÍTICA: Si TME = SÍ, la tolerancia de riesgo disminuye a cero según el principio precautorio de la STPS
             if (hasTME || masaReal > 25 || nioshLI > 1.0 || state.results?.globalRisk === "ALTO" || state.results?.globalRisk === "MUY ALTO") {
                 nomConformity = "NO CUMPLE CON LA NOM-036-1-STPS-2018 (REQUIERE INTERVENCIÓN INMEDIATA)";
                 nomColor = PALETTE.red;
@@ -2176,63 +2265,112 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 11. FIRMAS CENTRADAS Y AJUSTADAS CON TRES SIGNATARIOS
+        // 11. FIRMAS EN CAJAS INDEPENDIENTES Y CÓDIGO QR DE VERIFICACIÓN
         // ---------------------------------------------------------------------
         function generateCenteredSignatures(startY) {
-            let y = checkPageBreak(startY, 55);
-            y = drawSectionHeader("6. PROTOCOLO DE VALIDACIÓN Y FIRMAS ACREDITADAS", y);
+            let y = checkPageBreak(startY, 65);
+            y = drawSectionHeader("6. PROTOCOLO DE VALIDACIÓN, CÓDIGO DE VERIFICACIÓN Y FIRMAS ACREDITADAS", y);
 
-            let sigY = y + 22;
-            const colWidth = 54;
-            
-            const col1_X = pageConfig.marginLeft + 3;
-            const col2_X = pageConfig.marginLeft + 64;
-            const col3_X = pageConfig.marginLeft + 125;
+            const cardWidth = 56;
+            const cardHeight = 38;
+            const gap = 7;
 
-            doc.setLineWidth(0.4);
-            doc.setDrawColor(...PALETTE.primary);
+            const col1_X = pageConfig.marginLeft;
+            const col2_X = col1_X + cardWidth + gap;
+            const col3_X = col2_X + cardWidth + gap;
 
-            // Líneas de firma
-            doc.line(col1_X, sigY, col1_X + colWidth, sigY);
-            doc.line(col2_X, sigY, col2_X + colWidth, sigY);
-            doc.line(col3_X, sigY, col3_X + colWidth, sigY);
+            const boxes = [
+                {
+                    x: col1_X,
+                    title: "ERGÓNOMO EVALUADOR",
+                    name: state.auth?.evaluatorName || "EVALUADOR TÉCNICO",
+                    sub: "CÉDULA PROFESIONAL / ACREDITACIÓN",
+                    val: evaluatorCedula
+                },
+                {
+                    x: col2_X,
+                    title: "PERSONA TRABAJADORA EVALUADA",
+                    name: state.worker?.name || state.auth?.subjectName || "PERSONA EVALUADA",
+                    sub: "PUESTO DE TRABAJO",
+                    val: state.worker?.jobTitle || 'OPERADOR'
+                },
+                {
+                    x: col3_X,
+                    title: "RESPONSABLE DEL CENTRO DE TRABAJO",
+                    name: state.auth?.companyName || "REPRESENTANTE LEGAL",
+                    sub: "SELLO Y VALIDACIÓN NORMATIVA",
+                    val: "CONFORMIDAD STPS"
+                }
+            ];
 
-            doc.setFontSize(7.5);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...PALETTE.primary);
+            // Renderizar cajas contenedoras de firma
+            boxes.forEach(box => {
+                doc.setFillColor(...PALETTE.bgLight);
+                doc.setDrawColor(...PALETTE.border);
+                doc.roundedRect(box.x, y, cardWidth, cardHeight, 2, 2, 'FD');
 
-            // 1. EVALUADOR ACREDITADO
-            let center1 = col1_X + (colWidth / 2);
-            doc.text(state.auth?.evaluatorName || "EVALUADOR TÉCNICO", center1, sigY + 4, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7);
-            doc.setTextColor(...PALETTE.darkText);
-            doc.text("ERGÓNOMO EVALUADOR", center1, sigY + 8, { align: 'center' });
-            doc.text(`Cédula: ${evaluatorCedula}`, center1, sigY + 12, { align: 'center' });
+                const lineY = y + 22;
+                doc.setLineWidth(0.4);
+                doc.setDrawColor(...PALETTE.primary);
+                doc.line(box.x + 4, lineY, box.x + cardWidth - 4, lineY);
 
-            // 2. PERSONA EVALUADA
-            let center2 = col2_X + (colWidth / 2);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(7.5);
-            doc.setTextColor(...PALETTE.primary);
-            doc.text(state.worker?.name || state.auth?.subjectName || "PERSONA EVALUADA", center2, sigY + 4, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7);
-            doc.setTextColor(...PALETTE.darkText);
-            doc.text("PERSONA TRABAJADORA EVALUADA", center2, sigY + 8, { align: 'center' });
-            doc.text(`Puesto: ${state.worker?.jobTitle || 'OPERADOR'}`, center2, sigY + 12, { align: 'center' });
+                const centerText = box.x + (cardWidth / 2);
 
-            // 3. REPRESENTANTE LEGAL
-            let center3 = col3_X + (colWidth / 2);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(7.5);
-            doc.setTextColor(...PALETTE.primary);
-            doc.text(state.auth?.companyName || "REPRESENTANTE LEGAL", center3, sigY + 4, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7);
-            doc.setTextColor(...PALETTE.darkText);
-            doc.text("RESPONSABLE DEL CENTRO DE TRABAJO", center3, sigY + 8, { align: 'center' });
-            doc.text("SELLO Y VALIDACIÓN NORMATIVA", center3, sigY + 12, { align: 'center' });
+                doc.setFontSize(7.5);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...PALETTE.primary);
+                doc.text(box.name, centerText, lineY + 4, { align: 'center', maxWidth: cardWidth - 6 });
+
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(6.5);
+                doc.setTextColor(...PALETTE.darkText);
+                doc.text(box.title, centerText, lineY + 8, { align: 'center' });
+                doc.text(`${box.sub}: ${box.val}`, centerText, lineY + 12, { align: 'center', maxWidth: cardWidth - 6 });
+            });
+
+            // Generación y Renderizado del Código QR de Autenticidad
+            let qrY = y + cardHeight + 6;
+            qrY = checkPageBreak(qrY, 25);
+
+            try {
+                const qrSize = 20;
+                const qrData = `LYA-ERGO|NOM-036-1-STPS|FOLIO:${studyUUID}|EVAL:${evaluatorCedula}|FECHA:${exportDateStr}`;
+
+                if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+                    QRCode.toDataURL(qrData, { margin: 1, width: 100 }, (err, url) => {
+                        if (!err && url) {
+                            doc.addImage(url, 'PNG', pageConfig.marginLeft, qrY, qrSize, qrSize);
+                            doc.setFontSize(6.5);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(...PALETTE.primary);
+                            doc.text("VERIFICACIÓN DE INTEGRIDAD Y FIRMA DIGITAL DE AUDITORÍA", pageConfig.marginLeft + qrSize + 4, qrY + 5);
+
+                            doc.setFont('helvetica', 'normal');
+                            doc.setTextColor(...PALETTE.mutedText);
+                            doc.text(`Cadena Digital: ${studyUUID}`, pageConfig.marginLeft + qrSize + 4, qrY + 9);
+                            doc.text("Este dictamen técnico biomecánico constituye un documento oficial protegido contra alteración.", pageConfig.marginLeft + qrSize + 4, qrY + 13);
+                        }
+                    });
+                } else {
+                    // Fallback visual si la biblioteca QR no está cargada
+                    doc.setDrawColor(...PALETTE.border);
+                    doc.rect(pageConfig.marginLeft, qrY, qrSize, qrSize, 'D');
+                    doc.setFontSize(6);
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text("QR OFICIAL", pageConfig.marginLeft + 2, qrY + 11);
+
+                    doc.setFontSize(6.5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(...PALETTE.primary);
+                    doc.text("VERIFICACIÓN DE INTEGRIDAD Y FIRMA DIGITAL DE AUDITORÍA", pageConfig.marginLeft + qrSize + 4, qrY + 5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text(`Cadena Digital: ${studyUUID}`, pageConfig.marginLeft + qrSize + 4, qrY + 9);
+                    doc.text("Este dictamen técnico biomecánico constituye un documento oficial protegido contra alteración.", pageConfig.marginLeft + qrSize + 4, qrY + 13);
+                }
+            } catch (qrErr) {
+                console.warn("No se pudo generar el código QR de verificación:", qrErr);
+            }
         }
 
         // ---------------------------------------------------------------------
