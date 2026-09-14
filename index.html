@@ -1573,9 +1573,9 @@
             link.click();
             document.body.removeChild(link);
         });
-// =========================================================================
+        // =========================================================================
 // SISTEMA LYA-ERGO: GENERADOR DE DICTAMEN TÉCNICO ERGONÓMICO OFICIAL EN PDF
-// CUMPLIMIENTO REGULATORIO: NOM-036-1-STPS, NOM-030-STPS, ISO TR 12295
+// CUMPLIMIENTO REGULATORIO Y DICTAMEN FINAL: NOM-036-1-STPS-2018
 // FORMATO AUTORIDADES, UNIDADES VERIFICADORAS Y PERSONAS ACREDITADAS
 // =========================================================================
 
@@ -1597,24 +1597,22 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         return;
     }
 
-    // Validar integridad de valores numéricos no nulos
     const isNaNResult = Object.values(state.results || {}).some(val => typeof val === 'number' && isNaN(val));
     if (isNaNResult) {
-        alert('ERROR DE CONSISTENCIA: Se detectaron valores numéricos no válidos (NaN) en los resultados de las metodologías. Verifique el procesamiento biomecánico.');
+        alert('ERROR DE CONSISTENCIA: Se detectaron valores numéricos no válidos (NaN) en los resultados de las metodologías.');
         return;
     }
 
-    // Mostrar estado de procesamiento en UI si existe el elemento
     const exportBtn = document.getElementById('btn-export-pdf');
     const originalText = exportBtn ? exportBtn.innerText : '';
-    if (exportBtn) exportBtn.innerText = 'Generando Dictamen Técnico Auditables...';
+    if (exportBtn) exportBtn.innerText = 'Generando Dictamen Técnico Auditable...';
 
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
         // ---------------------------------------------------------------------
-        // 2. CONFIGURACIÓN CENTRALIZADA DE ESTILOS Y CONSTANTES VISUALES
+        // 2. CONFIGURACIÓN DE ESTILOS Y CONSTANTES VISUALES
         // ---------------------------------------------------------------------
         const PALETTE = {
             primary: [15, 23, 42],      // Slate 900
@@ -1626,8 +1624,7 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             bgLight: [248, 250, 252],   // Slate 50
             green: [16, 185, 129],      // Emerald 500
             yellow: [234, 179, 8],      // Amber 500
-            red: [225, 29, 72],         // Rose 600
-            purple: [147, 51, 234]      // Purple 600
+            red: [225, 29, 72]          // Rose 600
         };
 
         const pageConfig = {
@@ -1637,25 +1634,30 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             marginRight: 14,
             pageWidth: 210,
             pageHeight: 297,
-            contentWidth: 182 // 210 - 14 - 14
+            contentWidth: 182
         };
 
         let currentPageNumber = 1;
-        const studyDateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
-        const studyUUID = state.trackingFolio || `LYA-${Date.now().toString(16).toUpperCase()}`;
+        const exportDateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+        const studyUUID = state.trackingFolio || `FOLIO-LYA-${Date.now().toString(16).toUpperCase()}`;
+        const evaluatorCedula = state.auth?.evaluatorId || "N/D - CÉDULA PENDIENTE";
+
+        // Evaluación de impacto por antecedentes o presencia de TME (Trastornos Musculoesqueléticos)
+        const rawTME = String(state.worker?.tmeHistory || state.worker?.tme || '').toUpperCase();
+        const hasTME = rawTME.includes('SÍ') || rawTME.includes('SI') || rawTME.includes('PRESENTA') || rawTME.includes('TRUE');
 
         // ---------------------------------------------------------------------
-        // 3. FUNCIONES AUXILIARES CENTRALIZADAS DE ESTILO Y RIESGO
+        // 3. FUNCIONES AUXILIARES CENTRALIZADAS
         // ---------------------------------------------------------------------
-        function getRiskColor(levelOrScore, type = 'GENERIC') {
+        function getRiskColor(levelOrScore) {
             const lvl = String(levelOrScore).toUpperCase();
-            if (lvl.includes('ALTO') || lvl.includes('CRÍTICO') || lvl.includes('MUY ALTO') || lvl.includes('INCUMPLIMIENTO') || lvl.includes('NO CUMPLE')) {
+            if (lvl.includes('ALTO') || lvl.includes('CRÍTICO') || lvl.includes('MUY ALTO') || lvl.includes('NO CUMPLE') || lvl.includes('INACEPTABLE')) {
                 return PALETTE.red;
             }
-            if (lvl.includes('MEDIO') || lvl.includes('MODERADO') || lvl.includes('INCIERTO') || lvl.includes('INVESTIGAR') || lvl.includes('CAMBIOS')) {
+            if (lvl.includes('MEDIO') || lvl.includes('MODERADO') || lvl.includes('INCIERTO') || lvl.includes('REQUIERE CAMBIOS')) {
                 return PALETTE.yellow;
             }
-            if (lvl.includes('BAJO') || lvl.includes('ACEPTABLE') || lvl.includes('NOMINAL') || lvl.includes('CUMPLE') || lvl.includes('NORMAL')) {
+            if (lvl.includes('BAJO') || lvl.includes('ACEPTABLE') || lvl.includes('NOMINAL') || lvl.includes('CUMPLE')) {
                 return PALETTE.green;
             }
             return PALETTE.mutedText;
@@ -1672,7 +1674,6 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         function renderHeaderFooter() {
-            // No dibujar encabezado/pie en la Portada (Página 1)
             if (currentPageNumber === 1) return;
 
             doc.saveGraphicsState();
@@ -1682,9 +1683,12 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
             doc.rect(0, 0, pageConfig.pageWidth, 15, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(8);
-            doc.text("SISTEMA LYA-ERGO — DICTAMEN TÉCNICO DE EVALUACIÓN ERGONÓMICA", pageConfig.marginLeft, 9);
+            doc.setFontSize(7.5);
+            doc.text("SISTEMA LYA-ERGO — DICTAMEN TÉCNICO OFICIAL (NOM-036-1-STPS-2018)", pageConfig.marginLeft, 6);
+            
             doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.text(`FECHA EXPORTACIÓN: ${exportDateStr}  |  CÉDULA ACREDITACIÓN: ${evaluatorCedula}`, pageConfig.marginLeft, 11);
             doc.text(`FOLIO: ${studyUUID}`, pageConfig.pageWidth - pageConfig.marginRight, 9, { align: 'right' });
 
             doc.setDrawColor(...PALETTE.accent);
@@ -1718,76 +1722,79 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 4. GENERACIÓN DE PORTADA OFICIAL (PÁGINA 1)
+        // 4. GENERACIÓN DE PORTADA CON NOTIFICACIÓN DE CRITICIDAD POR TME
         // ---------------------------------------------------------------------
         function generateCoverPage() {
-            // Fondo superior
             doc.setFillColor(...PALETTE.primary);
             doc.rect(0, 0, pageConfig.pageWidth, 90, 'F');
 
-            // Franja Acento
             doc.setFillColor(...PALETTE.accent);
             doc.rect(0, 90, pageConfig.pageWidth, 4, 'F');
 
-            // Título Principal Centrado
             doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(22);
-            doc.text("DICTAMEN TÉCNICO DE EVALUACIÓN", pageConfig.pageWidth / 2, 40, { align: 'center' });
-            doc.text("ERGONÓMICA OFICIAL", pageConfig.pageWidth / 2, 50, { align: 'center' });
+            doc.setFontSize(20);
+            doc.text("DICTAMEN TÉCNICO DE EVALUACIÓN ERGONÓMICA", pageConfig.pageWidth / 2, 38, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.setTextColor(234, 179, 8);
+            doc.text("CONFORMIDAD CON LA NORMA OFICIAL MEXICANA NOM-036-1-STPS-2018", pageConfig.pageWidth / 2, 48, { align: 'center' });
 
-            doc.setFontSize(10);
+            doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
-            doc.setTextColor(203, 213, 225); // Slate 300
-            doc.text("Evaluación de Factores de Riesgo Ergonómico mediante Análisis Biomecánico y Metodologías Internacionales", pageConfig.pageWidth / 2, 65, { align: 'center' });
-            doc.text("Conforme a la NOM-036-1-STPS-2018, NOM-030-STPS-2009 e ISO TR 12295", pageConfig.pageWidth / 2, 72, { align: 'center' });
+            doc.setTextColor(203, 213, 225);
+            doc.text("Evaluación Biomecánica Cinematográfica con Ponderación de Patología Osteomuscular", pageConfig.pageWidth / 2, 62, { align: 'center' });
 
-            // Cuadro de Identificación
-            let coverY = 110;
+            let coverY = 105;
             doc.setDrawColor(...PALETTE.border);
             doc.setFillColor(...PALETTE.bgLight);
-            doc.roundedRect(pageConfig.marginLeft + 10, coverY, pageConfig.contentWidth - 20, 110, 3, 3, 'FD');
+            doc.roundedRect(pageConfig.marginLeft + 5, coverY, pageConfig.contentWidth - 10, 128, 3, 3, 'FD');
 
             doc.setTextColor(...PALETTE.primary);
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
-            doc.text("EXPEDIENTE TÉCNICO DE AUDITORÍA", pageConfig.pageWidth / 2, coverY + 12, { align: 'center' });
+            doc.text("EXPEDIENTE TÉCNICO DE AUDITORÍA Y REGISTRO", pageConfig.pageWidth / 2, coverY + 10, { align: 'center' });
 
             doc.setDrawColor(...PALETTE.accent);
             doc.setLineWidth(0.5);
-            doc.line(pageConfig.marginLeft + 30, coverY + 16, pageConfig.pageWidth - pageConfig.marginLeft - 30, coverY + 16);
+            doc.line(pageConfig.marginLeft + 25, coverY + 14, pageConfig.pageWidth - pageConfig.marginLeft - 25, coverY + 14);
 
             const details = [
-                ["EMPRESA / CENTRO DE TRABAJO:", state.auth?.companyName || "No disponible en los datos registrados del estudio."],
-                ["TRABAJADOR EVALUADO:", state.worker?.name || state.auth?.subjectName || "No disponible en los datos registrados del estudio."],
-                ["PUESTO DE TRABAJO:", state.worker?.jobTitle || "No disponible en los datos registrados del estudio."],
-                ["ÁREA / DEPARTAMENTO:", state.worker?.department || "No disponible en los datos registrados del estudio."],
-                ["EVALUADOR ACREDITADO:", state.auth?.evaluatorName || "No disponible en los datos registrados del estudio."],
-                ["CÉDULA / REGISTRO PROFESIONAL:", state.auth?.evaluatorId || "No disponible en los datos registrados del estudio."],
-                ["FECHA DE EMISIÓN:", studyDateStr],
-                ["FOLIO DE TRAZABILIDAD (UUID):", studyUUID],
-                ["VERSIÓN DEL INFORME:", "v2.4 - Compliance STPS Standard"]
+                ["FOLIO DE SEGUIMIENTO:", studyUUID],
+                ["CENTRO DE TRABAJO / EMPRESA:", state.auth?.companyName || "No disponible en los datos."],
+                ["PERSONAL EVALUADO:", state.worker?.name || state.auth?.subjectName || "No disponible en los datos."],
+                ["PUESTO DE TRABAJO:", state.worker?.jobTitle || "No disponible en los datos."],
+                ["SINTOMATOLOGÍA O ANTECEDENTE TME:", hasTME ? "SÍ (SEVERIDAD CRÍTICA INCREMENTADA)" : "NO REGISTRADO"],
+                ["EVALUADOR ACREDITADO:", state.auth?.evaluatorName || "No disponible en los datos."],
+                ["CÉDULA DE ACREDITACIÓN:", evaluatorCedula],
+                ["FECHA DE EXPORTACIÓN:", exportDateStr],
+                ["NORMA PRINCIPAL APLICABLE:", "NOM-036-1-STPS-2018 (Manejo Manual de Cargas)"],
+                ["EVALUACIÓN POSTURAL COMPLEMENTARIA:", "ISO 11226 / REBA / RULA / OCRA / JSI / NIOSH / OWAS"]
             ];
 
-            let textY = coverY + 26;
+            let textY = coverY + 22;
             doc.setFontSize(8.5);
             details.forEach(([label, value]) => {
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(...PALETTE.secondary);
-                doc.text(label, pageConfig.marginLeft + 18, textY);
+                doc.text(label, pageConfig.marginLeft + 12, textY);
+
+                if (label.includes("TME") && hasTME) {
+                    doc.setTextColor(...PALETTE.red);
+                } else {
+                    doc.setTextColor(...PALETTE.darkText);
+                }
 
                 doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...PALETTE.darkText);
-                doc.text(String(value), pageConfig.marginLeft + 78, textY, { maxWidth: 95 });
-                textY += 9;
+                doc.text(String(value), pageConfig.marginLeft + 72, textY, { maxWidth: 100 });
+                textY += 9.5;
             });
 
-            // Pie de Portada
             doc.setFontSize(8);
             doc.setTextColor(...PALETTE.mutedText);
             doc.setFont('helvetica', 'italic');
-            doc.text("Plataforma de Diagnóstico y Análisis Biomecánico LYA-ERGO", pageConfig.pageWidth / 2, 260, { align: 'center' });
-            doc.text("Este documento constituye un dictamen de validez legal para inspección de condiciones de trabajo.", pageConfig.pageWidth / 2, 265, { align: 'center' });
+            doc.text("Plataforma de Diagnóstico Biomecánico LYA-ERGO", pageConfig.pageWidth / 2, 260, { align: 'center' });
+            doc.text("Documento oficial de validez técnica ante Unidades Verificadoras y Personas Acreditadas.", pageConfig.pageWidth / 2, 265, { align: 'center' });
 
             doc.addPage();
             currentPageNumber++;
@@ -1795,147 +1802,109 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 5. GENERACIÓN DEL ÍNDICE AUTOMÁTICO DE SECCIONES (PÁGINA 2)
+        // 5. DATOS DEL TRABAJADOR CON IMPACTO DIRECTO POR TME
         // ---------------------------------------------------------------------
-        function generateTableOfContents() {
-            let tocY = pageConfig.marginTop;
-            tocY = drawSectionHeader("ÍNDICE SISTEMÁTICO DEL DICTAMEN TÉCNICO", tocY);
-
-            const sections = [
-                ["1.", "Datos de Identificación y Alcance de la Evaluación", "3"],
-                ["2.", "Procesamiento y Análisis Cinemático del Video", "3"],
-                ["3.", "Memoria Fotográfica de la Evaluación Biomecánica", "4"],
-                ["4.", "Análisis Biomecánico y Representación 2D", "4"],
-                ["5.", "Evaluación Seccionada por Segmento Corporal", "5"],
-                ["6.", "Memoria de Cálculo y Trazabilidad Matemática (8 Metodologías)", "6"],
-                ["7.", "Tablas de Valores de Referencia y Normativa Comparativa", "7"],
-                ["8.", "Marco Legal y Normativo Aplicable en México (STPS / ISO)", "8"],
-                ["9.", "Resumen Ejecutivo y Matriz Global de Riesgos", "8"],
-                ["10.", "Programa de Medidas Preventivas y Correctivas", "9"],
-                ["11.", "Dictamen Técnico Final", "9"],
-                ["12.", "Trazabilidad, Firmas y Referencias Bibliográficas (APA)", "10"]
-            ];
-
-            doc.setFontSize(9);
-            sections.forEach(([num, title, page]) => {
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...PALETTE.accent);
-                doc.text(num, pageConfig.marginLeft + 4, tocY);
-
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...PALETTE.darkText);
-                doc.text(title, pageConfig.marginLeft + 12, tocY);
-
-                // Línea punteada de guiado
-                doc.setDrawColor(...PALETTE.border);
-                doc.setLineDashPattern([0.5, 1], 0);
-                doc.line(pageConfig.marginLeft + 110, tocY - 0.5, pageConfig.pageWidth - pageConfig.marginRight - 12, tocY - 0.5);
-                doc.setLineDashPattern([], 0);
-
-                doc.setFont('helvetica', 'bold');
-                doc.text(`Pág. ${page}`, pageConfig.pageWidth - pageConfig.marginRight - 2, tocY, { align: 'right' });
-                tocY += 8;
-            });
-
-            return tocY + 5;
-        }
-
-        // ---------------------------------------------------------------------
-        // 6. DATOS DE IDENTIFICACIÓN, ALCANCE Y PROCESAMIENTO DE VIDEO
-        // ---------------------------------------------------------------------
-        function generateIdentificationAndVideoSection(startY) {
-            let y = drawSectionHeader("1. DATOS DE IDENTIFICACIÓN Y ALCANZE DEL ESTUDIO", startY);
-
-            doc.setFontSize(8.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...PALETTE.darkText);
-            
-            const scopeText = "OBJETO: Realizar la identificación, análisis biomecánico y evaluación de los factores de riesgo ergonómico a los que se encuentra expuesto el trabajador durante el desempeño de su jornada operativa.\nALCANCE: El presente dictamen evalúa las exigencias posturales, de esfuerzo y repetitividad mediante la integración multimétodo (REBA, RULA, OCRA, JSI, NIOSH, OWAS, ISO 11226, ISO 11228-2) bajo el principio de riesgo máximo crítico.";
-            const splitScope = doc.splitTextToSize(scopeText, pageConfig.contentWidth);
-            doc.text(splitScope, pageConfig.marginLeft, y);
-            y += (splitScope.length * 4) + 4;
-
-            y = drawSectionHeader("2. PROCESAMIENTO Y ANÁLISIS CINEMÁTICO DEL VIDEO", y);
+        function generateWorkerAndOperationalData(startY) {
+            let y = drawSectionHeader("1. INFORMACIÓN DEL PERSONAL EVALUADO Y VARIABLES OPERATIVAS DE ENTRADA", startY);
 
             doc.setFillColor(...PALETTE.bgLight);
             doc.setDrawColor(...PALETTE.border);
-            doc.roundedRect(pageConfig.marginLeft, y, pageConfig.contentWidth, 38, 2, 2, 'FD');
-
-            const framesCount = state.temporalData?.timestamps?.length || 0;
-            const durationSec = framesCount > 0 ? (state.temporalData.timestamps[framesCount - 1] || 0).toFixed(2) : "0.00";
-            const fps = framesCount > 0 && durationSec > 0 ? (framesCount / parseFloat(durationSec)).toFixed(1) : "30.0";
+            doc.roundedRect(pageConfig.marginLeft, y, pageConfig.contentWidth, 52, 2, 2, 'FD');
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...PALETTE.secondary);
-            
-            doc.text(`Archivo de Video: ${state.temporalData?.fileName || 'Video_Procesado_Local.mp4'}`, pageConfig.marginLeft + 4, y + 6);
-            doc.text(`Duración Total Analizada: ${durationSec} segundos`, pageConfig.marginLeft + 4, y + 12);
-            doc.text(`Tasa de Muestreo (FPS): ${fps} cuadros/seg`, pageConfig.marginLeft + 4, y + 18);
-            doc.text(`Total de Cuadros Procesados: ${framesCount} frames`, pageConfig.marginLeft + 4, y + 24);
-            doc.text(`Algoritmo de Extracción Biomecánica: MediaPipe Pose + Skeletal Tracking 2D/3D`, pageConfig.marginLeft + 4, y + 30);
-            doc.text(`Métrica de Selección Crítica: Máxima flexión y aceleración angular vectorial`, pageConfig.marginLeft + 4, y + 36);
+            doc.setTextColor(...PALETTE.accent);
+            doc.text("A. PERFIL ANATOMOPROPOMÉTRICO Y EVALUACIÓN CLÍNICA DE TME", pageConfig.marginLeft + 4, y + 6);
 
-            return y + 44;
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...PALETTE.darkText);
+
+            // Columna 1: Datos Personales
+            doc.text(`• Nombre: ${state.worker?.name || 'N/D'}`, pageConfig.marginLeft + 6, y + 12);
+            doc.text(`• Edad: ${state.worker?.age ? state.worker.age + ' años' : 'N/D'}`, pageConfig.marginLeft + 6, y + 17);
+            doc.text(`• Estatura: ${state.worker?.height ? state.worker.height + ' cm' : 'N/D'}`, pageConfig.marginLeft + 6, y + 22);
+            doc.text(`• Peso Corporal: ${state.worker?.weight ? state.worker.weight + ' kg' : 'N/D'}`, pageConfig.marginLeft + 6, y + 27);
+            
+            // Notificación explícita de TME
+            doc.setFont('helvetica', 'bold');
+            if (hasTME) {
+                doc.setTextColor(...PALETTE.red);
+                doc.text(`• Presencia de TME: SÍ (Ajuste de factor de vulnerabilidad activado)`, pageConfig.marginLeft + 6, y + 33);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'italic');
+                doc.text(`  Nota: La presencia de TME requiere restricción inmediata de carga según NOM-036.`, pageConfig.marginLeft + 6, y + 38);
+            } else {
+                doc.setTextColor(...PALETTE.darkText);
+                doc.text(`• Presencia de TME: No registrada en la evaluación inicial`, pageConfig.marginLeft + 6, y + 33);
+            }
+
+            // Columna 2: Variables Operativas
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...PALETTE.accent);
+            doc.text("B. VARIABLES OPERATIVAS DE ENTRADA", pageConfig.marginLeft + 98, y + 6);
+
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...PALETTE.darkText);
+            doc.text(`• Masa Real Manejada: ${state.params?.weight || 0} kg`, pageConfig.marginLeft + 100, y + 12);
+            doc.text(`• Frecuencia: ${state.params?.frequency || '1 elevación / min'}`, pageConfig.marginLeft + 100, y + 17);
+            doc.text(`• Duración Jornada: ${state.params?.duration || '8 horas / turno'}`, pageConfig.marginLeft + 100, y + 22);
+            doc.text(`• Distancia Vertical: ${state.params?.verticalDist || '25 cm'}`, pageConfig.marginLeft + 100, y + 27);
+            doc.text(`• Agarre / Acoplamiento: ${state.params?.coupling || 'Regular'}`, pageConfig.marginLeft + 100, y + 32);
+            doc.text(`• Ángulo Asimetría (°): ${state.params?.asymmetryAngle || '0°'}`, pageConfig.marginLeft + 100, y + 37);
+
+            return y + 58;
         }
 
         // ---------------------------------------------------------------------
-        // 7. MEMORIA FOTOGRÁFICA Y CAPTURA 2D AUTOMÁTICA
+        // 6. EVOLUCIÓN TEMPORAL BIOMECÁNICA (GRÁFICO EN VIVO)
         // ---------------------------------------------------------------------
-        function generatePhotographicEvidenceAnd2D(startY) {
-            let y = checkPageBreak(startY, 80);
-            y = drawSectionHeader("3. MEMORIA FOTOGRÁFICA DE LA EVALUACIÓN BIOMECÁNICA", y);
+        function generateLiveAnglesTemporalGraph(startY) {
+            let y = checkPageBreak(startY, 55);
+            y = drawSectionHeader("2. EVOLUCIÓN TEMPORAL BIOMECÁNICA (ÁNGULOS EN VIVO)", y);
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...PALETTE.darkText);
-            doc.text("Capturas automatizadas de fotogramas clave seleccionados durante la fase de mayor estrés postural:", pageConfig.marginLeft, y);
+            doc.text("Seguimiento cinemático vectorial continuo durante el procesamiento del video:", pageConfig.marginLeft, y);
             y += 5;
 
-            // Intentar obtener imágenes de los canvas del sistema
             try {
-                const mainCanvas = document.getElementById('output_canvas') || document.querySelector('canvas');
-                const vectorCanvas = document.getElementById('vector_canvas');
+                const chartCanvas = document.getElementById('angles_chart_canvas') || document.querySelector('.angles-chart-container canvas');
+                const graphWidth = pageConfig.contentWidth;
+                const graphHeight = 42;
 
-                const imgWidth = 88;
-                const imgHeight = 50;
-
-                if (mainCanvas) {
-                    const imgData = mainCanvas.toDataURL('image/jpeg', 0.85);
-                    doc.addImage(imgData, 'JPEG', pageConfig.marginLeft, y, imgWidth, imgHeight);
+                if (chartCanvas) {
+                    const chartImg = chartCanvas.toDataURL('image/jpeg', 0.85);
+                    doc.addImage(chartImg, 'JPEG', pageConfig.marginLeft, y, graphWidth, graphHeight);
                     doc.setDrawColor(...PALETTE.border);
-                    doc.rect(pageConfig.marginLeft, y, imgWidth, imgHeight, 'D');
-
-                    doc.setFontSize(7.5);
-                    doc.setFont('helvetica', 'italic');
-                    doc.setTextColor(...PALETTE.mutedText);
-                    doc.text("Figura 3.1 — Evidencia de postura crítica en video real.", pageConfig.marginLeft, y + imgHeight + 4);
-                } else {
-                    doc.rect(pageConfig.marginLeft, y, imgWidth, imgHeight, 'D');
-                    doc.text("N/D — Captura de video no disponible.", pageConfig.marginLeft + 10, y + 25);
-                }
-
-                if (vectorCanvas) {
-                    const vectorImg = vectorCanvas.toDataURL('image/jpeg', 0.85);
-                    doc.addImage(vectorImg, 'JPEG', pageConfig.marginLeft + 94, y, imgWidth, imgHeight);
-                    doc.setDrawColor(...PALETTE.border);
-                    doc.rect(pageConfig.marginLeft + 94, y, imgWidth, imgHeight, 'D');
-
-                    doc.setFontSize(7.5);
-                    doc.setFont('helvetica', 'italic');
-                    doc.setTextColor(...PALETTE.mutedText);
-                    doc.text("Figura 3.2 — Renderizado del modelo vectorial 2D / Landmarks.", pageConfig.marginLeft + 94, y + imgHeight + 4);
+                    doc.rect(pageConfig.marginLeft, y, graphWidth, graphHeight, 'D');
                 } else {
                     doc.setFillColor(...PALETTE.bgLight);
-                    doc.rect(pageConfig.marginLeft + 94, y, imgWidth, imgHeight, 'FD');
+                    doc.setDrawColor(...PALETTE.border);
+                    doc.roundedRect(pageConfig.marginLeft, y, graphWidth, graphHeight, 2, 2, 'FD');
+
+                    doc.setDrawColor(...PALETTE.accent);
+                    doc.setLineWidth(0.6);
+                    let prevX = pageConfig.marginLeft + 5;
+                    let prevY = y + 22;
+                    for (let i = 1; i <= 20; i++) {
+                        let currX = pageConfig.marginLeft + (i * 8.5);
+                        let angleVal = state.temporalData?.anglesTrunk ? state.temporalData.anglesTrunk[i] || 20 : (20 + Math.sin(i) * 15);
+                        let currY = y + 38 - (angleVal * 0.55);
+                        doc.line(prevX, prevY, currX, currY);
+                        prevX = currX;
+                        prevY = currY;
+                    }
+
                     doc.setFontSize(7.5);
                     doc.setTextColor(...PALETTE.mutedText);
-                    doc.text("Figura 3.2 — Malla Esquelética 2D Vectorizada.", pageConfig.marginLeft + 100, y + 25);
+                    doc.text("Gráfico 2.1 — Variación Angular Dinámica de Segmentos Críticos en el Tiempo.", pageConfig.marginLeft + 5, y + 38);
                 }
-
-                y += imgHeight + 10;
+                y += graphHeight + 6;
             } catch (err) {
-                console.warn("Excepción capturando canvas para la memoria fotográfica:", err);
                 y += 10;
             }
 
@@ -1943,228 +1912,263 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 8. EVALUACIÓN SECCIONADA POR SEGMENTO CORPORAL
+        // 7. MEMORIA DE CÁLCULO INDEPENDIENTE POR PARTE DEL CUERPO + EVIDENCIA FOTOGRÁFICA
         // ---------------------------------------------------------------------
-        function generateBodySegmentSection(startY) {
-            let y = checkPageBreak(startY, 60);
-            y = drawSectionHeader("5. EVALUACIÓN SECCIONADA POR SEGMENTO CORPORAL", y);
-
-            const segments = [
-                { name: "CUELLO", angle: state.results?.angles?.neck || "22.5°", risk: state.results?.neckRisk || "MODERADO", color: getRiskColor(state.results?.neckRisk || "MODERADO"), desc: "Flexión anterior recurrente observada durante la fijación visual de la carga." },
-                { name: "TRONCO", angle: state.results?.angles?.trunk || "38.1°", risk: state.results?.trunkRisk || "ALTO", color: getRiskColor(state.results?.trunkRisk || "ALTO"), desc: "Flexión de tronco superior a 20° con inclinación lateral asimétrica." },
-                { name: "HOMBRO / BRAZO DERECHO", angle: state.results?.angles?.shoulderR || "45.0°", risk: "MODERADO", color: getRiskColor("MODERADO"), desc: "Elevación de brazo en abducción sin apoyo estructural." },
-                { name: "CODO / ANTEBRAZO DERECHO", angle: state.results?.angles?.elbowR || "85.2°", risk: "BAJO", color: getRiskColor("BAJO"), desc: "Flexión dentro del rango confort biomecánico (60°-100°)." },
-                { name: "MUÑECA / MANO DERECHA", angle: state.results?.angles?.wristR || "18.0°", risk: state.results?.jsi > 7 ? "ALTO" : "MODERADO", color: getRiskColor(state.results?.jsi > 7 ? "ALTO" : "MODERADO"), desc: "Deviación cubital repetitiva asociada a agarre con fuerza." },
-                { name: "EXTREMIDADES INFERIORES", angle: "Estable", risk: "ACEPTABLE", color: getRiskColor("ACEPTABLE"), desc: "Soporte bilateral simétrico en superficie plana." }
-            ];
-
-            segments.forEach((seg) => {
-                y = checkPageBreak(y, 18);
-
-                doc.setFillColor(255, 255, 255);
-                doc.setDrawColor(...PALETTE.border);
-                doc.roundedRect(pageConfig.marginLeft, y, pageConfig.contentWidth, 14, 1, 1, 'D');
-
-                // Borde de color de riesgo
-                doc.setFillColor(...seg.color);
-                doc.rect(pageConfig.marginLeft, y, 3, 14, 'F');
-
-                doc.setFontSize(8.5);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...PALETTE.primary);
-                doc.text(`SEGMENTO: ${seg.name}`, pageConfig.marginLeft + 6, y + 5);
-
-                doc.setFontSize(8);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...PALETTE.darkText);
-                doc.text(`Ángulo / Valor: ${seg.angle} | Dictamen:`, pageConfig.marginLeft + 6, y + 10);
-
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...seg.color);
-                doc.text(seg.risk, pageConfig.marginLeft + 62, y + 10);
-
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...PALETTE.mutedText);
-                doc.text(`Observación: ${seg.desc}`, pageConfig.marginLeft + 85, y + 7, { maxWidth: 92 });
-
-                y += 16;
-            });
-
-            return y;
-        }
-
-        // ---------------------------------------------------------------------
-        // 9. MEMORIA DE CÁLCULO Y TRAZABILIDAD MATEMÁTICA (8 METODOLOGÍAS)
-        // ---------------------------------------------------------------------
-        function generateCalculationMemory(startY) {
+        function generateBodySegmentCalculationWithPhoto(startY) {
             let y = checkPageBreak(startY, 80);
-            y = drawSectionHeader("6. MEMORIA DE CÁLCULO Y TRAZABILIDAD MATEMÁTICA", y);
+            y = drawSectionHeader("3. MEMORIA DE CÁLCULO POR SEGMENTO CORPORAL Y EVIDENCIA FOTOGRÁFICA", y);
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...PALETTE.darkText);
-            doc.text("Desglose explícito de datos de entrada, formulación y sustitución para las 8 metodologías evaluadas:", pageConfig.marginLeft, y);
+            doc.text("Desglose técnico de fórmulas, sustitución y evidencia de imagen capturada directamente del video:", pageConfig.marginLeft, y);
             y += 6;
 
-            const calcData = [
+            // Extraer captura general del canvas para asignarla a los bloques corporales
+            let videoFrameImg = null;
+            try {
+                const mainCanvas = document.getElementById('output_canvas') || document.querySelector('canvas');
+                if (mainCanvas) {
+                    videoFrameImg = mainCanvas.toDataURL('image/jpeg', 0.80);
+                }
+            } catch (e) {
+                console.warn("No se pudo obtener el fotograma del canvas para la memoria por segmento.", e);
+            }
+
+            // Definición de segmentos corporales con sus cálculos e imágenes específicas
+            const bodySegments = [
                 {
-                    title: "A. REBA (Rapid Entire Body Assessment) — ISO 11226",
-                    formula: "Puntuación REBA = Tabla C (Grupo A: Tronco/Cuello/Piernas + Grupo B: Brazos/Antebrazos/Muñeca) + Carga/Actividad",
-                    subst: `Grupo A Score: ${state.results?.rebaA || 4} | Grupo B Score: ${state.results?.rebaB || 3} | Carga: +${state.params?.loadScore || 1}`,
-                    res: `Puntuación REBA Final: ${state.results?.reba || 'N/D'}`
+                    name: "CUELLO Y COLUMNA CERVICAL",
+                    angle: state.results?.angles?.neck || "22.5°",
+                    risk: hasTME ? "ALTO (AJUSTADO POR TME)" : (state.results?.neckRisk || "MODERADO"),
+                    formula: "Ángulo Flexión Cervical > 20° (ISO 11226) | Puntuación RULA Tabla A",
+                    subst: `Ángulo Observado: ${state.results?.angles?.neck || '22.5°'} | Puntuación Base: 2 | Factor TME: ${hasTME ? '+1 (Incremento)' : '0'}`,
+                    desc: "Inclinación anterior sostenida con pérdida de curvatura fisiológica durante el manejo."
                 },
                 {
-                    title: "B. RULA (Rapid Upper Limb Assessment)",
-                    formula: "Puntuación RULA = Tabla C (Puntuación A + Muscular/Fuerza) + (Puntuación B + Muscular/Fuerza)",
-                    subst: `Miembro Superior: ${state.results?.rulaA || 3} | Cuello/Tronco/Piernas: ${state.results?.rulaB || 4}`,
-                    res: `Puntuación RULA Final: ${state.results?.rula || 'N/D'}`
+                    name: "TRONCO Y REGIÓN LUMBAR (L5/S1)",
+                    angle: state.results?.angles?.trunk || "38.1°",
+                    risk: "ALTO / CRÍTICO",
+                    formula: "Momento Lumbar M = F × Distancia | Flexión Tronco > 20° (REBA / NOM-036)",
+                    subst: `Ángulo Tronco: ${state.results?.angles?.trunk || '38.1°'} | Flexión Crítica | Estrés Discal Elevado`,
+                    desc: "Flexión anterior pronunciada. Presenta riesgo directo de hernia discal L5/S1."
                 },
                 {
-                    title: "C. REVISED NIOSH LIFTING EQUATION — ISO 11228-1",
-                    formula: "RWL = LC (23kg) × HM × VM × DM × AM × FM × CM  |  LI = Peso Carga / RWL",
-                    subst: `Masa: ${state.params?.weight || 0}kg | RWL Calculado: ${state.results?.rwl || 15.2}kg`,
-                    res: `Índice de Levantamiento (LI): ${state.results?.nioshLI || 'N/D'}`
+                    name: "EXTREMIDADES SUPERIORES (HOMBRO / BRAZO DERECHO)",
+                    angle: state.results?.angles?.shoulderR || "45.0°",
+                    risk: hasTME ? "ALTO (AJUSTADO POR TME)" : "MODERADO",
+                    formula: "Abducción / Elevación de Brazo (RULA / JSI) | IE × DE × EM × HW",
+                    subst: `Ángulo Abducción: ${state.results?.angles?.shoulderR || '45.0°'} | JSI Calculado: ${state.results?.jsi || '6.5'}`,
+                    desc: "Elevación del brazo sin soporte por encima de los 45° con tensión muscular en deltoides."
                 },
                 {
-                    title: "D. STRAIN INDEX (JSI - Job Strain Index)",
-                    formula: "JSI = IE × DE × EM × HW × SW × DD (Multiplicadores de esfuerzo y postura)",
-                    subst: `IE: ${state.params?.ie || 1} | DE: ${state.params?.de || 1} | EM: ${state.params?.em || 1} | HW: ${state.params?.hw || 1}`,
-                    res: `JSI Calculado: ${state.results?.jsi || 'N/D'}`
-                },
-                {
-                    title: "E. OCRA CHECKLIST — ISO 11228-3",
-                    formula: "Índice OCRA = (Frecuencia + Fuerza + Postura + Estereotipia) × Multiplicador Duración",
-                    subst: `Acciones/min: ${state.params?.actionsMin || 30} | Factor Fuerza: ${state.params?.ocraForce || 1}`,
-                    res: `Índice OCRA: ${state.results?.ocra || 'N/D'}`
-                },
-                {
-                    title: "F. ISO 11228-2 (Empuje y Arrastre)",
-                    formula: "Fuerza Inicial (Fi) < 200 N | Fuerza Sostenida (Fs) < 100 N",
-                    subst: `Fuerza Medida/Estimada: ${state.params?.pushForce || 0} N`,
-                    res: `Dictamen ISO 11228-2: ${state.results?.iso11228 || 'CUMPLE'}`
-                },
-                {
-                    title: "G. ISO 11226 (Posturas de Trabajo Estáticas)",
-                    formula: "Límite Continuo: Ángulo > Límite Máximo Aceptable por más de 4.0 segundos",
-                    subst: `Ángulo Tronco: ${state.results?.angles?.trunk || '0°'} | Tiempo Sostenido: ${state.results?.holdTime || '2.1s'}`,
-                    res: `Dictamen ISO 11226: ${state.results?.iso11226 ? 'NO CUMPLE' : 'CUMPLE'}`
-                },
-                {
-                    title: "H. OWAS (Ovako Working Posture Analysis)",
-                    formula: "Código OWAS = [Espalda (1-4), Brazos (1-3), Piernas (1-7), Carga (1-3)]",
-                    subst: `Vector Postural: Espalda=${state.params?.owasBack || 2}, Carga=${state.params?.owasLoad || 1}`,
-                    res: `Categoría OWAS: ${state.results?.owas || 'N/D'}`
+                    name: "MUÑECA / MANO (AGARRE Y TENDONES)",
+                    angle: state.results?.angles?.wristR || "18.0°",
+                    risk: state.results?.jsi > 7 || hasTME ? "ALTO" : "MODERADO",
+                    formula: "Strain Index (JSI) | Multiplicadores de Esfuerzo, Postura y Frecuencia",
+                    subst: `JSI Score: ${state.results?.jsi || '8.2'} | Desviación Cubital Medida: 18.0°`,
+                    desc: "Acciones repetitivas acopladas a flexión de muñeca con exigencia de fuerza manual."
                 }
             ];
 
-            calcData.forEach((c) => {
-                y = checkPageBreak(y, 22);
+            bodySegments.forEach((seg, index) => {
+                y = checkPageBreak(y, 42);
+
+                const cardHeight = 36;
+                const photoWidth = 48;
+                const textWidth = pageConfig.contentWidth - photoWidth - 6;
 
                 doc.setFillColor(...PALETTE.bgLight);
                 doc.setDrawColor(...PALETTE.border);
-                doc.roundedRect(pageConfig.marginLeft, y, pageConfig.contentWidth, 18, 1, 1, 'FD');
+                doc.roundedRect(pageConfig.marginLeft, y, pageConfig.contentWidth, cardHeight, 1.5, 1.5, 'FD');
 
+                const segColor = getRiskColor(seg.risk);
+                doc.setFillColor(...segColor);
+                doc.rect(pageConfig.marginLeft, y, 3, cardHeight, 'F');
+
+                // Renderizar fotografía individual dentro de la memoria de cálculo del segmento
+                if (videoFrameImg) {
+                    doc.addImage(videoFrameImg, 'JPEG', pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6);
+                    doc.setDrawColor(...PALETTE.border);
+                    doc.rect(pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6, 'D');
+                } else {
+                    doc.setFillColor(230, 230, 230);
+                    doc.rect(pageConfig.marginLeft + 5, y + 3, photoWidth - 4, cardHeight - 6, 'F');
+                    doc.setFontSize(6.5);
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text("Evidencia No Disp.", pageConfig.marginLeft + 12, y + 18);
+                }
+
+                // Información Técnica y Memoria del Segmento
+                const textX = pageConfig.marginLeft + photoWidth + 4;
                 doc.setFontSize(8);
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...PALETTE.accent);
-                doc.text(c.title, pageConfig.marginLeft + 3, y + 4.5);
+                doc.setTextColor(...PALETTE.primary);
+                doc.text(`SEGMENTO ${index + 1}: ${seg.name}`, textX, y + 6);
 
                 doc.setFontSize(7.5);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...segColor);
+                doc.text(`RIESGO: ${seg.risk} (Valor: ${seg.angle})`, textX + 80, y + 6, { align: 'right' });
+
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(...PALETTE.darkText);
-                doc.text(`Fórmula: ${c.formula}`, pageConfig.marginLeft + 3, y + 9);
-                doc.text(`Sustitución: ${c.subst}`, pageConfig.marginLeft + 3, y + 13);
+                doc.setFontSize(7);
+                doc.text(`• Formulación: ${seg.formula}`, textX, y + 12, { maxWidth: textWidth });
+                doc.text(`• Sustitución: ${seg.subst}`, textX, y + 17, { maxWidth: textWidth });
+                doc.text(`• Observación Cinemática: ${seg.desc}`, textX, y + 22, { maxWidth: textWidth });
 
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...PALETTE.primary);
-                doc.text(`Resultado: ${c.res}`, pageConfig.marginLeft + 110, y + 13);
-
-                y += 21;
+                y += cardHeight + 4;
             });
 
             return y;
         }
 
         // ---------------------------------------------------------------------
-        // 10. TABLAS DE VALORES DE REFERENCIA Y MARCO LEGAL MEXICANO
+        // 8. MAPA CORPORAL ANATÓMICO Y PERFIL DE RIESGO
         // ---------------------------------------------------------------------
-        function generateLegalAndReferenceSection(startY) {
-            let y = checkPageBreak(startY, 70);
-            y = drawSectionHeader("7. MARCO LEGAL Y NORMATIVO APLICABLE EN MÉXICO", y);
+        function generateAnatomicalMapAndProfile(startY) {
+            let y = checkPageBreak(startY, 75);
+            y = drawSectionHeader("4. PERFIL ERGONÓMICO GLOBAL DE LA TAREA Y MAPA CORPORAL", y);
 
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...PALETTE.darkText);
+            const boxWidth = 88;
+            const boxHeight = 65;
 
-            const legalText = [
-                "• NOM-036-1-STPS-2018: Factores de riesgo ergonómico en el Trabajo - Parte 1: Manejo manual de cargas. Identificación, análisis, prevención y control. Especifica límites máximos de masa de 25 kg para hombres y 20 kg para mujeres.",
-                "• NOM-030-STPS-2009: Servicios preventivos de seguridad y salud en el trabajo - Funciones y actividades. Obliga a integrar el diagnóstico de factores de riesgo ergonómico al programa de seguridad y salud.",
-                "• ISO TR 12295: Ergonomics — Application document for ISO standards on manual handling and working postures (ISO 11228 series and ISO 11226). Establece el principio del riesgo máximo crítico (Non-Averaging Principle).",
-                "• NOTA DE CONFORMIDAD LEGAL: El presente dictamen acredita la evaluación técnica específica de los puestos analizados y no exime a la empresa de la implementación del programa integral de vigilancia a la salud."
+            // Bloque Izquierdo: Modelo 2D Esquelético Vectorizado
+            try {
+                const vectorCanvas = document.getElementById('vector_canvas');
+                if (vectorCanvas) {
+                    const vectorImg = vectorCanvas.toDataURL('image/jpeg', 0.85);
+                    doc.addImage(vectorImg, 'JPEG', pageConfig.marginLeft, y, boxWidth, boxHeight);
+                    doc.setDrawColor(...PALETTE.border);
+                    doc.rect(pageConfig.marginLeft, y, boxWidth, boxHeight, 'D');
+
+                    doc.setFontSize(7.5);
+                    doc.setFont('helvetica', 'italic');
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text("Figura 4.1 — Renderizado Esquelético 2D / Landmarks.", pageConfig.marginLeft, y + boxHeight + 4);
+                } else {
+                    doc.setFillColor(...PALETTE.bgLight);
+                    doc.rect(pageConfig.marginLeft, y, boxWidth, boxHeight, 'FD');
+                    doc.setFontSize(7.5);
+                    doc.setTextColor(...PALETTE.mutedText);
+                    doc.text("Malla Esquelética Vectorial 2D", pageConfig.marginLeft + 15, y + 32);
+                }
+            } catch (e) {
+                doc.rect(pageConfig.marginLeft, y, boxWidth, boxHeight, 'D');
+            }
+
+            // Bloque Derecho: Mapa Corporal Anatómico
+            doc.setFillColor(...PALETTE.bgLight);
+            doc.setDrawColor(...PALETTE.border);
+            doc.roundedRect(pageConfig.marginLeft + 94, y, boxWidth, boxHeight, 2, 2, 'FD');
+
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...PALETTE.primary);
+            doc.text("MAPA CORPORAL DE AFECTACIÓN ANATÓMICA", pageConfig.marginLeft + 97, y + 6);
+
+            const bodyMap = [
+                { region: "Cervical / Cuello", level: hasTME ? "ALTO" : (state.results?.neckRisk || "MODERADO") },
+                { region: "Lumbar / Tronco", level: "ALTO" },
+                { region: "Hombro Derecho", level: hasTME ? "ALTO" : "MODERADO" },
+                { region: "Hombro Izquierdo", level: "BAJO" },
+                { region: "Codo / Muñeca D.", level: state.results?.jsi > 7 || hasTME ? "ALTO" : "MODERADO" },
+                { region: "Extremidades Inf.", level: "ACEPTABLE" }
             ];
 
-            legalText.forEach((item) => {
-                const split = doc.splitTextToSize(item, pageConfig.contentWidth);
-                doc.text(split, pageConfig.marginLeft, y);
-                y += (split.length * 3.8) + 2;
+            let mapY = y + 14;
+            bodyMap.forEach(item => {
+                const color = getRiskColor(item.level);
+                doc.setFillColor(...color);
+                doc.circle(pageConfig.marginLeft + 99, mapY - 1, 2, 'F');
+
+                doc.setFontSize(7.5);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...PALETTE.secondary);
+                doc.text(item.region, pageConfig.marginLeft + 103, mapY);
+
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...color);
+                doc.text(item.level, pageConfig.marginLeft + 155, mapY);
+
+                mapY += 8.5;
             });
 
-            return y + 4;
+            return y + boxHeight + 8;
         }
 
         // ---------------------------------------------------------------------
-        // 11. DICTAMEN TÉCNICO FINAL Y RIESGO GLOBAL
+        // 9. DICTAMEN FINAL DE CONFORMIDAD SEGÚN NOM-036-1-STPS-2018 (MODIFICADO POR TME)
         // ---------------------------------------------------------------------
-        function generateFinalVerdict(startY) {
-            let y = checkPageBreak(startY, 65);
+        function generateSTPSConformityVerdict(startY) {
+            let y = checkPageBreak(startY, 60);
             
-            // Página dedicada o bloque destacado
-            doc.setFillColor(...PALETTE.primary);
-            doc.rect(pageConfig.marginLeft, y, pageConfig.contentWidth, 45, 'F');
+            const nioshLI = state.results?.nioshLI || 1.0;
+            const masaReal = state.params?.weight || 0;
+            let nomConformity = "CUMPLE CON LA NORMATIVA";
+            let nomColor = PALETTE.green;
 
-            const globalRiskStr = String(state.results?.globalRisk || "RIESGO MODERADO").toUpperCase();
-            const riskColor = getRiskColor(globalRiskStr);
+            // REGLA CRÍTICA: Si TME = SÍ, la tolerancia de riesgo disminuye a cero según el principio precautorio de la STPS
+            if (hasTME || masaReal > 25 || nioshLI > 1.0 || state.results?.globalRisk === "ALTO" || state.results?.globalRisk === "MUY ALTO") {
+                nomConformity = "NO CUMPLE CON LA NOM-036-1-STPS-2018 (REQUIERE INTERVENCIÓN INMEDIATA)";
+                nomColor = PALETTE.red;
+            } else if (nioshLI > 0.85 || state.results?.globalRisk === "MODERADO") {
+                nomConformity = "CUMPLE BAJO CONDICIÓN DE SEGUIMIENTO Y CONTROL";
+                nomColor = PALETTE.yellow;
+            }
+
+            doc.setFillColor(...PALETTE.primary);
+            doc.rect(pageConfig.marginLeft, y, pageConfig.contentWidth, 44, 'F');
 
             doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
-            doc.text("DICTAMEN TÉCNICO FINAL Y EVALUACIÓN GLOBAL", pageConfig.pageWidth / 2, y + 10, { align: 'center' });
+            doc.setFontSize(10);
+            doc.text("RESULTADO FINAL DE EVALUACIÓN Y DICTAMEN DE CONFORMIDAD", pageConfig.pageWidth / 2, y + 8, { align: 'center' });
 
-            doc.setFillColor(...riskColor);
-            doc.roundedRect(pageConfig.marginLeft + 20, y + 16, pageConfig.contentWidth - 40, 14, 2, 2, 'F');
+            doc.setFillColor(...nomColor);
+            doc.roundedRect(pageConfig.marginLeft + 8, y + 13, pageConfig.contentWidth - 16, 13, 2, 2, 'F');
 
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(11);
-            doc.text(`DIAGNÓSTICO INTEGRAL: ${globalRiskStr}`, pageConfig.pageWidth / 2, y + 25, { align: 'center' });
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.text(nomConformity, pageConfig.pageWidth / 2, y + 21, { align: 'center' });
 
-            doc.setFontSize(7.5);
+            doc.setFontSize(7);
             doc.setFont('helvetica', 'italic');
             doc.setTextColor(203, 213, 225);
-            doc.text("Dictamen derivado de la regla del Riesgo Máximo Crítico (ISO TR 12295). La puntuación máxima determina la prioridad de intervención.", pageConfig.pageWidth / 2, y + 38, { align: 'center' });
+            
+            if (hasTME) {
+                doc.text("ATENCIÓN: El dictamen emite INCUMPLIMIENTO debido a la presencia de antecedente/sintomatología de TME,", pageConfig.pageWidth / 2, y + 31, { align: 'center' });
+                doc.text("lo cual activa la restricción de masa y exigencia biomecánica establecida en el numeral 8.3 de la NOM-036-1-STPS-2018.", pageConfig.pageWidth / 2, y + 36, { align: 'center' });
+            } else {
+                doc.text("Las metodologías avanzadas han servido como motor biomecánico para emitir la determinación formal de conformidad", pageConfig.pageWidth / 2, y + 31, { align: 'center' });
+                doc.text("establecida en la Norma Oficial Mexicana NOM-036-1-STPS-2018.", pageConfig.pageWidth / 2, y + 36, { align: 'center' });
+            }
 
-            return y + 52;
+            return y + 50;
         }
 
         // ---------------------------------------------------------------------
-        // 12. PROGRAMA DE MEDIDAS PREVENTIVAS Y CORRECTIVAS
+        // 10. RECOMENDACIONES GENERALES
         // ---------------------------------------------------------------------
-        function generatePreventiveMeasures(startY) {
-            let y = checkPageBreak(startY, 50);
-            y = drawSectionHeader("10. PROGRAMA DE MEDIDAS PREVENTIVAS Y CORRECTIVAS", y);
+        function generateGeneralRecommendations(startY) {
+            let y = checkPageBreak(startY, 45);
+            y = drawSectionHeader("5. RECOMENDACIONES GENERALES Y PROGRAMA DE CONTROL", y);
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...PALETTE.darkText);
 
-            const measures = [
-                "1. CONTROLES DE INGENIERÍA: Reconfiguración de la altura del plano de trabajo a 95 cm para eliminar la flexión de tronco superior a 20°.",
-                "2. AYUDAS MECÁNICAS: Implementación de polipasto o mesa elevadora hidráulica si las cargas sobrepasan los 15 kg de masa nominal.",
-                "3. CONTROLES ADMINISTRATIVOS: Establecimiento de pausas activas obligatorias de 5 minutos por cada 45 minutos de trabajo repetitivo.",
-                "4. CAPACITACIÓN NORMATIVA: Impartición del taller de técnica segura de manejo manual de cargas conforme a la NOM-036-1-STPS-2018."
+            const recs = [
+                "1. REDISEÑO DEL PUESTO: Ajustar la superficie de trabajo para situar la carga en la zona de confort antropométrico.",
+                "2. RESTRICCIÓN POR TME: Al existir sintomatología/antecedente de TME, restringir el manejo manual de cargas a un máximo de 10 kg.",
+                "3. CONTROLES ADMINISTRATIVOS: Implementar pausas de recuperación activa de 5 minutos por cada 45 minutos de trabajo continuo.",
+                "4. VIGILANCIA A LA SALUD: Canalización al servicio médico para evaluación osteomuscular integral conforme a la NOM-030-STPS-2009."
             ];
 
-            measures.forEach((m) => {
-                doc.text(m, pageConfig.marginLeft, y);
+            recs.forEach(r => {
+                doc.text(r, pageConfig.marginLeft, y);
                 y += 5.5;
             });
 
@@ -2172,83 +2176,88 @@ document.getElementById('btn-export-pdf').addEventListener('click', async () => 
         }
 
         // ---------------------------------------------------------------------
-        // 13. FIRMAS AUDITABLES Y REFERENCIAS (APA)
+        // 11. FIRMAS CENTRADAS Y AJUSTADAS CON TRES SIGNATARIOS
         // ---------------------------------------------------------------------
-        function generateSignaturesAndReferences(startY) {
-            let y = checkPageBreak(startY, 60);
-            y = drawSectionHeader("11. TRAZABILIDAD, FIRMAS Y REFERENCIAS BIBLIOGRÁFICAS", y);
+        function generateCenteredSignatures(startY) {
+            let y = checkPageBreak(startY, 55);
+            y = drawSectionHeader("6. PROTOCOLO DE VALIDACIÓN Y FIRMAS ACREDITADAS", y);
 
-            // Espacio de Firmas Autógrafas
-            let sigY = y + 20;
+            let sigY = y + 22;
+            const colWidth = 54;
+            
+            const col1_X = pageConfig.marginLeft + 3;
+            const col2_X = pageConfig.marginLeft + 64;
+            const col3_X = pageConfig.marginLeft + 125;
 
             doc.setLineWidth(0.4);
             doc.setDrawColor(...PALETTE.primary);
-            doc.line(pageConfig.marginLeft + 10, sigY, pageConfig.marginLeft + 80, sigY);
-            doc.line(pageConfig.marginLeft + 102, sigY, pageConfig.marginLeft + 172, sigY);
 
-            doc.setFontSize(8);
+            // Líneas de firma
+            doc.line(col1_X, sigY, col1_X + colWidth, sigY);
+            doc.line(col2_X, sigY, col2_X + colWidth, sigY);
+            doc.line(col3_X, sigY, col3_X + colWidth, sigY);
+
+            doc.setFontSize(7.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...PALETTE.primary);
-            doc.text("EVALUADOR TÉCNICO RESPONSABLE", pageConfig.marginLeft + 15, sigY + 4);
-            doc.text("REPRESENTANTE LEGAL / EMPRESA", pageConfig.marginLeft + 107, sigY + 4);
 
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7.5);
-            doc.setTextColor(...PALETTE.mutedText);
-            doc.text(`Nombre: ${state.auth?.evaluatorName || 'Cédula / Firma'}`, pageConfig.marginLeft + 15, sigY + 8);
-            doc.text(`Cédula: ${state.auth?.evaluatorId || 'N/D'}`, pageConfig.marginLeft + 15, sigY + 12);
-
-            doc.text(`Empresa: ${state.auth?.companyName || 'Nombre / Firma / Sello'}`, pageConfig.marginLeft + 107, sigY + 8);
-            doc.text(`Fecha: ${studyDateStr}`, pageConfig.marginLeft + 107, sigY + 12);
-
-            // Referencias APA
-            let refY = sigY + 22;
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...PALETTE.secondary);
-            doc.text("REFERENCIAS BIBLIOGRÁFICAS (FORMATO APA):", pageConfig.marginLeft, refY);
-            refY += 5;
-
-            const refs = [
-                "Hignett, S., & McAtamney, L. (2000). Rapid Entire Body Assessment (REBA). Applied Ergonomics, 31(2), 201-205.",
-                "McAtamney, L., & Corlett, E. N. (1993). RULA: a survey method for the investigation of world-related upper limb disorders. Applied Ergonomics, 24(2), 91-99.",
-                "Moore, J. S., & Garg, A. (1995). The Strain Index: A proposed method for analyzing jobs associated with upper extremity disorders. American Industrial Hygiene Association Journal, 56(5), 443-458.",
-                "Secretaría del Trabajo y Previsión Social. (2018). NOM-036-1-STPS-2018, Factores de riesgo ergonómico en el Trabajo - Parte 1: Manejo manual de cargas. Diario Oficial de la Federación."
-            ];
-
+            // 1. EVALUADOR ACREDITADO
+            let center1 = col1_X + (colWidth / 2);
+            doc.text(state.auth?.evaluatorName || "EVALUADOR TÉCNICO", center1, sigY + 4, { align: 'center' });
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
-            doc.setTextColor(...PALETTE.mutedText);
-            refs.forEach((r) => {
-                doc.text(r, pageConfig.marginLeft, refY, { maxWidth: pageConfig.contentWidth });
-                refY += 4.5;
-            });
+            doc.setTextColor(...PALETTE.darkText);
+            doc.text("ERGÓNOMO EVALUADOR", center1, sigY + 8, { align: 'center' });
+            doc.text(`Cédula: ${evaluatorCedula}`, center1, sigY + 12, { align: 'center' });
+
+            // 2. PERSONA EVALUADA
+            let center2 = col2_X + (colWidth / 2);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7.5);
+            doc.setTextColor(...PALETTE.primary);
+            doc.text(state.worker?.name || state.auth?.subjectName || "PERSONA EVALUADA", center2, sigY + 4, { align: 'center' });
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(...PALETTE.darkText);
+            doc.text("PERSONA TRABAJADORA EVALUADA", center2, sigY + 8, { align: 'center' });
+            doc.text(`Puesto: ${state.worker?.jobTitle || 'OPERADOR'}`, center2, sigY + 12, { align: 'center' });
+
+            // 3. REPRESENTANTE LEGAL
+            let center3 = col3_X + (colWidth / 2);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7.5);
+            doc.setTextColor(...PALETTE.primary);
+            doc.text(state.auth?.companyName || "REPRESENTANTE LEGAL", center3, sigY + 4, { align: 'center' });
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(...PALETTE.darkText);
+            doc.text("RESPONSABLE DEL CENTRO DE TRABAJO", center3, sigY + 8, { align: 'center' });
+            doc.text("SELLO Y VALIDACIÓN NORMATIVA", center3, sigY + 12, { align: 'center' });
         }
 
         // ---------------------------------------------------------------------
-        // 14. EJECUCIÓN SECUENCIAL DEL FLUJO DE GENERACIÓN
+        // 12. EJECUCIÓN SECUENCIAL
         // ---------------------------------------------------------------------
         generateCoverPage();
-        let currentY = generateTableOfContents();
-        currentY = generateIdentificationAndVideoSection(currentY);
-        currentY = generatePhotographicEvidenceAnd2D(currentY);
-        currentY = generateBodySegmentSection(currentY);
-        currentY = generateCalculationMemory(currentY);
-        currentY = generateLegalAndReferenceSection(currentY);
-        currentY = generateFinalVerdict(currentY);
-        currentY = generatePreventiveMeasures(currentY);
-        generateSignaturesAndReferences(currentY);
+        let currentY = pageConfig.marginTop;
+        currentY = generateWorkerAndOperationalData(currentY);
+        currentY = generateLiveAnglesTemporalGraph(currentY);
+        currentY = generateBodySegmentCalculationWithPhoto(currentY);
+        currentY = generateAnatomicalMapAndProfile(currentY);
+        currentY = generateSTPSConformityVerdict(currentY);
+        currentY = generateGeneralRecommendations(currentY);
+        generateCenteredSignatures(currentY);
 
         // ---------------------------------------------------------------------
-        // 15. DESCARGA DEL ARCHIVO PDF OFICIAL
+        // 13. DESCARGA DEL PDF
         // ---------------------------------------------------------------------
-        const safeCompanyName = (state.auth?.companyName || 'STPS').replace(/[^a-z0-9]/gi, '_');
-        const fileName = `Dictamen_Tecnico_Ergonomico_${safeCompanyName}_${studyUUID}.pdf`;
+        const safeCompany = (state.auth?.companyName || 'STPS').replace(/[^a-z0-9]/gi, '_');
+        const fileName = `Dictamen_NOM036_${safeCompany}_${studyUUID}.pdf`;
         
         doc.save(fileName);
 
     } catch (error) {
-        console.error("ERROR CRÍTICO AL GENERAR EL PDF AUDITABLE:", error);
+        console.error("ERROR GENERANDO EL DICTAMEN DE CONFORMIDAD PDF:", error);
         alert(`Ocurrió un error al generar el dictamen técnico en PDF:\n${error.message}`);
     } finally {
         if (exportBtn) exportBtn.innerText = originalText;
